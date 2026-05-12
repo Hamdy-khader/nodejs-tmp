@@ -114,6 +114,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -133,6 +134,7 @@ function RootComponent() {
             </main>
           </div>
         </div>
+        <Toaster richColors position="top-right" />
       </SidebarProvider>
     </QueryClientProvider>
   );
