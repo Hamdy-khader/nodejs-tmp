@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   patientsStore, usePatient, usePlan, defaultTeeth,
-  STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus,
+  STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
 import { TeethChart } from "@/components/TeethChart";
@@ -355,7 +355,7 @@ function JawGrid({
   numbers, plan, selected, onSelect,
 }: {
   numbers: number[];
-  plan: ReturnType<typeof usePlan> & object;
+  plan: TreatmentPlan;
   selected: number | null;
   onSelect: (n: number) => void;
 }) {
