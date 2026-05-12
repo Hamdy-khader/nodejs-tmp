@@ -125,8 +125,7 @@ function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
         <path
           d={shape.crown}
           fill={indicatorFill}
-          opacity={0.55}
-          style={{ clipPath: "inset(0 0 55% 0)" }}
+          style={{ clipPath: "inset(0 0 35% 0)" }}
         />
       )}
 
