@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   User,
   Users,
+  UserPlus,
   Tag,
   LayoutTemplate,
   Settings,
@@ -25,6 +26,7 @@ import {
 
 const items = [
   { title: "Account", url: "/", icon: User },
+  { title: "Patients", url: "/patients", icon: UserPlus },
   { title: "Users", url: "/users", icon: Users },
   { title: "Price list", url: "/price-list", icon: Tag },
   { title: "Templates", url: "/templates", icon: LayoutTemplate },

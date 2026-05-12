@@ -16,6 +16,7 @@ import {
   Bell,
   Search,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 const steps = [
   { n: 1, title: "Synopsis", state: "done" as const },
@@ -23,12 +24,12 @@ const steps = [
   { n: 3, title: "Watch the Tutorials", state: "todo" as const },
 ];
 
-const tiles = [
-  { title: "New Patient", icon: UserPlus, primary: true },
-  { title: "All Patients", icon: UsersIcon },
-  { title: "Your Clinic Fees", icon: Wallet },
-  { title: "Help Center", icon: HelpCircle },
-  { title: "Live Support", icon: MessageCircle },
+const tiles: { title: string; icon: typeof UserPlus; primary?: boolean; to: string }[] = [
+  { title: "New Patient", icon: UserPlus, primary: true, to: "/patients" },
+  { title: "All Patients", icon: UsersIcon, to: "/patients" },
+  { title: "Your Clinic Fees", icon: Wallet, to: "/" },
+  { title: "Help Center", icon: HelpCircle, to: "/" },
+  { title: "Live Support", icon: MessageCircle, to: "/" },
 ];
 
 const utilities = [
@@ -185,7 +186,8 @@ export function Dashboard() {
               {tiles.map((t) => {
                 const Icon = t.icon;
                 return (
-                  <button
+                  <Link
+                    to={t.to}
                     key={t.title}
                     className={`group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-2xl p-4 text-center transition-all duration-300 hover:-translate-y-0.5 ${
                       t.primary
@@ -206,7 +208,7 @@ export function Dashboard() {
                         +
                       </span>
                     )}
-                  </button>
+                  </Link>
                 );
               })}
             </div>
