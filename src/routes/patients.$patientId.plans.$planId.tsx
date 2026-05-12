@@ -124,7 +124,7 @@ function PlanPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-5 lg:grid-cols-[1fr_300px]">
+      <div className="mx-auto grid w-full max-w-[1600px] min-w-0 grid-cols-1 gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main column */}
         <div className="space-y-5">
           {/* Plan header (back + name) */}
