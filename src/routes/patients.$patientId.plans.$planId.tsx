@@ -198,7 +198,7 @@ function PlanPage() {
                       {canSelectStatus ? `Tooth ${selected}` : "Pick a tooth"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     {STATUS_OPTIONS.map((opt) => {
                       const isToothStatus = opt.value !== "general" && opt.value !== "other";
                       const active = canSelectStatus && isToothStatus && selectedTooth?.status === opt.value;
@@ -209,22 +209,19 @@ function PlanPage() {
                           disabled={disabled}
                           onClick={() => isToothStatus && setStatus(opt.value as ToothStatus)}
                           className={cn(
-                            "group flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-xs font-medium transition-all",
+                            "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
                             active
                               ? "bg-primary text-primary-foreground shadow-sm"
                               : disabled
-                              ? "cursor-not-allowed bg-muted text-muted-foreground/70"
-                              : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-foreground",
+                              ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
+                              : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
                           )}
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            {isToothStatus && (
+                            {isToothStatus && !disabled && (
                               <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1"
-                                style={{
-                                  background: STATUS_META[opt.value as ToothStatus].color,
-                                  boxShadow: `inset 0 0 0 1px ${STATUS_META[opt.value as ToothStatus].ring}`,
-                                }}
+                                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
+                                style={{ background: STATUS_META[opt.value as ToothStatus].color }}
                               />
                             )}
                             <span className="truncate">{opt.label}</span>
@@ -232,7 +229,7 @@ function PlanPage() {
                           {active ? (
                             <Check className="h-3.5 w-3.5 shrink-0" />
                           ) : (
-                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
                           )}
                         </button>
                       );
@@ -252,26 +249,10 @@ function PlanPage() {
                 open={open.general}
                 onToggle={() => setOpen((o) => ({ ...o, general: !o.general }))}
               >
-                <div className="flex items-stretch gap-2">
-                  <Textarea
-                    rows={2}
-                    defaultValue={plan.notes}
-                    onBlur={(e) => {
-                      if (e.target.value !== plan.notes) {
-                        patientsStore.updatePlan(plan.id, { notes: e.target.value });
-                      }
-                    }}
-                    placeholder="General observations, follow-ups, recommendations…"
-                    className="flex-1 bg-muted/40"
-                  />
-                  <button
-                    type="button"
-                    className="grid w-12 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                    aria-label="Add note"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
-                </div>
+                <NoteRow
+                  value={plan.notes}
+                  onChange={(v) => patientsStore.updatePlan(plan.id, { notes: v })}
+                />
               </Section>
 
               {/* Upper jaw */}
@@ -426,29 +407,29 @@ function JawGrid({
                 key={n}
                 onClick={() => onSelect(n)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-md bg-muted/40 px-3 py-2 text-left text-sm transition-all",
-                  isSel
-                    ? "ring-1 ring-primary"
-                    : "hover:bg-muted",
+                  "flex w-full items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5 text-left text-sm transition-all",
+                  isSel ? "ring-1 ring-primary bg-primary/5" : "hover:bg-muted",
                 )}
               >
                 <span className={cn(
-                  "min-w-[28px] text-sm font-semibold tabular-nums",
-                  isSel ? "text-primary" : "text-foreground/80",
+                  "min-w-[26px] text-sm font-semibold tabular-nums",
+                  isSel ? "text-primary" : "text-foreground/70",
                 )}>
                   {n}
                 </span>
-                {set ? (
-                  <span className="flex flex-1 items-center gap-2 text-xs font-medium">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: STATUS_META[status].color }}
-                    />
-                    {STATUS_META[status].label}
-                  </span>
-                ) : (
-                  <span className="flex-1 text-xs text-muted-foreground">—</span>
-                )}
+                <span className="flex flex-1 items-center gap-2">
+                  {set && (
+                    <>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: STATUS_META[status].color }}
+                      />
+                      <span className="text-xs font-medium text-foreground/80">
+                        {STATUS_META[status].label}
+                      </span>
+                    </>
+                  )}
+                </span>
                 <Plus className={cn(
                   "h-4 w-4 shrink-0",
                   isSel ? "text-primary" : "text-muted-foreground",
@@ -498,6 +479,42 @@ function RailButton({
     >
       <span className={cn(disabled ? "opacity-50" : "")}>{icon}</span>
       {label}
+    </button>
+  );
+}
+
+function NoteRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  if (editing) {
+    return (
+      <div className="flex items-stretch gap-2">
+        <Textarea
+          autoFocus
+          rows={2}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            if (draft !== value) onChange(draft);
+            setEditing(false);
+          }}
+          placeholder="Add a general note…"
+          className="flex-1 bg-muted/40"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="flex h-12 w-full items-center justify-between rounded-md bg-muted/50 px-4 text-left text-sm text-muted-foreground transition-colors hover:bg-muted"
+    >
+      <span className="truncate">{value || ""}</span>
+      <Plus className="h-5 w-5 shrink-0 text-muted-foreground" />
     </button>
   );
 }
