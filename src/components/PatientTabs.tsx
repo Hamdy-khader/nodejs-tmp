@@ -1,14 +1,16 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { X, Sparkle, FileText } from "lucide-react";
 import { useTabs, tabsStore } from "@/lib/tabs-store";
+import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
 
 export function PatientTabs() {
   const tabs = useTabs();
+  const hydrated = useHydrated();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
-  if (tabs.length === 0) return null;
+  if (!hydrated || tabs.length === 0) return null;
 
   return (
     <div className="flex items-end gap-1 overflow-x-auto bg-[image:var(--gradient-hero)] px-3 pt-2">
