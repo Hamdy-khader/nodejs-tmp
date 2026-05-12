@@ -108,7 +108,7 @@ function PlanPage() {
                 key={s.id}
                 onClick={() => setStep(s.id)}
                 className={cn(
-                  "relative flex flex-1 min-w-[140px] items-center justify-center gap-2 px-6 py-4 text-sm font-semibold uppercase tracking-wide transition-all",
+                  "relative flex flex-1 min-w-0 items-center justify-center gap-2 px-3 py-3 text-[11px] font-semibold uppercase tracking-wide transition-all sm:px-5 sm:py-4 sm:text-sm",
                   active
                     ? "bg-[oklch(0.96_0.12_95)] text-foreground"
                     : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
