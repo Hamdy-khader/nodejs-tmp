@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/patients/$patientId")({
+export const Route = createFileRoute("/patients/$patientId/")({
   component: PatientPage,
   notFoundComponent: () => <div className="p-8">Patient not found</div>,
 });
