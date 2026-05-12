@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Pencil, Plus, Trash2, Calendar, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { patientsStore, usePatient, usePlansFor } from "@/lib/patients-store";
+import { tabsStore } from "@/lib/tabs-store";
 import { PatientFormDialog } from "@/components/PatientFormDialog";
 import {
   AlertDialog,

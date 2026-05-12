@@ -115,6 +115,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { PatientTabs } from "@/components/PatientTabs";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -129,6 +130,7 @@ function RootComponent() {
               <SidebarTrigger />
               <span className="text-sm font-semibold">BrightPlans</span>
             </header>
+            <PatientTabs />
             <main className="flex-1">
               <Outlet />
             </main>
