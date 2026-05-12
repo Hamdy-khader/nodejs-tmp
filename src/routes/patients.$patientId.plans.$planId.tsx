@@ -97,10 +97,10 @@ function PlanPage() {
     .filter((x) => x.count > 0);
 
   return (
-    <div className="flex w-full flex-col bg-muted/30">
+    <div className="flex w-full min-w-0 flex-col overflow-x-hidden bg-muted/30">
       {/* Wizard steps */}
       <div className="border-b border-border/60 bg-card">
-        <div className="mx-auto flex max-w-[1600px] items-stretch overflow-x-auto">
+        <div className="mx-auto flex max-w-[1600px] items-stretch">
           {STEPS.map((s, i) => {
             const active = step === s.id;
             return (
@@ -108,7 +108,7 @@ function PlanPage() {
                 key={s.id}
                 onClick={() => setStep(s.id)}
                 className={cn(
-                  "relative flex flex-1 min-w-[140px] items-center justify-center gap-2 px-6 py-4 text-sm font-semibold uppercase tracking-wide transition-all",
+                  "relative flex flex-1 min-w-0 items-center justify-center gap-2 px-3 py-3 text-[11px] font-semibold uppercase tracking-wide transition-all sm:px-5 sm:py-4 sm:text-sm",
                   active
                     ? "bg-[oklch(0.96_0.12_95)] text-foreground"
                     : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
@@ -124,7 +124,7 @@ function PlanPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-5 lg:grid-cols-[1fr_300px]">
+      <div className="mx-auto grid w-full max-w-[1600px] min-w-0 grid-cols-1 gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main column */}
         <div className="space-y-5">
           {/* Plan header (back + name) */}
@@ -170,7 +170,7 @@ function PlanPage() {
           ) : (
             <>
               {/* Teeth chart + status grid (no heavy card chrome) */}
-              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[1fr_420px]">
+              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div>
                   <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
                   <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
