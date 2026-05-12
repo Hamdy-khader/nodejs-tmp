@@ -482,3 +482,39 @@ function RailButton({
     </button>
   );
 }
+
+function NoteRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  if (editing) {
+    return (
+      <div className="flex items-stretch gap-2">
+        <Textarea
+          autoFocus
+          rows={2}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            if (draft !== value) onChange(draft);
+            setEditing(false);
+          }}
+          placeholder="Add a general note…"
+          className="flex-1 bg-muted/40"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="flex h-12 w-full items-center justify-between rounded-md bg-muted/50 px-4 text-left text-sm text-muted-foreground transition-colors hover:bg-muted"
+    >
+      <span className="truncate">{value || ""}</span>
+      <Plus className="h-5 w-5 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
