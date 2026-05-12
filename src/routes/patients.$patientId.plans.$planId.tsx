@@ -97,7 +97,7 @@ function PlanPage() {
     .filter((x) => x.count > 0);
 
   return (
-    <div className="flex w-full flex-col bg-muted/30">
+    <div className="flex w-full min-w-0 flex-col overflow-x-hidden bg-muted/30">
       {/* Wizard steps */}
       <div className="border-b border-border/60 bg-card">
         <div className="mx-auto flex max-w-[1600px] items-stretch">
