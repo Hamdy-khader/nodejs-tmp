@@ -136,11 +136,28 @@ export function usePatient(id: string | undefined) {
   );
 }
 
+const plansForCache = new WeakMap<TreatmentPlan[], Map<string, TreatmentPlan[]>>();
+function getPlansFor(patientId: string | undefined): TreatmentPlan[] {
+  if (!patientId) return EMPTY_PLANS;
+  let bucket = plansForCache.get(state.plans);
+  if (!bucket) {
+    bucket = new Map();
+    plansForCache.set(state.plans, bucket);
+  }
+  let result = bucket.get(patientId);
+  if (!result) {
+    result = state.plans.filter((p) => p.patientId === patientId);
+    bucket.set(patientId, result);
+  }
+  return result;
+}
+const EMPTY_PLANS: TreatmentPlan[] = [];
+
 export function usePlansFor(patientId: string | undefined) {
   return useSyncExternalStore(
     subscribe,
-    () => state.plans.filter((p) => p.patientId === patientId),
-    () => state.plans.filter((p) => p.patientId === patientId),
+    () => getPlansFor(patientId),
+    () => getPlansFor(patientId),
   );
 }
 
