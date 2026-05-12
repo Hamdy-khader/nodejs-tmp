@@ -407,29 +407,29 @@ function JawGrid({
                 key={n}
                 onClick={() => onSelect(n)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-md bg-muted/40 px-3 py-2 text-left text-sm transition-all",
-                  isSel
-                    ? "ring-1 ring-primary"
-                    : "hover:bg-muted",
+                  "flex w-full items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5 text-left text-sm transition-all",
+                  isSel ? "ring-1 ring-primary bg-primary/5" : "hover:bg-muted",
                 )}
               >
                 <span className={cn(
-                  "min-w-[28px] text-sm font-semibold tabular-nums",
-                  isSel ? "text-primary" : "text-foreground/80",
+                  "min-w-[26px] text-sm font-semibold tabular-nums",
+                  isSel ? "text-primary" : "text-foreground/70",
                 )}>
                   {n}
                 </span>
-                {set ? (
-                  <span className="flex flex-1 items-center gap-2 text-xs font-medium">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ background: STATUS_META[status].color }}
-                    />
-                    {STATUS_META[status].label}
-                  </span>
-                ) : (
-                  <span className="flex-1 text-xs text-muted-foreground">—</span>
-                )}
+                <span className="flex flex-1 items-center gap-2">
+                  {set && (
+                    <>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: STATUS_META[status].color }}
+                      />
+                      <span className="text-xs font-medium text-foreground/80">
+                        {STATUS_META[status].label}
+                      </span>
+                    </>
+                  )}
+                </span>
                 <Plus className={cn(
                   "h-4 w-4 shrink-0",
                   isSel ? "text-primary" : "text-muted-foreground",
