@@ -96,24 +96,30 @@ function PatientsList() {
                 key={p.id}
                 className="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-primary-soft/40 sm:px-6"
               >
-                <Link
-                  to="/patients/$patientId"
-                  params={{ patientId: p.id }}
-                  className="flex flex-1 items-center gap-4"
-                >
-                  <div className="grid h-10 w-10 place-items-center rounded-full bg-[image:var(--gradient-hero)] text-sm font-semibold text-primary-foreground">
-                    {initials(p.name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{p.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {p.email || p.phone || "—"}
-                    </p>
-                  </div>
-                  <span className="hidden text-xs text-muted-foreground sm:block">
-                    {p.currency} · {p.language.toUpperCase()}
-                  </span>
-                </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  const plan = patientsStore.ensurePlanFor(p.id);
+                  navigate({
+                    to: "/patients/$patientId/plans/$planId",
+                    params: { patientId: p.id, planId: plan.id },
+                  });
+                }}
+                className="flex flex-1 items-center gap-4 text-left"
+              >
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-[image:var(--gradient-hero)] text-sm font-semibold text-primary-foreground">
+                  {initials(p.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{p.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {p.email || p.phone || "—"}
+                  </p>
+                </div>
+                <span className="hidden text-xs text-muted-foreground sm:block">
+                  {p.currency} · {p.language.toUpperCase()}
+                </span>
+              </button>
                 <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     size="icon"
