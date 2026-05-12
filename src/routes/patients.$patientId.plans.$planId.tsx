@@ -198,7 +198,7 @@ function PlanPage() {
                       {canSelectStatus ? `Tooth ${selected}` : "Pick a tooth"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     {STATUS_OPTIONS.map((opt) => {
                       const isToothStatus = opt.value !== "general" && opt.value !== "other";
                       const active = canSelectStatus && isToothStatus && selectedTooth?.status === opt.value;
@@ -209,22 +209,19 @@ function PlanPage() {
                           disabled={disabled}
                           onClick={() => isToothStatus && setStatus(opt.value as ToothStatus)}
                           className={cn(
-                            "group flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-xs font-medium transition-all",
+                            "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
                             active
                               ? "bg-primary text-primary-foreground shadow-sm"
                               : disabled
-                              ? "cursor-not-allowed bg-muted text-muted-foreground/70"
-                              : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-foreground",
+                              ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
+                              : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
                           )}
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            {isToothStatus && (
+                            {isToothStatus && !disabled && (
                               <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1"
-                                style={{
-                                  background: STATUS_META[opt.value as ToothStatus].color,
-                                  boxShadow: `inset 0 0 0 1px ${STATUS_META[opt.value as ToothStatus].ring}`,
-                                }}
+                                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
+                                style={{ background: STATUS_META[opt.value as ToothStatus].color }}
                               />
                             )}
                             <span className="truncate">{opt.label}</span>
@@ -232,7 +229,7 @@ function PlanPage() {
                           {active ? (
                             <Check className="h-3.5 w-3.5 shrink-0" />
                           ) : (
-                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
                           )}
                         </button>
                       );
