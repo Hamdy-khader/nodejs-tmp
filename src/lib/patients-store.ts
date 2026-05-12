@@ -58,11 +58,47 @@ export function defaultTeeth(): Record<number, ToothState> {
   return out;
 }
 
+function seedDemo(): StoreData {
+  const now = Date.now();
+  const mk = (over: Partial<Patient>): Patient => ({
+    id: Math.random().toString(36).slice(2, 10) + now.toString(36),
+    name: "",
+    language: "en",
+    currency: "USD",
+    createdAt: now,
+    ...over,
+  });
+  const patients: Patient[] = [
+    mk({ name: "Sarah Al-Hamadi", email: "sarah.h@example.com", phone: "+971 50 123 4567", dateOfBirth: "1990-04-12", language: "ar", currency: "AED" }),
+    mk({ name: "Omar Khaled", email: "omar.k@example.com", phone: "+962 79 555 0199", dateOfBirth: "1985-11-03", language: "ar", currency: "USD" }),
+    mk({ name: "Lina Haddad", email: "lina@example.com", phone: "+961 71 222 333", dateOfBirth: "1998-02-21", language: "en", currency: "EUR" }),
+    mk({ name: "John Smith", email: "john.smith@example.com", phone: "+1 415 555 0142", dateOfBirth: "1979-08-30", language: "en", currency: "USD" }),
+    mk({ name: "Fatima Noor", phone: "+966 55 444 8821", dateOfBirth: "2002-06-17", language: "ar", currency: "SAR" }),
+  ];
+  const buildTeeth = (overrides: Partial<Record<number, ToothStatus>>) => {
+    const t = defaultTeeth();
+    for (const [k, v] of Object.entries(overrides)) t[+k] = { number: +k, status: v as ToothStatus };
+    return t;
+  };
+  const plans: TreatmentPlan[] = [
+    { id: "p1" + now.toString(36), patientId: patients[0].id, name: "Initial assessment", notes: "Routine checkup with two cavities found.", teeth: buildTeeth({ 16: "caries", 26: "filled", 36: "caries", 46: "crown" }), createdAt: now, updatedAt: now },
+    { id: "p2" + now.toString(36), patientId: patients[0].id, name: "Crown replacement", notes: "Plan to replace old crown on 46.", teeth: buildTeeth({ 46: "crown", 47: "filled" }), createdAt: now - 86400000, updatedAt: now - 86400000 },
+    { id: "p3" + now.toString(36), patientId: patients[1].id, name: "Implant evaluation", notes: "Missing 36, candidate for implant.", teeth: buildTeeth({ 36: "missing", 37: "intact", 16: "root-treated" }), createdAt: now, updatedAt: now },
+    { id: "p4" + now.toString(36), patientId: patients[2].id, name: "Orthodontic baseline", notes: "Pre-ortho mapping.", teeth: buildTeeth({ 11: "intact", 21: "intact", 36: "filled" }), createdAt: now, updatedAt: now },
+    { id: "p5" + now.toString(36), patientId: patients[3].id, name: "Bridge planning", notes: "Bridge between 24-26.", teeth: buildTeeth({ 24: "bridge", 25: "missing", 26: "bridge" }), createdAt: now, updatedAt: now },
+  ];
+  return { patients, plans };
+}
+
 function load(): StoreData {
   if (typeof window === "undefined") return { patients: [], plans: [] };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { patients: [], plans: [] };
+    if (!raw) {
+      const seeded = seedDemo();
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+      return seeded;
+    }
     return JSON.parse(raw) as StoreData;
   } catch {
     return { patients: [], plans: [] };
