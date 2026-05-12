@@ -1,28 +1,22 @@
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, Save, Trash2, RotateCcw, Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft, Save, Trash2, RotateCcw, Pencil, Undo2, Redo2,
+  Globe, DollarSign, ScanLine, Pin, Check, Stethoscope, ClipboardList, Play, FileText, Eye, Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  patientsStore,
-  usePatient,
-  usePlan,
-  defaultTeeth,
-  STATUS_META,
-  type ToothStatus,
+  patientsStore, usePatient, usePlan, defaultTeeth,
+  STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus,
 } from "@/lib/patients-store";
+import { tabsStore } from "@/lib/tabs-store";
 import { TeethChart } from "@/components/TeethChart";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -32,15 +26,25 @@ export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   notFoundComponent: () => <div className="p-8">Plan not found</div>,
 });
 
-const STATUSES: ToothStatus[] = [
-  "intact",
-  "missing",
-  "caries",
-  "filled",
-  "crown",
-  "root-treated",
-  "implant",
-  "bridge",
+const STEPS = [
+  { id: "diagnosis", label: "Diagnosis", icon: Stethoscope },
+  { id: "treatments", label: "Treatments", icon: ClipboardList },
+  { id: "animation", label: "Animation", icon: Play },
+  { id: "documents", label: "Documents", icon: FileText },
+  { id: "overview", label: "Overview", icon: Eye },
+] as const;
+
+const STATUS_OPTIONS: { value: ToothStatus | "general" | "other"; label: string }[] = [
+  { value: "missing", label: "Missing" },
+  { value: "intact", label: "Intact" },
+  { value: "filled", label: "Filled (amalgam)" },
+  { value: "caries", label: "Caries" },
+  { value: "root-treated", label: "Root treated" },
+  { value: "implant", label: "Implant + abutment" },
+  { value: "crown", label: "Crown" },
+  { value: "bridge", label: "Bridge" },
+  { value: "general", label: "General" },
+  { value: "other", label: "Other..." },
 ];
 
 function PlanPage() {
@@ -48,11 +52,24 @@ function PlanPage() {
   const patient = usePatient(patientId);
   const plan = usePlan(planId);
   const navigate = useNavigate();
+  const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");
   const [selected, setSelected] = useState<number | null>(null);
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState(plan?.name ?? "");
   const [resetOpen, setResetOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  const [pinned, setPinned] = useState(true);
+
+  useEffect(() => {
+    if (patient && plan) {
+      tabsStore.open({
+        patientId: patient.id,
+        name: patient.name,
+        planId: plan.id,
+        planName: plan.name,
+      });
+    }
+  }, [patient?.id, patient?.name, plan?.id, plan?.name]);
 
   if (!patient || !plan) {
     return (
@@ -64,171 +81,223 @@ function PlanPage() {
   }
 
   const selectedTooth = selected != null ? plan.teeth[selected] : null;
+  const canSelectStatus = selectedTooth != null;
+
+  const setStatus = (s: ToothStatus) => {
+    if (!selectedTooth) return;
+    patientsStore.setTooth(plan.id, { ...selectedTooth, status: s });
+  };
+
+  const summary = (Object.keys(STATUS_META) as ToothStatus[])
+    .filter((s) => s !== "intact")
+    .map((s) => ({ s, count: Object.values(plan.teeth).filter((t) => t.status === s).length }))
+    .filter((x) => x.count > 0);
 
   return (
-    <div className="mx-auto w-full max-w-7xl p-4 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          to="/patients/$patientId"
-          params={{ patientId }}
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> {patient.name}
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setResetOpen(true)}>
-            <RotateCcw className="h-4 w-4" /> Reset
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setDelOpen(true)}
-          >
-            <Trash2 className="h-4 w-4" /> Delete plan
-          </Button>
+    <div className="flex w-full flex-col bg-muted/30">
+      {/* Wizard steps */}
+      <div className="border-b border-border/60 bg-card">
+        <div className="mx-auto flex max-w-[1600px] items-stretch overflow-x-auto">
+          {STEPS.map((s, i) => {
+            const active = step === s.id;
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setStep(s.id)}
+                className={cn(
+                  "relative flex flex-1 min-w-[160px] items-center justify-center gap-2 px-4 py-4 text-sm font-semibold transition-colors",
+                  active
+                    ? "bg-accent/15 text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {s.label}
+                {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />}
+                {i < STEPS.length - 1 && (
+                  <span className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-1/2 text-border md:block">
+                    ›
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        {editName ? (
-          <div className="flex flex-1 items-center gap-2">
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-md text-lg font-semibold" />
-            <Button
-              size="sm"
-              onClick={() => {
-                if (name.trim()) {
-                  patientsStore.updatePlan(plan.id, { name: name.trim() });
-                  toast.success("Plan renamed");
-                }
-                setEditName(false);
-              }}
+      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-5 lg:grid-cols-[1fr_280px]">
+        {/* Main column */}
+        <div className="space-y-4">
+          {/* Plan header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-[var(--shadow-soft)]">
+            <Link
+              to="/patients/$patientId"
+              params={{ patientId }}
+              className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              <Save className="h-4 w-4" /> Save
-            </Button>
-          </div>
-        ) : (
-          <>
-            <h1 className="text-2xl font-bold tracking-tight">{plan.name}</h1>
-            <Button size="icon" variant="ghost" onClick={() => { setName(plan.name); setEditName(true); }}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-          </>
-        )}
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
-          <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
-
-          <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Legend</h3>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {STATUSES.map((s) => (
-                <div key={s} className="flex items-center gap-2 rounded-lg bg-muted/50 px-2 py-1.5">
-                  <span
-                    className="h-3 w-3 rounded-full ring-1"
-                    style={{ background: STATUS_META[s].color, boxShadow: `inset 0 0 0 1px ${STATUS_META[s].ring}` }}
-                  />
-                  <span className="text-xs">{STATUS_META[s].label}</span>
-                </div>
-              ))}
+              <ArrowLeft className="h-4 w-4" /> {patient.name}
+            </Link>
+            <div className="flex items-center gap-2">
+              {editName ? (
+                <>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 max-w-xs text-sm" />
+                  <Button size="sm" onClick={() => {
+                    if (name.trim()) {
+                      patientsStore.updatePlan(plan.id, { name: name.trim() });
+                      toast.success("Renamed");
+                    }
+                    setEditName(false);
+                  }}>
+                    <Save className="h-4 w-4" /> Save
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-base font-bold tracking-tight">{plan.name}</h1>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setName(plan.name); setEditName(true); }}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
-            <Label htmlFor="notes">Plan notes</Label>
-            <Textarea
-              id="notes"
-              rows={4}
-              defaultValue={plan.notes}
-              onBlur={(e) => {
-                if (e.target.value !== plan.notes) {
-                  patientsStore.updatePlan(plan.id, { notes: e.target.value });
-                }
-              }}
-              placeholder="General observations, follow-ups, recommendations…"
-            />
-          </div>
-        </div>
+          {step !== "diagnosis" ? (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-card p-12 text-center shadow-[var(--shadow-soft)]">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{STEPS.find((s) => s.id === step)?.label}</span> step coming soon.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Teeth chart + status grid */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+                <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+                  <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
+                  <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Pin className={cn("h-3 w-3", pinned ? "text-accent" : "")} />
+                    <button onClick={() => setPinned((p) => !p)}>{pinned ? "Pinned chart" : "Unpinned"}</button>
+                  </div>
+                </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Tooth {selected ?? "—"}
-            </h3>
-            {selectedTooth ? (
-              <>
-                <div className="mt-3 space-y-1.5">
-                  <Label className="text-xs">Status</Label>
+                <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Tooth status
+                    </h3>
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                      canSelectStatus ? "bg-accent/20 text-accent-foreground" : "bg-muted text-muted-foreground",
+                    )}>
+                      {canSelectStatus ? `Tooth ${selected}` : "Pick a tooth"}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {STATUSES.map((s) => {
-                      const active = selectedTooth.status === s;
+                    {STATUS_OPTIONS.map((opt) => {
+                      const isToothStatus = opt.value !== "general" && opt.value !== "other";
+                      const active = canSelectStatus && isToothStatus && selectedTooth?.status === opt.value;
+                      const disabled = !canSelectStatus || !isToothStatus;
                       return (
                         <button
-                          key={s}
-                          onClick={() => patientsStore.setTooth(plan.id, { ...selectedTooth, status: s })}
+                          key={opt.value}
+                          disabled={disabled}
+                          onClick={() => isToothStatus && setStatus(opt.value as ToothStatus)}
                           className={cn(
-                            "rounded-lg border px-2 py-1.5 text-left text-xs font-medium transition-colors",
+                            "group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-medium transition-all",
                             active
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-card hover:bg-muted",
+                              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                              : disabled
+                              ? "cursor-not-allowed border-border/50 bg-muted/40 text-muted-foreground/60"
+                              : "border-border bg-card hover:border-primary/40 hover:bg-primary/5",
                           )}
                         >
-                          <span
-                            className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
-                            style={{ background: STATUS_META[s].color }}
-                          />
-                          {STATUS_META[s].label}
+                          {isToothStatus && (
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full ring-1"
+                              style={{
+                                background: STATUS_META[opt.value as ToothStatus].color,
+                                boxShadow: `inset 0 0 0 1px ${STATUS_META[opt.value as ToothStatus].ring}`,
+                              }}
+                            />
+                          )}
+                          <span className="truncate">{opt.label}</span>
+                          {active && <Check className="ml-auto h-3.5 w-3.5" />}
                         </button>
                       );
                     })}
                   </div>
+                  {!canSelectStatus && (
+                    <p className="mt-2 text-[11px] italic text-muted-foreground">
+                      Click a tooth on the chart to enable selection.
+                    </p>
+                  )}
                 </div>
-                <div className="mt-4 space-y-1.5">
-                  <Label htmlFor="toothNote" className="text-xs">Note</Label>
-                  <Textarea
-                    id="toothNote"
-                    key={selected}
-                    rows={3}
-                    defaultValue={selectedTooth.note ?? ""}
-                    onBlur={(e) =>
-                      patientsStore.setTooth(plan.id, { ...selectedTooth, note: e.target.value || undefined })
+              </div>
+
+              {/* General notes */}
+              <Section title="General">
+                <Textarea
+                  rows={2}
+                  defaultValue={plan.notes}
+                  onBlur={(e) => {
+                    if (e.target.value !== plan.notes) {
+                      patientsStore.updatePlan(plan.id, { notes: e.target.value });
                     }
-                    placeholder="Tooth-specific note"
-                  />
-                </div>
-              </>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Select a tooth on the chart to edit its status.
-              </p>
-            )}
+                  }}
+                  placeholder="General observations, follow-ups, recommendations…"
+                />
+              </Section>
+
+              {/* Upper jaw */}
+              <Section title="Upper jaw">
+                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+              </Section>
+
+              {/* Lower jaw */}
+              <Section title="Lower jaw">
+                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+              </Section>
+            </>
+          )}
+        </div>
+
+        {/* Right rail */}
+        <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+          <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+            <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
+            <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
+            <div className="my-2 h-px bg-border" />
+            <RailButton icon={<Undo2 className="h-4 w-4" />} label="Undo" disabled />
+            <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
+            <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
+            <div className="my-2 h-px bg-border" />
+            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" />
+            <RailButton
+              icon={<Trash2 className="h-4 w-4" />}
+              label="Delete plan"
+              onClick={() => setDelOpen(true)}
+              danger
+            />
           </div>
 
-          <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Summary</h3>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {STATUSES.filter((s) => s !== "intact").map((s) => {
-                const count = Object.values(plan.teeth).filter((t) => t.status === s).length;
-                if (!count) return null;
-                return (
+          <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis</h3>
+            {summary.length === 0 ? (
+              <p className="mt-2 text-xs italic text-muted-foreground">First select a status.</p>
+            ) : (
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {summary.map(({ s, count }) => (
                   <li key={s} className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ background: STATUS_META[s].color }}
-                      />
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_META[s].color }} />
                       {STATUS_META[s].label}
                     </span>
                     <span className="font-semibold tabular-nums">{count}</span>
                   </li>
-                );
-              })}
-              {Object.values(plan.teeth).every((t) => t.status === "intact") && (
-                <li className="text-xs text-muted-foreground">All teeth intact.</li>
-              )}
-            </ul>
+                ))}
+              </ul>
+            )}
           </div>
         </aside>
       </div>
@@ -241,15 +310,11 @@ function PlanPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                patientsStore.updatePlan(plan.id, { teeth: defaultTeeth() });
-                toast.success("Teeth reset");
-                setResetOpen(false);
-              }}
-            >
-              Reset
-            </AlertDialogAction>
+            <AlertDialogAction onClick={() => {
+              patientsStore.updatePlan(plan.id, { teeth: defaultTeeth() });
+              toast.success("Teeth reset");
+              setResetOpen(false);
+            }}>Reset</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -269,12 +334,116 @@ function PlanPage() {
                 toast.success("Plan deleted");
                 navigate({ to: "/patients/$patientId", params: { patientId } });
               }}
-            >
-              Delete
-            </AlertDialogAction>
+            >Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
+      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-primary">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function JawGrid({
+  numbers, plan, selected, onSelect,
+}: {
+  numbers: number[];
+  plan: ReturnType<typeof usePlan> & object;
+  selected: number | null;
+  onSelect: (n: number) => void;
+}) {
+  const left = numbers.slice(0, 8);
+  const right = numbers.slice(8);
+  return (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+      {[left, right].map((col, i) => (
+        <div key={i} className="space-y-1.5">
+          {col.map((n) => {
+            const t = plan.teeth[n];
+            const isSel = selected === n;
+            const status = t?.status ?? "intact";
+            const set = status !== "intact";
+            return (
+              <button
+                key={n}
+                onClick={() => onSelect(n)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                  isSel
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border/60 bg-muted/30 hover:bg-muted",
+                )}
+              >
+                <span className={cn(
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-md text-xs font-bold tabular-nums",
+                  isSel ? "bg-primary text-primary-foreground" : "bg-card text-foreground",
+                )}>
+                  {n}
+                </span>
+                {set ? (
+                  <span className="flex items-center gap-2 text-xs font-medium">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ background: STATUS_META[status].color }}
+                    />
+                    {STATUS_META[status].label}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No diagnosis</span>
+                )}
+                <Plus className="ml-auto h-4 w-4 text-muted-foreground" />
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RailRow({ icon, label, sub }: { icon: React.ReactNode; label: string; sub?: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm">
+      <span className="text-muted-foreground">{icon}</span>
+      <div className="min-w-0">
+        <div className="truncate font-medium">{label}</div>
+        {sub && <div className="truncate text-[10px] text-muted-foreground">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function RailButton({
+  icon, label, onClick, disabled, danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
+        disabled
+          ? "cursor-not-allowed text-muted-foreground/50"
+          : danger
+          ? "text-destructive hover:bg-destructive/10"
+          : "hover:bg-muted",
+      )}
+    >
+      <span>{icon}</span>
+      {label}
+    </button>
   );
 }
