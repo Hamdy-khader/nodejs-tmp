@@ -60,7 +60,7 @@ function ToothSVG({ status, isUpper }: { status: ToothStatus; isUpper: boolean }
 
 function Row({ numbers, isUpper, teeth, selected, onSelect }: { numbers: number[]; isUpper: boolean } & Props) {
   return (
-    <div className="flex items-end justify-center gap-1 sm:gap-1.5">
+    <div className="flex w-full items-end justify-center gap-0.5 sm:gap-1">
       {numbers.map((n) => {
         const t = teeth[n];
         const isSel = selected === n;
@@ -70,13 +70,13 @@ function Row({ numbers, isUpper, teeth, selected, onSelect }: { numbers: number[
             type="button"
             onClick={() => onSelect?.(n)}
             className={cn(
-              "group flex w-7 flex-col items-center sm:w-9",
+              "group flex min-w-0 flex-1 flex-col items-center",
               isUpper ? "flex-col" : "flex-col-reverse",
             )}
           >
             <div
               className={cn(
-                "h-12 w-7 rounded-md transition-all sm:h-14 sm:w-9",
+                "aspect-[2/3] w-full max-w-[36px] rounded-md transition-all",
                 isSel
                   ? "scale-110 ring-2 ring-primary ring-offset-2 ring-offset-background"
                   : "hover:scale-105",
