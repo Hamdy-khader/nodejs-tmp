@@ -249,26 +249,10 @@ function PlanPage() {
                 open={open.general}
                 onToggle={() => setOpen((o) => ({ ...o, general: !o.general }))}
               >
-                <div className="flex items-stretch gap-2">
-                  <Textarea
-                    rows={2}
-                    defaultValue={plan.notes}
-                    onBlur={(e) => {
-                      if (e.target.value !== plan.notes) {
-                        patientsStore.updatePlan(plan.id, { notes: e.target.value });
-                      }
-                    }}
-                    placeholder="General observations, follow-ups, recommendations…"
-                    className="flex-1 bg-muted/40"
-                  />
-                  <button
-                    type="button"
-                    className="grid w-12 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                    aria-label="Add note"
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
-                </div>
+                <NoteRow
+                  value={plan.notes}
+                  onChange={(v) => patientsStore.updatePlan(plan.id, { notes: v })}
+                />
               </Section>
 
               {/* Upper jaw */}
