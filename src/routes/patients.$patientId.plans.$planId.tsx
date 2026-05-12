@@ -100,7 +100,7 @@ function PlanPage() {
     <div className="flex w-full flex-col bg-muted/30">
       {/* Wizard steps */}
       <div className="border-b border-border/60 bg-card">
-        <div className="mx-auto flex max-w-[1600px] items-stretch overflow-x-auto">
+        <div className="mx-auto flex max-w-[1600px] items-stretch">
           {STEPS.map((s, i) => {
             const active = step === s.id;
             return (
