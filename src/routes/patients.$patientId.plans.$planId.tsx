@@ -2,12 +2,11 @@ import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-r
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, Save, Trash2, RotateCcw, Pencil, Undo2, Redo2,
-  Globe, DollarSign, ScanLine, Pin, Check, Stethoscope, ClipboardList, Play, FileText, Eye, Plus,
+  Globe, DollarSign, ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   patientsStore, usePatient, usePlan, defaultTeeth,
   STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
@@ -28,11 +27,11 @@ export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
 });
 
 const STEPS = [
-  { id: "diagnosis", label: "Diagnosis", icon: Stethoscope },
-  { id: "treatments", label: "Treatments", icon: ClipboardList },
-  { id: "animation", label: "Animation", icon: Play },
-  { id: "documents", label: "Documents", icon: FileText },
-  { id: "overview", label: "Overview", icon: Eye },
+  { id: "diagnosis", label: "Diagnosis" },
+  { id: "treatments", label: "Treatments" },
+  { id: "animation", label: "Animation" },
+  { id: "documents", label: "Documents" },
+  { id: "overview", label: "Overview" },
 ] as const;
 
 const STATUS_OPTIONS: { value: ToothStatus | "general" | "other"; label: string }[] = [
@@ -60,6 +59,7 @@ function PlanPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
+  const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
   useEffect(() => {
@@ -74,7 +74,6 @@ function PlanPage() {
   }, [patient?.id, patient?.name, plan?.id, plan?.name]);
 
   if (!hydrated) return <div className="p-8" />;
-
   if (!patient || !plan) {
     return (
       <div className="p-8">
@@ -104,25 +103,20 @@ function PlanPage() {
         <div className="mx-auto flex max-w-[1600px] items-stretch overflow-x-auto">
           {STEPS.map((s, i) => {
             const active = step === s.id;
-            const Icon = s.icon;
             return (
               <button
                 key={s.id}
                 onClick={() => setStep(s.id)}
                 className={cn(
-                  "relative flex flex-1 min-w-[160px] items-center justify-center gap-2 px-4 py-4 text-sm font-semibold transition-colors",
+                  "relative flex flex-1 min-w-[140px] items-center justify-center gap-2 px-6 py-4 text-sm font-semibold uppercase tracking-wide transition-all",
                   active
-                    ? "bg-accent/15 text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    ? "bg-[oklch(0.96_0.12_95)] text-foreground"
+                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
                 {s.label}
-                {active && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" />}
                 {i < STEPS.length - 1 && (
-                  <span className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-1/2 text-border md:block">
-                    ›
-                  </span>
+                  <ChevronRight className="absolute right-0 top-1/2 h-5 w-5 -translate-y-1/2 translate-x-1/2 text-border" />
                 )}
               </button>
             );
@@ -130,17 +124,16 @@ function PlanPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-5 lg:grid-cols-[1fr_280px]">
+      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-4 p-3 sm:p-5 lg:grid-cols-[1fr_300px]">
         {/* Main column */}
-        <div className="space-y-4">
-          {/* Plan header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-[var(--shadow-soft)]">
+        <div className="space-y-5">
+          {/* Plan header (back + name) */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Link
-              to="/patients/$patientId"
-              params={{ patientId }}
+              to="/patients"
               className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft className="h-4 w-4" /> {patient.name}
+              <ArrowLeft className="h-4 w-4" /> All patients
             </Link>
             <div className="flex items-center gap-2">
               {editName ? (
@@ -158,6 +151,7 @@ function PlanPage() {
                 </>
               ) : (
                 <>
+                  <span className="text-xs text-muted-foreground">{patient.name} ·</span>
                   <h1 className="text-base font-bold tracking-tight">{plan.name}</h1>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setName(plan.name); setEditName(true); }}>
                     <Pencil className="h-3.5 w-3.5" />
@@ -175,29 +169,36 @@ function PlanPage() {
             </div>
           ) : (
             <>
-              {/* Teeth chart + status grid */}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-                <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+              {/* Teeth chart + status grid (no heavy card chrome) */}
+              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[1fr_420px]">
+                <div>
                   <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
-                  <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Pin className={cn("h-3 w-3", pinned ? "text-accent" : "")} />
-                    <button onClick={() => setPinned((p) => !p)}>{pinned ? "Pinned chart" : "Unpinned"}</button>
+                  <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setPinned((p) => !p)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-2.5 py-1 transition-colors hover:bg-muted"
+                    >
+                      <Pin className={cn("h-3 w-3", pinned ? "rotate-45 text-accent" : "text-muted-foreground")} />
+                      {pinned ? "Pinned chart" : "Unpinned"}
+                    </button>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+                {/* Status pseudo-dropdown grid */}
+                <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Tooth status
                     </h3>
                     <span className={cn(
                       "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                      canSelectStatus ? "bg-accent/20 text-accent-foreground" : "bg-muted text-muted-foreground",
+                      canSelectStatus ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
                     )}>
                       {canSelectStatus ? `Tooth ${selected}` : "Pick a tooth"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {STATUS_OPTIONS.map((opt) => {
                       const isToothStatus = opt.value !== "general" && opt.value !== "other";
                       const active = canSelectStatus && isToothStatus && selectedTooth?.status === opt.value;
@@ -208,25 +209,31 @@ function PlanPage() {
                           disabled={disabled}
                           onClick={() => isToothStatus && setStatus(opt.value as ToothStatus)}
                           className={cn(
-                            "group flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-medium transition-all",
+                            "group flex items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-xs font-medium transition-all",
                             active
-                              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                              ? "bg-primary text-primary-foreground shadow-sm"
                               : disabled
-                              ? "cursor-not-allowed border-border/50 bg-muted/40 text-muted-foreground/60"
-                              : "border-border bg-card hover:border-primary/40 hover:bg-primary/5",
+                              ? "cursor-not-allowed bg-muted text-muted-foreground/70"
+                              : "bg-secondary text-secondary-foreground hover:bg-primary/10 hover:text-foreground",
                           )}
                         >
-                          {isToothStatus && (
-                            <span
-                              className="h-2.5 w-2.5 shrink-0 rounded-full ring-1"
-                              style={{
-                                background: STATUS_META[opt.value as ToothStatus].color,
-                                boxShadow: `inset 0 0 0 1px ${STATUS_META[opt.value as ToothStatus].ring}`,
-                              }}
-                            />
+                          <span className="flex min-w-0 items-center gap-2">
+                            {isToothStatus && (
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1"
+                                style={{
+                                  background: STATUS_META[opt.value as ToothStatus].color,
+                                  boxShadow: `inset 0 0 0 1px ${STATUS_META[opt.value as ToothStatus].ring}`,
+                                }}
+                              />
+                            )}
+                            <span className="truncate">{opt.label}</span>
+                          </span>
+                          {active ? (
+                            <Check className="h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
                           )}
-                          <span className="truncate">{opt.label}</span>
-                          {active && <Check className="ml-auto h-3.5 w-3.5" />}
                         </button>
                       );
                     })}
@@ -239,27 +246,49 @@ function PlanPage() {
                 </div>
               </div>
 
-              {/* General notes */}
-              <Section title="General">
-                <Textarea
-                  rows={2}
-                  defaultValue={plan.notes}
-                  onBlur={(e) => {
-                    if (e.target.value !== plan.notes) {
-                      patientsStore.updatePlan(plan.id, { notes: e.target.value });
-                    }
-                  }}
-                  placeholder="General observations, follow-ups, recommendations…"
-                />
+              {/* General section */}
+              <Section
+                title="General"
+                open={open.general}
+                onToggle={() => setOpen((o) => ({ ...o, general: !o.general }))}
+              >
+                <div className="flex items-stretch gap-2">
+                  <Textarea
+                    rows={2}
+                    defaultValue={plan.notes}
+                    onBlur={(e) => {
+                      if (e.target.value !== plan.notes) {
+                        patientsStore.updatePlan(plan.id, { notes: e.target.value });
+                      }
+                    }}
+                    placeholder="General observations, follow-ups, recommendations…"
+                    className="flex-1 bg-muted/40"
+                  />
+                  <button
+                    type="button"
+                    className="grid w-12 shrink-0 place-items-center rounded-md bg-muted/60 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    aria-label="Add note"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                </div>
               </Section>
 
               {/* Upper jaw */}
-              <Section title="Upper jaw">
+              <Section
+                title="Upper jaw"
+                open={open.upper}
+                onToggle={() => setOpen((o) => ({ ...o, upper: !o.upper }))}
+              >
                 <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
               </Section>
 
               {/* Lower jaw */}
-              <Section title="Lower jaw">
+              <Section
+                title="Lower jaw"
+                open={open.lower}
+                onToggle={() => setOpen((o) => ({ ...o, lower: !o.lower }))}
+              >
                 <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
               </Section>
             </>
@@ -268,7 +297,7 @@ function PlanPage() {
 
         {/* Right rail */}
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
-          <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
+          <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
             <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
             <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
             <div className="my-2 h-px bg-border" />
@@ -285,12 +314,12 @@ function PlanPage() {
             />
           </div>
 
-          <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis</h3>
+          <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Diagnosis:</h3>
             {summary.length === 0 ? (
               <p className="mt-2 text-xs italic text-muted-foreground">First select a status.</p>
             ) : (
-              <ul className="mt-2 space-y-1.5 text-sm">
+              <ul className="mt-3 space-y-1.5 text-sm">
                 {summary.map(({ s, count }) => (
                   <li key={s} className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
@@ -346,11 +375,29 @@ function PlanPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title, open, onToggle, children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
-      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-primary">{title}</h3>
-      {children}
+    <div className="rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-soft)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-5 py-3 text-left"
+      >
+        <h3 className="text-sm font-bold uppercase tracking-wider text-primary">{title}</h3>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-primary" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-primary" />
+        )}
+      </button>
+      {open && <div className="border-t border-border/40 px-5 py-4">{children}</div>}
     </div>
   );
 }
@@ -366,9 +413,9 @@ function JawGrid({
   const left = numbers.slice(0, 8);
   const right = numbers.slice(8);
   return (
-    <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
       {[left, right].map((col, i) => (
-        <div key={i} className="space-y-1.5">
+        <div key={i} className="space-y-2">
           {col.map((n) => {
             const t = plan.teeth[n];
             const isSel = selected === n;
@@ -379,20 +426,20 @@ function JawGrid({
                 key={n}
                 onClick={() => onSelect(n)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-all",
+                  "flex w-full items-center gap-3 rounded-md bg-muted/40 px-3 py-2 text-left text-sm transition-all",
                   isSel
-                    ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "border-border/60 bg-muted/30 hover:bg-muted",
+                    ? "ring-1 ring-primary"
+                    : "hover:bg-muted",
                 )}
               >
                 <span className={cn(
-                  "grid h-7 w-7 shrink-0 place-items-center rounded-md text-xs font-bold tabular-nums",
-                  isSel ? "bg-primary text-primary-foreground" : "bg-card text-foreground",
+                  "min-w-[28px] text-sm font-semibold tabular-nums",
+                  isSel ? "text-primary" : "text-foreground/80",
                 )}>
                   {n}
                 </span>
                 {set ? (
-                  <span className="flex items-center gap-2 text-xs font-medium">
+                  <span className="flex flex-1 items-center gap-2 text-xs font-medium">
                     <span
                       className="h-2.5 w-2.5 rounded-full"
                       style={{ background: STATUS_META[status].color }}
@@ -400,9 +447,12 @@ function JawGrid({
                     {STATUS_META[status].label}
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground">No diagnosis</span>
+                  <span className="flex-1 text-xs text-muted-foreground">—</span>
                 )}
-                <Plus className="ml-auto h-4 w-4 text-muted-foreground" />
+                <Plus className={cn(
+                  "h-4 w-4 shrink-0",
+                  isSel ? "text-primary" : "text-muted-foreground",
+                )} />
               </button>
             );
           })}
@@ -414,8 +464,8 @@ function JawGrid({
 
 function RailRow({ icon, label, sub }: { icon: React.ReactNode; label: string; sub?: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm">
-      <span className="text-muted-foreground">{icon}</span>
+    <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
+      <span className="grid h-7 w-7 place-items-center rounded-md bg-muted text-muted-foreground">{icon}</span>
       <div className="min-w-0">
         <div className="truncate font-medium">{label}</div>
         {sub && <div className="truncate text-[10px] text-muted-foreground">{sub}</div>}
@@ -438,15 +488,15 @@ function RailButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground/50"
           : danger
           ? "text-destructive hover:bg-destructive/10"
-          : "hover:bg-muted",
+          : "text-foreground/80 hover:bg-muted hover:text-foreground",
       )}
     >
-      <span>{icon}</span>
+      <span className={cn(disabled ? "opacity-50" : "")}>{icon}</span>
       {label}
     </button>
   );
