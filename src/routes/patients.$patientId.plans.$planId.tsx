@@ -13,6 +13,7 @@ import {
   STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
+import { useHydrated } from "@/lib/use-hydrated";
 import { TeethChart } from "@/components/TeethChart";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -59,6 +60,7 @@ function PlanPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
+  const hydrated = useHydrated();
 
   useEffect(() => {
     if (patient && plan) {
@@ -70,6 +72,8 @@ function PlanPage() {
       });
     }
   }, [patient?.id, patient?.name, plan?.id, plan?.name]);
+
+  if (!hydrated) return <div className="p-8" />;
 
   if (!patient || !plan) {
     return (

@@ -4,6 +4,7 @@ import { Plus, Search, Pencil, Trash2, Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { patientsStore, usePatients, type Patient } from "@/lib/patients-store";
+import { useHydrated } from "@/lib/use-hydrated";
 import { PatientFormDialog } from "@/components/PatientFormDialog";
 import {
   AlertDialog,
@@ -33,7 +34,9 @@ function initials(name: string) {
 }
 
 function PatientsList() {
-  const patients = usePatients();
+  const hydrated = useHydrated();
+  const patientsRaw = usePatients();
+  const patients = hydrated ? patientsRaw : [];
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [openNew, setOpenNew] = useState(false);
