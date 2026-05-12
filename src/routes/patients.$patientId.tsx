@@ -40,6 +40,10 @@ function PatientPage() {
   const [newPlanName, setNewPlanName] = useState("Your suggested treatment");
   const [delPlanId, setDelPlanId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (patient) tabsStore.open({ patientId: patient.id, name: patient.name });
+  }, [patient?.id, patient?.name]);
+
   if (!patient) {
     return (
       <div className="p-8">
