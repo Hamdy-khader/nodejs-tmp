@@ -191,6 +191,13 @@ export const patientsStore = {
     persist();
     return plan;
   },
+  ensurePlanFor(patientId: string): TreatmentPlan {
+    const existing = state.plans
+      .filter((p) => p.patientId === patientId)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (existing) return existing;
+    return this.createPlan(patientId, "Your suggested treatment");
+  },
   updatePlan(id: string, input: Partial<Omit<TreatmentPlan, "id" | "patientId" | "createdAt">>) {
     state = {
       ...state,
