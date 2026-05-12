@@ -170,7 +170,7 @@ function PlanPage() {
           ) : (
             <>
               {/* Teeth chart + status grid (no heavy card chrome) */}
-              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[1fr_420px]">
+              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div>
                   <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
                   <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
