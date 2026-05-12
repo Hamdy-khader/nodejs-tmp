@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { patientsStore, usePatient, usePlansFor } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
+import { useHydrated } from "@/lib/use-hydrated";
 import { PatientFormDialog } from "@/components/PatientFormDialog";
 import {
   AlertDialog,
