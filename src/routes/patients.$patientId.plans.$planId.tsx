@@ -260,7 +260,9 @@ function PlanPage() {
             </div>
           </div>
 
-          {step !== "diagnosis" ? (
+          {step === "treatments" ? (
+            <TreatmentsView plan={plan} />
+          ) : step !== "diagnosis" ? (
             <div className="rounded-2xl border border-dashed border-border/60 bg-card p-12 text-center shadow-[var(--shadow-soft)]">
               <p className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{STEPS.find((s) => s.id === step)?.label}</span> step coming soon.
