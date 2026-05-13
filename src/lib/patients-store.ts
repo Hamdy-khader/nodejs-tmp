@@ -14,6 +14,7 @@ export interface ToothState {
   number: number;
   status: ToothStatus;
   note?: string;
+  diagnosis?: string[];
 }
 
 export interface TreatmentPlan {

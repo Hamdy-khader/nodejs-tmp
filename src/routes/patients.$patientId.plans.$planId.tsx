@@ -24,6 +24,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { XrayPanel } from "@/components/XrayPanel";
+import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
+
+const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -105,6 +108,7 @@ function PlanPage() {
   const [delOpen, setDelOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
   const [xrayOpen, setXrayOpen] = useState(false);
+  const [filledPanelOpen, setFilledPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -296,6 +300,9 @@ function PlanPage() {
                             status: group.id as ToothStatus,
                             note: item,
                           });
+                          if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
+                            setFilledPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -353,6 +360,21 @@ function PlanPage() {
                   )}
                 </div>
               </div>
+
+              {filledPanelOpen &&
+                selectedTooth &&
+                selectedTooth.status === "filled" &&
+                selectedTooth.note &&
+                FILLED_VARIANTS.includes(selectedTooth.note) && (
+                  <div className="flex justify-end">
+                    <FilledDiagnosisPanel
+                      planId={plan.id}
+                      tooth={selectedTooth}
+                      variant={selectedTooth.note}
+                      onClose={() => setFilledPanelOpen(false)}
+                    />
+                  </div>
+                )}
 
               {xrayOpen && (
                 <XrayPanel
