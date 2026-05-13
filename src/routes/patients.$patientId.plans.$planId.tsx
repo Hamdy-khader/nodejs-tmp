@@ -30,6 +30,8 @@ import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
 import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
+import { GeneralStatusDialog } from "@/components/GeneralStatusDialog";
+import { X } from "lucide-react";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
@@ -130,6 +132,7 @@ function PlanPage() {
   const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [facialPanelOpen, setFacialPanelOpen] = useState(false);
+  const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -367,6 +370,24 @@ function PlanPage() {
                         );
                       }
 
+                      if (group.id === "general" || group.id === "other") {
+                        const goClass = cn(
+                          "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                          "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
+                        );
+                        return (
+                          <button
+                            key={group.id}
+                            type="button"
+                            onClick={() => setGeneralDialogOpen(true)}
+                            className={goClass}
+                          >
+                            <span className="truncate">{group.label}</span>
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                          </button>
+                        );
+                      }
+
                       return (
                         <DropdownMenu key={group.id}>
                           <DropdownMenuTrigger asChild disabled={disabled}>
@@ -418,10 +439,39 @@ function PlanPage() {
                 open={open.general}
                 onToggle={() => setOpen((o) => ({ ...o, general: !o.general }))}
               >
-                <NoteRow
-                  value={plan.notes}
-                  onChange={(v) => patientsStore.updatePlan(plan.id, { notes: v })}
-                />
+                <div className="flex h-12 w-full items-center gap-2 rounded-md bg-muted/50 px-3">
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    {(plan.generalStatuses ?? []).map((s, i) => (
+                      <span
+                        key={`${s}-${i}`}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs"
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (plan.generalStatuses ?? []).filter(
+                              (_, idx) => idx !== i,
+                            );
+                            patientsStore.updatePlan(plan.id, { generalStatuses: next });
+                          }}
+                          className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+                          aria-label={`Remove ${s}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGeneralDialogOpen(true)}
+                    className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Add general status"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                </div>
               </Section>
 
               {/* Upper jaw */}
@@ -597,6 +647,16 @@ function PlanPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <GeneralStatusDialog
+        open={generalDialogOpen}
+        toothNumber={selectedTooth?.number}
+        onClose={() => setGeneralDialogOpen(false)}
+        onSubmit={(status) => {
+          const next = [...(plan.generalStatuses ?? []), status];
+          patientsStore.updatePlan(plan.id, { generalStatuses: next });
+        }}
+      />
     </div>
   );
 }

@@ -24,6 +24,7 @@ export interface TreatmentPlan {
   notes: string;
   teeth: Record<number, ToothState>;
   xrays?: string[];
+  generalStatuses?: string[];
   createdAt: number;
   updatedAt: number;
 }
