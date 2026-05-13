@@ -465,6 +465,19 @@ function PlanPage() {
               />
             )}
 
+          {bridgePanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "bridge" &&
+            selectedTooth.note &&
+            BRIDGE_VARIANTS.includes(selectedTooth.note) && (
+              <BridgeDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setBridgePanelOpen(false)}
+              />
+            )}
+
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
             <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
             <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
