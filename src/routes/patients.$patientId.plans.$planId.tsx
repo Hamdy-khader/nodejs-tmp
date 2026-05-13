@@ -24,6 +24,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { XrayPanel } from "@/components/XrayPanel";
+import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
+
+const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
