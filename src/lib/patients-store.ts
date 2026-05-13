@@ -22,6 +22,7 @@ export interface TreatmentPlan {
   name: string;
   notes: string;
   teeth: Record<number, ToothState>;
+  xrays?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -237,6 +238,28 @@ export const patientsStore = {
   },
   deletePlan(id: string) {
     state = { ...state, plans: state.plans.filter((p) => p.id !== id) };
+    persist();
+  },
+  addXrays(planId: string, dataUrls: string[]) {
+    state = {
+      ...state,
+      plans: state.plans.map((p) =>
+        p.id === planId
+          ? { ...p, xrays: [...(p.xrays ?? []), ...dataUrls], updatedAt: Date.now() }
+          : p,
+      ),
+    };
+    persist();
+  },
+  removeXray(planId: string, index: number) {
+    state = {
+      ...state,
+      plans: state.plans.map((p) =>
+        p.id === planId
+          ? { ...p, xrays: (p.xrays ?? []).filter((_, i) => i !== index), updatedAt: Date.now() }
+          : p,
+      ),
+    };
     persist();
   },
 };

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { XrayPanel } from "@/components/XrayPanel";
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -59,6 +60,7 @@ function PlanPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
+  const [xrayOpen, setXrayOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -243,6 +245,14 @@ function PlanPage() {
                 </div>
               </div>
 
+              {xrayOpen && (
+                <XrayPanel
+                  planId={plan.id}
+                  xrays={plan.xrays ?? []}
+                  onClose={() => setXrayOpen(false)}
+                />
+              )}
+
               {/* General section */}
               <Section
                 title="General"
@@ -286,7 +296,7 @@ function PlanPage() {
             <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
             <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
             <div className="my-2 h-px bg-border" />
-            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" />
+            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={() => setXrayOpen((o) => !o)} active={xrayOpen} />
             <RailButton
               icon={<Trash2 className="h-4 w-4" />}
               label="Delete plan"
@@ -456,13 +466,14 @@ function RailRow({ icon, label, sub }: { icon: React.ReactNode; label: string; s
 }
 
 function RailButton({
-  icon, label, onClick, disabled, danger,
+  icon, label, onClick, disabled, danger, active,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   danger?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -472,6 +483,8 @@ function RailButton({
         "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground/50"
+          : active
+          ? "bg-primary/10 text-primary"
           : danger
           ? "text-destructive hover:bg-destructive/10"
           : "text-foreground/80 hover:bg-muted hover:text-foreground",
