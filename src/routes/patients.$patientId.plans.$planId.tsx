@@ -345,6 +345,12 @@ function PlanPage() {
                             ...selectedTooth,
                             note: item,
                           });
+                          if (
+                            (group.id === "general" && item === "General") ||
+                            (group.id === "other" && item === "Other...")
+                          ) {
+                            setGeneralDialogOpen(true);
+                          }
                           if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
                             setMalocclusionPanelOpen(true);
                           }
@@ -370,23 +376,6 @@ function PlanPage() {
                         );
                       }
 
-                      if (group.id === "general" || group.id === "other") {
-                        const goClass = cn(
-                          "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                          "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
-                        );
-                        return (
-                          <button
-                            key={group.id}
-                            type="button"
-                            onClick={() => setGeneralDialogOpen(true)}
-                            className={goClass}
-                          >
-                            <span className="truncate">{group.label}</span>
-                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                          </button>
-                        );
-                      }
 
                       return (
                         <DropdownMenu key={group.id}>
