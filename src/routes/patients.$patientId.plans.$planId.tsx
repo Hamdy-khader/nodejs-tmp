@@ -373,8 +373,17 @@ function PlanPage() {
                             (group.id === "other" && item === "Other...")
                           ) {
                             setGeneralDialogOpen(true);
+                          } else if (selectedTooth) {
+                            // Tooth selected — attach as note on that tooth (shows in jaw row)
+                            patientsStore.setTooth(plan.id, {
+                              ...selectedTooth,
+                              note: item,
+                            });
+                            if (MALOCCLUSION_VARIANTS.includes(item)) setMalocclusionPanelOpen(true);
+                            else if (FACIAL_VARIANTS.includes(item)) setFacialPanelOpen(true);
+                            else if (GENERAL_SEVERITY_VARIANTS.includes(item)) setSeverityPanelOpen(true);
                           } else {
-                            // Any predefined item — add directly as a tag in General box
+                            // No tooth selected — add as a tag in General box
                             const next = [...(plan.generalStatuses ?? []), item];
                             patientsStore.updatePlan(plan.id, { generalStatuses: next });
                           }
@@ -667,8 +676,12 @@ function PlanPage() {
         toothNumber={selectedTooth?.number}
         onClose={() => setGeneralDialogOpen(false)}
         onSubmit={(status) => {
-          const next = [...(plan.generalStatuses ?? []), status];
-          patientsStore.updatePlan(plan.id, { generalStatuses: next });
+          if (selectedTooth) {
+            patientsStore.setTooth(plan.id, { ...selectedTooth, note: status });
+          } else {
+            const next = [...(plan.generalStatuses ?? []), status];
+            patientsStore.updatePlan(plan.id, { generalStatuses: next });
+          }
         }}
       />
     </div>
