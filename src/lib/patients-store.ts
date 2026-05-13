@@ -26,9 +26,9 @@ export interface TreatmentItem {
 }
 
 export type TreatmentRow =
-  | { id: string; kind: "visit"; label?: string; items: TreatmentItem[] }
-  | { id: string; kind: "healing"; label?: string; days?: number }
-  | { id: string; kind: "discount"; mode: "amount" | "percent"; value: number };
+  | { id: string; kind: "visit"; label?: string; note?: string; items: TreatmentItem[] }
+  | { id: string; kind: "healing"; label?: string; note?: string; days?: number }
+  | { id: string; kind: "discount"; note?: string; mode: "amount" | "percent"; value: number };
 
 export interface TreatmentPlan {
   id: string;
