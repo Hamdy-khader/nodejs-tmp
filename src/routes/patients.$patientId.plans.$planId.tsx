@@ -427,6 +427,19 @@ function PlanPage() {
               />
             )}
 
+          {severityPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "intact" &&
+            selectedTooth.note &&
+            SEVERITY_VARIANTS.includes(selectedTooth.note) && (
+              <SeverityDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setSeverityPanelOpen(false)}
+              />
+            )}
+
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
             <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
             <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
