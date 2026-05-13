@@ -408,6 +408,19 @@ function PlanPage() {
 
         {/* Right rail */}
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+          {filledPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "filled" &&
+            selectedTooth.note &&
+            FILLED_VARIANTS.includes(selectedTooth.note) && (
+              <FilledDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setFilledPanelOpen(false)}
+              />
+            )}
+
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
             <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
             <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
