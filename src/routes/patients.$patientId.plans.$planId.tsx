@@ -647,6 +647,16 @@ function PlanPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <GeneralStatusDialog
+        open={generalDialogOpen}
+        toothNumber={selectedTooth?.number}
+        onClose={() => setGeneralDialogOpen(false)}
+        onSubmit={(status) => {
+          const next = [...(plan.generalStatuses ?? []), status];
+          patientsStore.updatePlan(plan.id, { generalStatuses: next });
+        }}
+      />
     </div>
   );
 }
