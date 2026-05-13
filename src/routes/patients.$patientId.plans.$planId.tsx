@@ -370,6 +370,19 @@ function PlanPage() {
                         );
                       }
 
+                      if (group.id === "general" || group.id === "other") {
+                        return (
+                          <button
+                            key={group.id}
+                            type="button"
+                            onClick={() => setGeneralDialogOpen(true)}
+                            className={triggerClass}
+                          >
+                            {triggerInner}
+                          </button>
+                        );
+                      }
+
                       return (
                         <DropdownMenu key={group.id}>
                           <DropdownMenuTrigger asChild disabled={disabled}>
