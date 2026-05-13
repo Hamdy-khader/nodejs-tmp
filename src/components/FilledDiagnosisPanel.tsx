@@ -39,7 +39,7 @@ export function FilledDiagnosisPanel({ planId, tooth, variant, onClose }: Props)
   };
 
   return (
-    <div className="w-full max-w-[220px] rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
+    <div className="w-full rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
       <div>
         <h3 className="text-sm font-bold text-foreground">Diagnosis:</h3>
         <p className="text-sm text-muted-foreground">{variant}</p>
