@@ -28,11 +28,13 @@ import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
+import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
+const MALOCCLUSION_VARIANTS = ["Malocclusion"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -118,6 +120,7 @@ function PlanPage() {
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [implantPanelOpen, setImplantPanelOpen] = useState(false);
   const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
+  const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -330,6 +333,9 @@ function PlanPage() {
                             ...selectedTooth,
                             note: item,
                           });
+                          if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
+                            setMalocclusionPanelOpen(true);
+                          }
                         }
                       };
 
@@ -475,6 +481,18 @@ function PlanPage() {
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
                 onClose={() => setBridgePanelOpen(false)}
+              />
+            )}
+
+          {malocclusionPanelOpen &&
+            selectedTooth &&
+            selectedTooth.note &&
+            MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
+              <MalocclusionDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setMalocclusionPanelOpen(false)}
               />
             )}
 
