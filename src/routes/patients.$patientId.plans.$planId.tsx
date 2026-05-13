@@ -676,8 +676,12 @@ function PlanPage() {
         toothNumber={selectedTooth?.number}
         onClose={() => setGeneralDialogOpen(false)}
         onSubmit={(status) => {
-          const next = [...(plan.generalStatuses ?? []), status];
-          patientsStore.updatePlan(plan.id, { generalStatuses: next });
+          if (selectedTooth) {
+            patientsStore.setTooth(plan.id, { ...selectedTooth, note: status });
+          } else {
+            const next = [...(plan.generalStatuses ?? []), status];
+            patientsStore.updatePlan(plan.id, { generalStatuses: next });
+          }
         }}
       />
     </div>
