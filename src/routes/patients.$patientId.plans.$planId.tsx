@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { XrayPanel } from "@/components/XrayPanel";
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
