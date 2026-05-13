@@ -496,7 +496,7 @@ function PlanPage() {
                 open={open.upper}
                 onToggle={() => setOpen((o) => ({ ...o, upper: !o.upper }))}
               >
-                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
 
               {/* Lower jaw */}
@@ -505,7 +505,7 @@ function PlanPage() {
                 open={open.lower}
                 onToggle={() => setOpen((o) => ({ ...o, lower: !o.lower }))}
               >
-                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
             </>
           )}
