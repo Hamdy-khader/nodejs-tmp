@@ -114,6 +114,7 @@ function PlanPage() {
   const [xrayOpen, setXrayOpen] = useState(false);
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
+  const [implantPanelOpen, setImplantPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
