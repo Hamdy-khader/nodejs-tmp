@@ -253,34 +253,59 @@ function PlanPage() {
                         active && selectedTooth?.note && group.items.includes(selectedTooth.note)
                           ? selectedTooth.note
                           : group.label;
+                      const isSingle = group.items.length <= 1;
+                      const triggerClass = cn(
+                        "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : disabled
+                          ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
+                          : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
+                      );
+                      const triggerInner = (
+                        <>
+                          <span className="flex min-w-0 items-center gap-2">
+                            {isToothStatus && !disabled && (
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
+                                style={{ background: STATUS_META[group.id as ToothStatus].color }}
+                              />
+                            )}
+                            <span className="truncate">{currentLabel}</span>
+                          </span>
+                          {active ? (
+                            <Check className="h-3.5 w-3.5 shrink-0" />
+                          ) : !isSingle ? (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                          ) : null}
+                        </>
+                      );
+
+                      if (isSingle) {
+                        return (
+                          <button
+                            key={group.id}
+                            disabled={disabled}
+                            onClick={() => {
+                              if (!isToothStatus || !selectedTooth) return;
+                              patientsStore.setTooth(plan.id, {
+                                ...selectedTooth,
+                                status: group.id as ToothStatus,
+                                note: group.items[0],
+                              });
+                            }}
+                            className={triggerClass}
+                          >
+                            {triggerInner}
+                          </button>
+                        );
+                      }
+
                       return (
                         <DropdownMenu key={group.id}>
                           <DropdownMenuTrigger asChild disabled={disabled}>
-                            <button
-                              disabled={disabled}
-                              className={cn(
-                                "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                                active
-                                  ? "bg-primary text-primary-foreground shadow-sm"
-                                  : disabled
-                                  ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
-                                  : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
-                              )}
-                            >
-                              <span className="flex min-w-0 items-center gap-2">
-                                {isToothStatus && !disabled && (
-                                  <span
-                                    className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
-                                    style={{ background: STATUS_META[group.id as ToothStatus].color }}
-                                  />
-                                )}
-                                <span className="truncate">{currentLabel}</span>
-                              </span>
-                              {active ? (
-                                <Check className="h-3.5 w-3.5 shrink-0" />
-                              ) : (
-                                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                              )}
+                            <button disabled={disabled} className={triggerClass}>
+                              {triggerInner}
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start" className="min-w-[200px]">
