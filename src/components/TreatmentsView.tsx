@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Check, ChevronDown, GripVertical, Plus, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, GripVertical, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
   type TreatmentPlan,
   type TreatmentRow,
   type TreatmentItem,
+  UPPER_TEETH,
+  LOWER_TEETH,
 } from "@/lib/patients-store";
 import { TeethChart } from "@/components/TeethChart";
 import {
@@ -20,7 +22,7 @@ import { cn } from "@/lib/utils";
 interface TreatmentGroup {
   id: string;
   label: string;
-  items: string[];
+  items?: string[];
   /** When true, render as a single direct-action button (no dropdown). */
   flat?: boolean;
 }
@@ -88,6 +90,7 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
     label: "Crown",
     items: ["Crown", "Veneer", "Veneer preparation", "Telescopic crown", "Filing"],
   },
+  { id: "bridge", label: "Bridge", flat: true },
   {
     id: "general",
     label: "General",
@@ -136,13 +139,36 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
   },
 ];
 
+/** Ordered FDI map across both jaws for finding "between" teeth. */
+const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
+
+function teethBetween(a: number, b: number): number[] {
+  for (const row of JAW_ORDER) {
+    const ia = row.indexOf(a);
+    const ib = row.indexOf(b);
+    if (ia !== -1 && ib !== -1) {
+      const [lo, hi] = ia < ib ? [ia, ib] : [ib, ia];
+      return row.slice(lo + 1, hi);
+    }
+  }
+  return [];
+}
+
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [customOpen, setCustomOpen] = useState<{ groupId: string } | null>(null);
   const [customText, setCustomText] = useState("");
+  const [bridgeMode, setBridgeMode] = useState(false);
+  const [bridgeSel, setBridgeSel] = useState<number[]>([]);
 
   const rows = plan.treatments ?? [];
   const billingMode = plan.billingMode ?? "insurance";
+
+  const toggleBridgeTooth = (n: number) => {
+    setBridgeSel((prev) =>
+      prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n],
+    );
+  };
 
   const handlePick = (group: TreatmentGroup, item: string) => {
     if (item === "Custom...") {
@@ -156,6 +182,52 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       amount: 1,
       unitPrice: 0,
     });
+  };
+
+  const startBridge = () => {
+    setBridgeMode(true);
+    setBridgeSel([]);
+    setSelected(null);
+  };
+
+  const cancelBridge = () => {
+    setBridgeMode(false);
+    setBridgeSel([]);
+  };
+
+  const applyBridge = () => {
+    if (bridgeSel.length < 2) return;
+    // Sort selection along the jaw order
+    const sorted = [...bridgeSel].sort((a, b) => {
+      for (const row of JAW_ORDER) {
+        const ia = row.indexOf(a);
+        const ib = row.indexOf(b);
+        if (ia !== -1 && ib !== -1) return ia - ib;
+      }
+      return a - b;
+    });
+    // Selected teeth become abutments (bridge crowns); intact teeth between
+    // them become missing pontics. Already-missing teeth stay missing.
+    const lo = sorted[0];
+    const hi = sorted[sorted.length - 1];
+    const between = teethBetween(lo, hi);
+    for (const n of sorted) {
+      const t = plan.teeth[n];
+      patientsStore.setTooth(plan.id, { ...(t ?? { number: n, status: "intact" }), status: "bridge" });
+    }
+    for (const n of between) {
+      const t = plan.teeth[n];
+      if (!t || t.status === "intact") {
+        patientsStore.setTooth(plan.id, { number: n, status: "missing" });
+      }
+    }
+    // Add a treatment line summarizing the bridge span
+    patientsStore.addTreatmentItemToLastVisit(plan.id, {
+      name: `Bridge ${lo}–${hi}`,
+      amount: 1,
+      unitPrice: 0,
+    });
+    cancelBridge();
   };
 
   const totals = (() => {
@@ -178,8 +250,40 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     <>
       {/* Teeth + Treatment categories */}
       <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div>
-          <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
+        <div className="space-y-2">
+          <TeethChart
+            teeth={plan.teeth}
+            selected={bridgeMode ? null : selected}
+            onSelect={bridgeMode ? toggleBridgeTooth : setSelected}
+            highlighted={bridgeMode ? bridgeSel : undefined}
+          />
+          {bridgeMode && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[oklch(0.55_0.18_290)]/40 bg-[oklch(0.55_0.18_290)]/10 px-3 py-2">
+              <p className="text-xs font-medium text-foreground">
+                Bridge mode — pick 2+ teeth across a missing tooth
+                {bridgeSel.length > 0 && (
+                  <span className="ml-2 font-semibold text-[oklch(0.45_0.18_290)]">
+                    Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
+                  </span>
+                )}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={cancelBridge}
+                  className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={applyBridge}
+                  disabled={bridgeSel.length < 2}
+                  className="rounded-md bg-[oklch(0.55_0.18_290)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  Apply Bridge
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -190,41 +294,72 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                selected
-                  ? "bg-primary/15 text-primary"
-                  : "bg-muted text-muted-foreground",
+                bridgeMode
+                  ? "bg-[oklch(0.55_0.18_290)]/15 text-[oklch(0.45_0.18_290)]"
+                  : selected
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground",
               )}
             >
-              {selected ? `Tooth ${selected}` : "Any tooth"}
+              {bridgeMode
+                ? "Bridge mode"
+                : selected
+                  ? `Tooth ${selected}`
+                  : "Any tooth"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            {TREATMENT_GROUPS.map((group) => (
-              <DropdownMenu key={group.id}>
-                <DropdownMenuTrigger asChild>
+            {TREATMENT_GROUPS.map((group) => {
+              if (group.flat) {
+                const isActive = group.id === "bridge" && bridgeMode;
+                return (
                   <button
+                    key={group.id}
+                    onClick={() => {
+                      if (group.id === "bridge") {
+                        if (bridgeMode) cancelBridge();
+                        else startBridge();
+                      }
+                    }}
                     className={cn(
-                      "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                      "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
+                      "flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                      isActive
+                        ? "bg-[oklch(0.55_0.18_290)] text-white"
+                        : "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
                     )}
                   >
                     <span className="truncate">{group.label}</span>
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                    {isActive && <Check className="h-3.5 w-3.5 shrink-0" />}
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
-                  {group.items.map((item) => (
-                    <DropdownMenuItem
-                      key={item}
-                      onSelect={() => handlePick(group, item)}
-                      className="text-xs font-medium"
+                );
+              }
+              return (
+                <DropdownMenu key={group.id}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={cn(
+                        "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                        "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
+                      )}
                     >
-                      <span className="truncate">{item}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ))}
+                      <span className="truncate">{group.label}</span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
+                    {group.items?.map((item) => (
+                      <DropdownMenuItem
+                        key={item}
+                        onSelect={() => handlePick(group, item)}
+                        className="text-xs font-medium"
+                      >
+                        <span className="truncate">{item}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -396,10 +531,16 @@ function RowRenderer({
 function RowShell({
   children,
   onDelete,
+  onToggleNote,
+  noteOpen,
+  hasNote,
   variant = "default",
 }: {
   children: React.ReactNode;
   onDelete: () => void;
+  onToggleNote: () => void;
+  noteOpen: boolean;
+  hasNote: boolean;
   variant?: "default" | "visit";
 }) {
   return (
@@ -420,10 +561,17 @@ function RowShell({
       <div className="flex items-center justify-end gap-1">
         <button
           type="button"
-          className="rounded p-1 text-muted-foreground hover:bg-muted"
-          aria-label="Magic"
+          onClick={onToggleNote}
+          className={cn(
+            "rounded p-1 transition-colors",
+            noteOpen || hasNote
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-muted",
+          )}
+          aria-label="Add note"
+          title="Add note"
         >
-          <Wand2 className="h-4 w-4" />
+          <StickyNote className="h-4 w-4" />
         </button>
         <button
           type="button"
@@ -438,6 +586,27 @@ function RowShell({
   );
 }
 
+function NoteInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="ml-7 mt-1 flex items-center gap-2 rounded-md border border-dashed border-border/60 bg-background px-2 py-1.5">
+      <StickyNote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <Input
+        autoFocus
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Add a note…"
+        className="h-7 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+      />
+    </div>
+  );
+}
+
 function VisitRow({
   row,
   index,
@@ -447,10 +616,17 @@ function VisitRow({
   index: number;
   planId: string;
 }) {
+  const [open, setOpen] = useState(Boolean(row.note));
   const total = row.items.reduce((acc, it) => acc + it.amount * it.unitPrice, 0);
   return (
     <div className="space-y-1">
-      <RowShell variant="visit" onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}>
+      <RowShell
+        variant="visit"
+        onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}
+        onToggleNote={() => setOpen((v) => !v)}
+        noteOpen={open}
+        hasNote={Boolean(row.note)}
+      >
         <div className="flex items-center gap-2">
           <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
             {index + 1}
@@ -465,6 +641,15 @@ function VisitRow({
           Payable: <span className="font-semibold text-primary">$ {total.toFixed(0)}</span>
         </div>
       </RowShell>
+
+      {open && (
+        <NoteInput
+          value={row.note ?? ""}
+          onChange={(v) =>
+            patientsStore.updateTreatmentRow(planId, row.id, { note: v } as Partial<TreatmentRow>)
+          }
+        />
+      )}
 
       {row.items.map((it) => (
         <ItemRow key={it.id} planId={planId} rowId={row.id} item={it} />
@@ -543,28 +728,44 @@ function HealingRow({
   row: Extract<TreatmentRow, { kind: "healing" }>;
   planId: string;
 }) {
+  const [open, setOpen] = useState(Boolean(row.note));
   return (
-    <RowShell onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold italic text-foreground/80">Healing period:</span>
-        <Input
-          type="number"
-          min={0}
-          placeholder="days"
-          value={row.days ?? ""}
-          onChange={(e) =>
-            patientsStore.updateTreatmentRow(planId, row.id, {
-              days: e.target.value === "" ? undefined : Number(e.target.value),
-            } as Partial<TreatmentRow>)
+    <div className="space-y-1">
+      <RowShell
+        onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}
+        onToggleNote={() => setOpen((v) => !v)}
+        noteOpen={open}
+        hasNote={Boolean(row.note)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold italic text-foreground/80">Healing period:</span>
+          <Input
+            type="number"
+            min={0}
+            placeholder="days"
+            value={row.days ?? ""}
+            onChange={(e) =>
+              patientsStore.updateTreatmentRow(planId, row.id, {
+                days: e.target.value === "" ? undefined : Number(e.target.value),
+              } as Partial<TreatmentRow>)
+            }
+            className="h-7 w-20 text-xs"
+          />
+          <span className="text-xs text-muted-foreground">days</span>
+        </div>
+        <div />
+        <div />
+        <div />
+      </RowShell>
+      {open && (
+        <NoteInput
+          value={row.note ?? ""}
+          onChange={(v) =>
+            patientsStore.updateTreatmentRow(planId, row.id, { note: v } as Partial<TreatmentRow>)
           }
-          className="h-7 w-20 text-xs"
         />
-        <span className="text-xs text-muted-foreground">days</span>
-      </div>
-      <div />
-      <div />
-      <div />
-    </RowShell>
+      )}
+    </div>
   );
 }
 
@@ -575,63 +776,79 @@ function DiscountRow({
   row: Extract<TreatmentRow, { kind: "discount" }>;
   planId: string;
 }) {
+  const [open, setOpen] = useState(Boolean(row.note));
   return (
-    <RowShell onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}>
-      <div className="flex items-center gap-2">
-        <span className="grid h-4 w-4 place-items-center rounded-full border-2 border-primary">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-        </span>
-        <span className="text-sm font-semibold">Discount</span>
-      </div>
-      <div />
-      <div className="flex items-center justify-end gap-1">
-        <span className="text-xs text-muted-foreground">
-          {row.mode === "percent" ? "%" : "$"}
-        </span>
-        <Input
-          type="number"
-          value={row.value}
-          onChange={(e) =>
-            patientsStore.updateTreatmentRow(planId, row.id, {
-              value: Number(e.target.value) || 0,
-            } as Partial<TreatmentRow>)
+    <div className="space-y-1">
+      <RowShell
+        onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}
+        onToggleNote={() => setOpen((v) => !v)}
+        noteOpen={open}
+        hasNote={Boolean(row.note)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-4 w-4 place-items-center rounded-full border-2 border-primary">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          </span>
+          <span className="text-sm font-semibold">Discount</span>
+        </div>
+        <div />
+        <div className="flex items-center justify-end gap-1">
+          <span className="text-xs text-muted-foreground">
+            {row.mode === "percent" ? "%" : "$"}
+          </span>
+          <Input
+            type="number"
+            value={row.value}
+            onChange={(e) =>
+              patientsStore.updateTreatmentRow(planId, row.id, {
+                value: Number(e.target.value) || 0,
+              } as Partial<TreatmentRow>)
+            }
+            className="h-7 w-20 text-right text-xs"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded p-1 hover:bg-muted">
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem
+                onSelect={() =>
+                  patientsStore.updateTreatmentRow(planId, row.id, {
+                    mode: "amount",
+                  } as Partial<TreatmentRow>)
+                }
+              >
+                <span className="flex items-center gap-2">
+                  {row.mode === "amount" && <Check className="h-3.5 w-3.5" />} Amount ($)
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  patientsStore.updateTreatmentRow(planId, row.id, {
+                    mode: "percent",
+                  } as Partial<TreatmentRow>)
+                }
+              >
+                <span className="flex items-center gap-2">
+                  {row.mode === "percent" && <Check className="h-3.5 w-3.5" />} Percent (%)
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="text-right text-xs text-muted-foreground">=</div>
+      </RowShell>
+      {open && (
+        <NoteInput
+          value={row.note ?? ""}
+          onChange={(v) =>
+            patientsStore.updateTreatmentRow(planId, row.id, { note: v } as Partial<TreatmentRow>)
           }
-          className="h-7 w-20 text-right text-xs"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="rounded p-1 hover:bg-muted">
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem
-              onSelect={() =>
-                patientsStore.updateTreatmentRow(planId, row.id, {
-                  mode: "amount",
-                } as Partial<TreatmentRow>)
-              }
-            >
-              <span className="flex items-center gap-2">
-                {row.mode === "amount" && <Check className="h-3.5 w-3.5" />} Amount ($)
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() =>
-                patientsStore.updateTreatmentRow(planId, row.id, {
-                  mode: "percent",
-                } as Partial<TreatmentRow>)
-              }
-            >
-              <span className="flex items-center gap-2">
-                {row.mode === "percent" && <Check className="h-3.5 w-3.5" />} Percent (%)
-              </span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="text-right text-xs text-muted-foreground">=</div>
-    </RowShell>
+      )}
+    </div>
   );
 }
 
