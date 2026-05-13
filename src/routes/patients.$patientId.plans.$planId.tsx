@@ -322,6 +322,9 @@ function PlanPage() {
                           if (group.id === "implant" && IMPLANT_VARIANTS.includes(item)) {
                             setImplantPanelOpen(true);
                           }
+                          if (group.id === "bridge" && BRIDGE_VARIANTS.includes(item)) {
+                            setBridgePanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
