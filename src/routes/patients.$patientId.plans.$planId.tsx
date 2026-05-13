@@ -35,6 +35,12 @@ const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
 const MALOCCLUSION_VARIANTS = ["Malocclusion"];
+const GENERAL_SEVERITY_VARIANTS = [
+  "Bruxism signs",
+  "Gingivitis",
+  "Periodontitis",
+  "Gingival recession",
+];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -336,6 +342,9 @@ function PlanPage() {
                           if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
                             setMalocclusionPanelOpen(true);
                           }
+                          if (group.id === "general" && GENERAL_SEVERITY_VARIANTS.includes(item)) {
+                            setSeverityPanelOpen(true);
+                          }
                         }
                       };
 
@@ -447,9 +456,9 @@ function PlanPage() {
 
           {severityPanelOpen &&
             selectedTooth &&
-            selectedTooth.status === "intact" &&
             selectedTooth.note &&
-            SEVERITY_VARIANTS.includes(selectedTooth.note) && (
+            ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
+              GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
               <SeverityDiagnosisPanel
                 planId={plan.id}
                 tooth={selectedTooth}
