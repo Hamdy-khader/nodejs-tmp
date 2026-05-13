@@ -18,6 +18,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { XrayPanel } from "@/components/XrayPanel";
@@ -35,17 +38,58 @@ const STEPS = [
   { id: "overview", label: "Overview" },
 ] as const;
 
-const STATUS_OPTIONS: { value: ToothStatus | "general" | "other"; label: string }[] = [
-  { value: "missing", label: "Missing" },
-  { value: "intact", label: "Intact" },
-  { value: "filled", label: "Filled (amalgam)" },
-  { value: "caries", label: "Caries" },
-  { value: "root-treated", label: "Root treated" },
-  { value: "implant", label: "Implant + abutment" },
-  { value: "crown", label: "Crown" },
-  { value: "bridge", label: "Bridge" },
-  { value: "general", label: "General" },
-  { value: "other", label: "Other..." },
+type StatusGroupId = ToothStatus | "general" | "other";
+
+const STATUS_GROUPS: {
+  id: StatusGroupId;
+  label: string;
+  items: string[];
+}[] = [
+  { id: "missing", label: "Missing", items: ["Missing"] },
+  {
+    id: "intact",
+    label: "Intact",
+    items: [
+      "Intact", "Discolored", "Worn", "Fractured", "Fractured root",
+      "Radix", "Root resorption", "Mobility", "Necrosis",
+    ],
+  },
+  {
+    id: "filled",
+    label: "Filled (amalgam)",
+    items: ["Filled (composite)", "Inlay", "Filled (amalgam)"],
+  },
+  { id: "caries", label: "Caries", items: ["Caries"] },
+  {
+    id: "root-treated",
+    label: "Root treated",
+    items: ["Root treated", "Post", "Parapulpal pin"],
+  },
+  {
+    id: "implant",
+    label: "Implant + abutment",
+    items: ["Implant + abutment", "Implant"],
+  },
+  { id: "crown", label: "Crown", items: ["Crown", "Veneer"] },
+  { id: "bridge", label: "Bridge", items: ["Bridge", "Dentures"] },
+  {
+    id: "general",
+    label: "General",
+    items: [
+      "General", "Malocclusion", "Bruxism signs", "Facial disproportions",
+      "Plaque", "Gingivitis", "Periodontitis", "Bone loss",
+      "Gingival overgrowth", "Gingival recession", "Gummy smile",
+      "TMJ disorder", "Muscle disorder", "Large maxillary sinus",
+    ],
+  },
+  {
+    id: "other",
+    label: "Other...",
+    items: [
+      "Other...", "Drifted (front)", "Drifted (back)",
+      "Apical lesion", "Cyst", "Granuloma", "Impacted",
+    ],
+  },
 ];
 
 function PlanPage() {
@@ -201,39 +245,70 @@ function PlanPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
-                    {STATUS_OPTIONS.map((opt) => {
-                      const isToothStatus = opt.value !== "general" && opt.value !== "other";
-                      const active = canSelectStatus && isToothStatus && selectedTooth?.status === opt.value;
+                    {STATUS_GROUPS.map((group) => {
+                      const isToothStatus = group.id !== "general" && group.id !== "other";
+                      const active = canSelectStatus && isToothStatus && selectedTooth?.status === group.id;
                       const disabled = !canSelectStatus || !isToothStatus;
+                      const currentLabel =
+                        active && selectedTooth?.note && group.items.includes(selectedTooth.note)
+                          ? selectedTooth.note
+                          : group.label;
                       return (
-                        <button
-                          key={opt.value}
-                          disabled={disabled}
-                          onClick={() => isToothStatus && setStatus(opt.value as ToothStatus)}
-                          className={cn(
-                            "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                            active
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : disabled
-                              ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
-                              : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
-                          )}
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            {isToothStatus && !disabled && (
-                              <span
-                                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
-                                style={{ background: STATUS_META[opt.value as ToothStatus].color }}
-                              />
-                            )}
-                            <span className="truncate">{opt.label}</span>
-                          </span>
-                          {active ? (
-                            <Check className="h-3.5 w-3.5 shrink-0" />
-                          ) : (
-                            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                          )}
-                        </button>
+                        <DropdownMenu key={group.id}>
+                          <DropdownMenuTrigger asChild disabled={disabled}>
+                            <button
+                              disabled={disabled}
+                              className={cn(
+                                "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                                active
+                                  ? "bg-primary text-primary-foreground shadow-sm"
+                                  : disabled
+                                  ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
+                                  : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
+                              )}
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                {isToothStatus && !disabled && (
+                                  <span
+                                    className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
+                                    style={{ background: STATUS_META[group.id as ToothStatus].color }}
+                                  />
+                                )}
+                                <span className="truncate">{currentLabel}</span>
+                              </span>
+                              {active ? (
+                                <Check className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                              )}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[200px]">
+                            {group.items.map((item) => {
+                              const isActive = active && currentLabel === item;
+                              return (
+                                <DropdownMenuItem
+                                  key={item}
+                                  onSelect={() => {
+                                    if (!isToothStatus || !selectedTooth) return;
+                                    patientsStore.setTooth(plan.id, {
+                                      ...selectedTooth,
+                                      status: group.id as ToothStatus,
+                                      note: item,
+                                    });
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-between gap-2 text-xs font-medium",
+                                    isActive && "bg-accent",
+                                  )}
+                                >
+                                  <span className="truncate">{item}</span>
+                                  {isActive && <Check className="h-3.5 w-3.5 text-primary" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       );
                     })}
                   </div>
