@@ -29,6 +29,7 @@ import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
+import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
