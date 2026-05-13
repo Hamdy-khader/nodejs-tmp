@@ -240,6 +240,28 @@ export const patientsStore = {
     state = { ...state, plans: state.plans.filter((p) => p.id !== id) };
     persist();
   },
+  addXrays(planId: string, dataUrls: string[]) {
+    state = {
+      ...state,
+      plans: state.plans.map((p) =>
+        p.id === planId
+          ? { ...p, xrays: [...(p.xrays ?? []), ...dataUrls], updatedAt: Date.now() }
+          : p,
+      ),
+    };
+    persist();
+  },
+  removeXray(planId: string, index: number) {
+    state = {
+      ...state,
+      plans: state.plans.map((p) =>
+        p.id === planId
+          ? { ...p, xrays: (p.xrays ?? []).filter((_, i) => i !== index), updatedAt: Date.now() }
+          : p,
+      ),
+    };
+    persist();
+  },
 };
 
 export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string }> = {
