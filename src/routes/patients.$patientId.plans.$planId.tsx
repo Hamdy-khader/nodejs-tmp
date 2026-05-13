@@ -711,12 +711,13 @@ function Section({
 }
 
 function JawGrid({
-  numbers, plan, selected, onSelect,
+  numbers, plan, selected, onSelect, onEditDiagnosis,
 }: {
   numbers: number[];
   plan: TreatmentPlan;
   selected: number | null;
   onSelect: (n: number) => void;
+  onEditDiagnosis?: (n: number) => void;
 }) {
   const left = numbers.slice(0, 8);
   const right = numbers.slice(8);
@@ -757,7 +758,16 @@ function JawGrid({
                 <div className="flex flex-1 flex-wrap items-center gap-1.5">
                   {chipLabel && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-medium text-foreground/80 shadow-sm">
-                      {chipLabel}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditDiagnosis?.(n);
+                        }}
+                        className="cursor-pointer hover:underline"
+                      >
+                        {chipLabel}
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
