@@ -36,6 +36,7 @@ const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
 const MALOCCLUSION_VARIANTS = ["Malocclusion"];
+const FACIAL_VARIANTS = ["Facial disproportions"];
 const GENERAL_SEVERITY_VARIANTS = [
   "Bruxism signs",
   "Gingivitis",
