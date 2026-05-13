@@ -456,9 +456,9 @@ function PlanPage() {
 
           {severityPanelOpen &&
             selectedTooth &&
-            selectedTooth.status === "intact" &&
             selectedTooth.note &&
-            SEVERITY_VARIANTS.includes(selectedTooth.note) && (
+            ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
+              GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
               <SeverityDiagnosisPanel
                 planId={plan.id}
                 tooth={selectedTooth}
