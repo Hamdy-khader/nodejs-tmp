@@ -348,6 +348,9 @@ function PlanPage() {
                           if (group.id === "general" && GENERAL_SEVERITY_VARIANTS.includes(item)) {
                             setSeverityPanelOpen(true);
                           }
+                          if (group.id === "general" && FACIAL_VARIANTS.includes(item)) {
+                            setFacialPanelOpen(true);
+                          }
                         }
                       };
 
