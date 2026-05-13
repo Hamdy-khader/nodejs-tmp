@@ -316,6 +316,9 @@ function PlanPage() {
                           if (group.id === "intact" && SEVERITY_VARIANTS.includes(item)) {
                             setSeverityPanelOpen(true);
                           }
+                          if (group.id === "implant" && IMPLANT_VARIANTS.includes(item)) {
+                            setImplantPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
