@@ -133,7 +133,32 @@ function PlanPage() {
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [facialPanelOpen, setFacialPanelOpen] = useState(false);
   const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
+  const [panelKey, setPanelKey] = useState(0);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
+
+  const closeAllPanels = () => {
+    setFilledPanelOpen(false);
+    setSeverityPanelOpen(false);
+    setImplantPanelOpen(false);
+    setBridgePanelOpen(false);
+    setMalocclusionPanelOpen(false);
+    setFacialPanelOpen(false);
+  };
+
+  const openDiagnosisPanelForTooth = (n: number) => {
+    const t = plan?.teeth[n];
+    if (!t || !t.note) return;
+    setSelected(n);
+    closeAllPanels();
+    if (t.status === "filled" && FILLED_VARIANTS.includes(t.note)) setFilledPanelOpen(true);
+    else if (t.status === "intact" && SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
+    else if (GENERAL_SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
+    else if (t.status === "implant" && IMPLANT_VARIANTS.includes(t.note)) setImplantPanelOpen(true);
+    else if (t.status === "bridge" && BRIDGE_VARIANTS.includes(t.note)) setBridgePanelOpen(true);
+    else if (MALOCCLUSION_VARIANTS.includes(t.note)) setMalocclusionPanelOpen(true);
+    else if (FACIAL_VARIANTS.includes(t.note)) setFacialPanelOpen(true);
+    setPanelKey((k) => k + 1);
+  };
   const hydrated = useHydrated();
 
   useEffect(() => {
@@ -322,6 +347,7 @@ function PlanPage() {
 
                       const applySelection = (item: string) => {
                         if (!selectedTooth) return;
+                        closeAllPanels();
                         if (isToothStatus) {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -361,6 +387,7 @@ function PlanPage() {
                             setFacialPanelOpen(true);
                           }
                         }
+                        setPanelKey((k) => k + 1);
                       };
 
                       if (isSingle) {
@@ -469,7 +496,7 @@ function PlanPage() {
                 open={open.upper}
                 onToggle={() => setOpen((o) => ({ ...o, upper: !o.upper }))}
               >
-                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
 
               {/* Lower jaw */}
@@ -478,7 +505,7 @@ function PlanPage() {
                 open={open.lower}
                 onToggle={() => setOpen((o) => ({ ...o, lower: !o.lower }))}
               >
-                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} />
+                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
             </>
           )}
@@ -492,6 +519,7 @@ function PlanPage() {
             selectedTooth.note &&
             FILLED_VARIANTS.includes(selectedTooth.note) && (
               <FilledDiagnosisPanel
+                key={`filled-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -505,6 +533,7 @@ function PlanPage() {
             ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
               GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
               <SeverityDiagnosisPanel
+                key={`severity-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -518,6 +547,7 @@ function PlanPage() {
             selectedTooth.note &&
             IMPLANT_VARIANTS.includes(selectedTooth.note) && (
               <ImplantDiagnosisPanel
+                key={`implant-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -531,6 +561,7 @@ function PlanPage() {
             selectedTooth.note &&
             BRIDGE_VARIANTS.includes(selectedTooth.note) && (
               <BridgeDiagnosisPanel
+                key={`bridge-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -543,6 +574,7 @@ function PlanPage() {
             selectedTooth.note &&
             MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
               <MalocclusionDiagnosisPanel
+                key={`malocclusion-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -555,6 +587,7 @@ function PlanPage() {
             selectedTooth.note &&
             FACIAL_VARIANTS.includes(selectedTooth.note) && (
               <FacialDisproportionsPanel
+                key={`facial-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -678,12 +711,13 @@ function Section({
 }
 
 function JawGrid({
-  numbers, plan, selected, onSelect,
+  numbers, plan, selected, onSelect, onEditDiagnosis,
 }: {
   numbers: number[];
   plan: TreatmentPlan;
   selected: number | null;
   onSelect: (n: number) => void;
+  onEditDiagnosis?: (n: number) => void;
 }) {
   const left = numbers.slice(0, 8);
   const right = numbers.slice(8);
@@ -724,7 +758,16 @@ function JawGrid({
                 <div className="flex flex-1 flex-wrap items-center gap-1.5">
                   {chipLabel && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-medium text-foreground/80 shadow-sm">
-                      {chipLabel}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditDiagnosis?.(n);
+                        }}
+                        className="cursor-pointer hover:underline"
+                      >
+                        {chipLabel}
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
