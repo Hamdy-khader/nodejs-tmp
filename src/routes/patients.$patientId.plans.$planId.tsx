@@ -132,6 +132,7 @@ function PlanPage() {
   const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [facialPanelOpen, setFacialPanelOpen] = useState(false);
+  const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
