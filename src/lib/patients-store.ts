@@ -22,6 +22,7 @@ export interface TreatmentPlan {
   name: string;
   notes: string;
   teeth: Record<number, ToothState>;
+  xrays?: string[];
   createdAt: number;
   updatedAt: number;
 }
