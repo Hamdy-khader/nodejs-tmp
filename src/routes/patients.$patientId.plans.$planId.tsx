@@ -29,12 +29,14 @@ import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
+import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
 const MALOCCLUSION_VARIANTS = ["Malocclusion"];
+const FACIAL_VARIANTS = ["Facial disproportions"];
 const GENERAL_SEVERITY_VARIANTS = [
   "Bruxism signs",
   "Gingivitis",
@@ -127,6 +129,7 @@ function PlanPage() {
   const [implantPanelOpen, setImplantPanelOpen] = useState(false);
   const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
+  const [facialPanelOpen, setFacialPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -345,6 +348,9 @@ function PlanPage() {
                           if (group.id === "general" && GENERAL_SEVERITY_VARIANTS.includes(item)) {
                             setSeverityPanelOpen(true);
                           }
+                          if (group.id === "general" && FACIAL_VARIANTS.includes(item)) {
+                            setFacialPanelOpen(true);
+                          }
                         }
                       };
 
@@ -502,6 +508,18 @@ function PlanPage() {
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
                 onClose={() => setMalocclusionPanelOpen(false)}
+              />
+            )}
+
+          {facialPanelOpen &&
+            selectedTooth &&
+            selectedTooth.note &&
+            FACIAL_VARIANTS.includes(selectedTooth.note) && (
+              <FacialDisproportionsPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setFacialPanelOpen(false)}
               />
             )}
 
