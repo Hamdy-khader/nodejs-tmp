@@ -35,6 +35,12 @@ const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
 const MALOCCLUSION_VARIANTS = ["Malocclusion"];
+const GENERAL_SEVERITY_VARIANTS = [
+  "Bruxism signs",
+  "Gingivitis",
+  "Periodontitis",
+  "Gingival recession",
+];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
