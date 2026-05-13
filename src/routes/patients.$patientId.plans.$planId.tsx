@@ -345,6 +345,12 @@ function PlanPage() {
                             ...selectedTooth,
                             note: item,
                           });
+                          if (
+                            (group.id === "general" && item === "General") ||
+                            (group.id === "other" && item === "Other...")
+                          ) {
+                            setGeneralDialogOpen(true);
+                          }
                           if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
                             setMalocclusionPanelOpen(true);
                           }
