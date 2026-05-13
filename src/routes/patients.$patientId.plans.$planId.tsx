@@ -696,39 +696,63 @@ function JawGrid({
             const isSel = selected === n;
             const status = t?.status ?? "intact";
             const set = status !== "intact";
+            const baseLabel = t?.note || (set ? STATUS_META[status].label : "");
+            const dx = (t?.diagnosis ?? []).filter(Boolean);
+            const chipLabel = baseLabel
+              ? dx.length
+                ? `${baseLabel} - ${dx.join(", ")}`
+                : baseLabel
+              : "";
             return (
-              <button
+              <div
                 key={n}
-                onClick={() => onSelect(n)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-md bg-muted/50 px-3 py-2.5 text-left text-sm transition-all",
+                  "flex w-full items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-left text-sm transition-all",
                   isSel ? "ring-1 ring-primary bg-primary/5" : "hover:bg-muted",
                 )}
               >
-                <span className={cn(
-                  "min-w-[26px] text-sm font-semibold tabular-nums",
-                  isSel ? "text-primary" : "text-foreground/70",
-                )}>
-                  {n}
-                </span>
-                <span className="flex flex-1 items-center gap-2">
-                  {set && (
-                    <>
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ background: STATUS_META[status].color }}
-                      />
-                      <span className="text-xs font-medium text-foreground/80">
-                        {STATUS_META[status].label}
-                      </span>
-                    </>
+                <button
+                  type="button"
+                  onClick={() => onSelect(n)}
+                  className={cn(
+                    "min-w-[26px] text-sm font-semibold tabular-nums text-left",
+                    isSel ? "text-primary" : "text-foreground/70",
                   )}
-                </span>
-                <Plus className={cn(
-                  "h-4 w-4 shrink-0",
-                  isSel ? "text-primary" : "text-muted-foreground",
-                )} />
-              </button>
+                >
+                  {n}
+                </button>
+                <div className="flex flex-1 flex-wrap items-center gap-1.5">
+                  {chipLabel && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-medium text-foreground/80 shadow-sm">
+                      {chipLabel}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          patientsStore.setTooth(plan.id, {
+                            number: n,
+                            status: "intact",
+                            note: undefined,
+                            diagnosis: undefined,
+                          });
+                        }}
+                        className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+                        aria-label={`Clear tooth ${n}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelect(n)}
+                  className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted"
+                  aria-label={`Select tooth ${n}`}
+                >
+                  <Plus className={cn("h-4 w-4", isSel ? "text-primary" : "text-muted-foreground")} />
+                </button>
+              </div>
             );
           })}
         </div>
