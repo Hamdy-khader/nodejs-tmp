@@ -120,6 +120,7 @@ function PlanPage() {
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [implantPanelOpen, setImplantPanelOpen] = useState(false);
   const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
+  const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
