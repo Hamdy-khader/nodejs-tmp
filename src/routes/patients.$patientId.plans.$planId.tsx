@@ -519,6 +519,7 @@ function PlanPage() {
             selectedTooth.note &&
             FILLED_VARIANTS.includes(selectedTooth.note) && (
               <FilledDiagnosisPanel
+                key={`filled-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -532,6 +533,7 @@ function PlanPage() {
             ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
               GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
               <SeverityDiagnosisPanel
+                key={`severity-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -545,6 +547,7 @@ function PlanPage() {
             selectedTooth.note &&
             IMPLANT_VARIANTS.includes(selectedTooth.note) && (
               <ImplantDiagnosisPanel
+                key={`implant-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -558,6 +561,7 @@ function PlanPage() {
             selectedTooth.note &&
             BRIDGE_VARIANTS.includes(selectedTooth.note) && (
               <BridgeDiagnosisPanel
+                key={`bridge-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -570,6 +574,7 @@ function PlanPage() {
             selectedTooth.note &&
             MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
               <MalocclusionDiagnosisPanel
+                key={`malocclusion-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
@@ -582,6 +587,7 @@ function PlanPage() {
             selectedTooth.note &&
             FACIAL_VARIANTS.includes(selectedTooth.note) && (
               <FacialDisproportionsPanel
+                key={`facial-${panelKey}`}
                 planId={plan.id}
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
