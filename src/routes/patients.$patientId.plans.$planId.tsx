@@ -458,13 +458,14 @@ function RailRow({ icon, label, sub }: { icon: React.ReactNode; label: string; s
 }
 
 function RailButton({
-  icon, label, onClick, disabled, danger,
+  icon, label, onClick, disabled, danger, active,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   danger?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -474,6 +475,8 @@ function RailButton({
         "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground/50"
+          : active
+          ? "bg-primary/10 text-primary"
           : danger
           ? "text-destructive hover:bg-destructive/10"
           : "text-foreground/80 hover:bg-muted hover:text-foreground",
