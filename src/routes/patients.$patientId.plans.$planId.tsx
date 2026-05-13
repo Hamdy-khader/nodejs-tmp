@@ -288,7 +288,7 @@ function PlanPage() {
             <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
             <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
             <div className="my-2 h-px bg-border" />
-            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" />
+            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={() => setXrayOpen((o) => !o)} active={xrayOpen} />
             <RailButton
               icon={<Trash2 className="h-4 w-4" />}
               label="Delete plan"
