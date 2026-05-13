@@ -252,7 +252,11 @@ function PlanPage() {
                     {STATUS_GROUPS.map((group) => {
                       const isToothStatus = group.id !== "general" && group.id !== "other";
                       const statusActive =
-                        canSelectStatus && isToothStatus && selectedTooth?.status === group.id;
+                        canSelectStatus &&
+                        isToothStatus &&
+                        selectedTooth?.status === group.id &&
+                        !!selectedTooth?.note &&
+                        group.items.includes(selectedTooth.note);
                       const noteActive =
                         canSelectStatus &&
                         !isToothStatus &&
