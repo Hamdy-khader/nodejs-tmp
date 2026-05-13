@@ -111,6 +111,7 @@ function PlanPage() {
   const [pinned, setPinned] = useState(true);
   const [xrayOpen, setXrayOpen] = useState(false);
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
+  const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
