@@ -28,11 +28,13 @@ import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
+import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 const BRIDGE_VARIANTS = ["Bridge"];
+const MALOCCLUSION_VARIANTS = ["Malocclusion"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
