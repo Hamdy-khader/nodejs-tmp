@@ -439,10 +439,39 @@ function PlanPage() {
                 open={open.general}
                 onToggle={() => setOpen((o) => ({ ...o, general: !o.general }))}
               >
-                <NoteRow
-                  value={plan.notes}
-                  onChange={(v) => patientsStore.updatePlan(plan.id, { notes: v })}
-                />
+                <div className="flex h-12 w-full items-center gap-2 rounded-md bg-muted/50 px-3">
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    {(plan.generalStatuses ?? []).map((s, i) => (
+                      <span
+                        key={`${s}-${i}`}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs"
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (plan.generalStatuses ?? []).filter(
+                              (_, idx) => idx !== i,
+                            );
+                            patientsStore.updatePlan(plan.id, { generalStatuses: next });
+                          }}
+                          className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+                          aria-label={`Remove ${s}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setGeneralDialogOpen(true)}
+                    className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Add general status"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                </div>
               </Section>
 
               {/* Upper jaw */}
