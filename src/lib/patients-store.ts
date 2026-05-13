@@ -254,6 +254,76 @@ export const patientsStore = {
     };
     persist();
   },
+  setTreatments(planId: string, treatments: TreatmentRow[]) {
+    state = {
+      ...state,
+      plans: state.plans.map((p) =>
+        p.id === planId ? { ...p, treatments, updatedAt: Date.now() } : p,
+      ),
+    };
+    persist();
+  },
+  addTreatmentRow(planId: string, row: TreatmentRow) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.setTreatments(planId, [...(plan.treatments ?? []), row]);
+  },
+  updateTreatmentRow(planId: string, rowId: string, patch: Partial<TreatmentRow>) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.setTreatments(
+      planId,
+      (plan.treatments ?? []).map((r) =>
+        r.id === rowId ? ({ ...r, ...patch } as TreatmentRow) : r,
+      ),
+    );
+  },
+  removeTreatmentRow(planId: string, rowId: string) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.setTreatments(planId, (plan.treatments ?? []).filter((r) => r.id !== rowId));
+  },
+  addTreatmentItemToLastVisit(planId: string, item: Omit<TreatmentItem, "id">) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    const rows = [...(plan.treatments ?? [])];
+    let lastVisitIndex = -1;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].kind === "visit") { lastVisitIndex = i; break; }
+    }
+    const newItem: TreatmentItem = { ...item, id: uid() };
+    if (lastVisitIndex === -1) {
+      rows.push({ id: uid(), kind: "visit", items: [newItem] });
+    } else {
+      const v = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
+      rows[lastVisitIndex] = { ...v, items: [...v.items, newItem] };
+    }
+    this.setTreatments(planId, rows);
+  },
+  removeTreatmentItem(planId: string, rowId: string, itemId: string) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.setTreatments(
+      planId,
+      (plan.treatments ?? []).map((r) =>
+        r.kind === "visit" && r.id === rowId
+          ? { ...r, items: r.items.filter((it) => it.id !== itemId) }
+          : r,
+      ),
+    );
+  },
+  updateTreatmentItem(planId: string, rowId: string, itemId: string, patch: Partial<TreatmentItem>) {
+    const plan = state.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    this.setTreatments(
+      planId,
+      (plan.treatments ?? []).map((r) =>
+        r.kind === "visit" && r.id === rowId
+          ? { ...r, items: r.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)) }
+          : r,
+      ),
+    );
+  },
   deletePlan(id: string) {
     state = { ...state, plans: state.plans.filter((p) => p.id !== id) };
     persist();
