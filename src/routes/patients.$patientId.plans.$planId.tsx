@@ -133,7 +133,32 @@ function PlanPage() {
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [facialPanelOpen, setFacialPanelOpen] = useState(false);
   const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
+  const [panelKey, setPanelKey] = useState(0);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
+
+  const closeAllPanels = () => {
+    setFilledPanelOpen(false);
+    setSeverityPanelOpen(false);
+    setImplantPanelOpen(false);
+    setBridgePanelOpen(false);
+    setMalocclusionPanelOpen(false);
+    setFacialPanelOpen(false);
+  };
+
+  const openDiagnosisPanelForTooth = (n: number) => {
+    const t = plan?.teeth[n];
+    if (!t || !t.note) return;
+    setSelected(n);
+    closeAllPanels();
+    if (t.status === "filled" && FILLED_VARIANTS.includes(t.note)) setFilledPanelOpen(true);
+    else if (t.status === "intact" && SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
+    else if (GENERAL_SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
+    else if (t.status === "implant" && IMPLANT_VARIANTS.includes(t.note)) setImplantPanelOpen(true);
+    else if (t.status === "bridge" && BRIDGE_VARIANTS.includes(t.note)) setBridgePanelOpen(true);
+    else if (MALOCCLUSION_VARIANTS.includes(t.note)) setMalocclusionPanelOpen(true);
+    else if (FACIAL_VARIANTS.includes(t.note)) setFacialPanelOpen(true);
+    setPanelKey((k) => k + 1);
+  };
   const hydrated = useHydrated();
 
   useEffect(() => {
