@@ -333,6 +333,9 @@ function PlanPage() {
                             ...selectedTooth,
                             note: item,
                           });
+                          if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
+                            setMalocclusionPanelOpen(true);
+                          }
                         }
                       };
 
