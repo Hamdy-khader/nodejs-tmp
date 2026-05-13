@@ -247,8 +247,15 @@ function PlanPage() {
                   <div className="grid grid-cols-2 gap-2.5">
                     {STATUS_GROUPS.map((group) => {
                       const isToothStatus = group.id !== "general" && group.id !== "other";
-                      const active = canSelectStatus && isToothStatus && selectedTooth?.status === group.id;
-                      const disabled = !canSelectStatus || !isToothStatus;
+                      const statusActive =
+                        canSelectStatus && isToothStatus && selectedTooth?.status === group.id;
+                      const noteActive =
+                        canSelectStatus &&
+                        !isToothStatus &&
+                        !!selectedTooth?.note &&
+                        group.items.includes(selectedTooth.note);
+                      const active = statusActive || noteActive;
+                      const disabled = !canSelectStatus;
                       const currentLabel =
                         active && selectedTooth?.note && group.items.includes(selectedTooth.note)
                           ? selectedTooth.note
@@ -265,7 +272,7 @@ function PlanPage() {
                       const triggerInner = (
                         <>
                           <span className="flex min-w-0 items-center gap-2">
-                            {isToothStatus && !disabled && (
+                            {isToothStatus && (
                               <span
                                 className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/40"
                                 style={{ background: STATUS_META[group.id as ToothStatus].color }}
@@ -281,19 +288,28 @@ function PlanPage() {
                         </>
                       );
 
+                      const applySelection = (item: string) => {
+                        if (!selectedTooth) return;
+                        if (isToothStatus) {
+                          patientsStore.setTooth(plan.id, {
+                            ...selectedTooth,
+                            status: group.id as ToothStatus,
+                            note: item,
+                          });
+                        } else {
+                          patientsStore.setTooth(plan.id, {
+                            ...selectedTooth,
+                            note: item,
+                          });
+                        }
+                      };
+
                       if (isSingle) {
                         return (
                           <button
                             key={group.id}
                             disabled={disabled}
-                            onClick={() => {
-                              if (!isToothStatus || !selectedTooth) return;
-                              patientsStore.setTooth(plan.id, {
-                                ...selectedTooth,
-                                status: group.id as ToothStatus,
-                                note: group.items[0],
-                              });
-                            }}
+                            onClick={() => applySelection(group.items[0])}
                             className={triggerClass}
                           >
                             {triggerInner}
@@ -314,14 +330,7 @@ function PlanPage() {
                               return (
                                 <DropdownMenuItem
                                   key={item}
-                                  onSelect={() => {
-                                    if (!isToothStatus || !selectedTooth) return;
-                                    patientsStore.setTooth(plan.id, {
-                                      ...selectedTooth,
-                                      status: group.id as ToothStatus,
-                                      note: item,
-                                    });
-                                  }}
+                                  onSelect={() => applySelection(item)}
                                   className={cn(
                                     "flex items-center justify-between gap-2 text-xs font-medium",
                                     isActive && "bg-accent",
