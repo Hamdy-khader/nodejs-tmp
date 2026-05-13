@@ -164,12 +164,15 @@ function Row({
   teeth,
   selected,
   onSelect,
+  highlighted,
 }: { numbers: number[]; isUpper: boolean } & Props) {
+  const hSet = new Set(highlighted ?? []);
   return (
     <div className="flex w-full items-end justify-center gap-0.5 sm:gap-1">
       {numbers.map((n) => {
         const t = teeth[n];
         const isSel = selected === n;
+        const isHi = hSet.has(n);
         return (
           <button
             key={n}
@@ -185,7 +188,9 @@ function Row({
                 "aspect-[1/2] w-full max-w-[44px] rounded-md transition-all",
                 isSel
                   ? "scale-110 ring-2 ring-primary ring-offset-2 ring-offset-background"
-                  : "hover:scale-105",
+                  : isHi
+                    ? "scale-105 ring-2 ring-[oklch(0.55_0.18_290)] ring-offset-2 ring-offset-background"
+                    : "hover:scale-105",
               )}
             >
               <ToothSVG number={n} status={t?.status ?? "intact"} />
@@ -193,7 +198,11 @@ function Row({
             <span
               className={cn(
                 "mt-1 text-[10px] font-medium tabular-nums sm:text-xs",
-                isSel ? "text-primary font-bold" : "text-muted-foreground",
+                isSel
+                  ? "text-primary font-bold"
+                  : isHi
+                    ? "font-bold text-[oklch(0.45_0.18_290)]"
+                    : "text-muted-foreground",
               )}
             >
               {n}
@@ -205,12 +214,12 @@ function Row({
   );
 }
 
-export function TeethChart({ teeth, selected, onSelect }: Props) {
+export function TeethChart({ teeth, selected, onSelect, highlighted }: Props) {
   return (
     <div className="space-y-3 rounded-2xl border border-border/60 bg-card p-3 sm:p-5">
-      <Row numbers={UPPER_TEETH} isUpper teeth={teeth} selected={selected} onSelect={onSelect} />
+      <Row numbers={UPPER_TEETH} isUpper teeth={teeth} selected={selected} onSelect={onSelect} highlighted={highlighted} />
       <div className="mx-auto h-px w-full bg-border" />
-      <Row numbers={LOWER_TEETH} isUpper={false} teeth={teeth} selected={selected} onSelect={onSelect} />
+      <Row numbers={LOWER_TEETH} isUpper={false} teeth={teeth} selected={selected} onSelect={onSelect} highlighted={highlighted} />
     </div>
   );
 }
