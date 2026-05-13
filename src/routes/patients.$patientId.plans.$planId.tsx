@@ -361,6 +361,21 @@ function PlanPage() {
                 </div>
               </div>
 
+              {filledPanelOpen &&
+                selectedTooth &&
+                selectedTooth.status === "filled" &&
+                selectedTooth.note &&
+                FILLED_VARIANTS.includes(selectedTooth.note) && (
+                  <div className="flex justify-end">
+                    <FilledDiagnosisPanel
+                      planId={plan.id}
+                      tooth={selectedTooth}
+                      variant={selectedTooth.note}
+                      onClose={() => setFilledPanelOpen(false)}
+                    />
+                  </div>
+                )}
+
               {xrayOpen && (
                 <XrayPanel
                   planId={plan.id}
