@@ -300,6 +300,9 @@ function PlanPage() {
                             status: group.id as ToothStatus,
                             note: item,
                           });
+                          if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
+                            setFilledPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
