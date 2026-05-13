@@ -312,7 +312,7 @@ function PlanPage() {
                         !!selectedTooth?.note &&
                         group.items.includes(selectedTooth.note);
                       const active = statusActive || noteActive;
-                      const disabled = !canSelectStatus;
+                      const disabled = !canSelectStatus && isToothStatus;
                       const currentLabel =
                         active && selectedTooth?.note && group.items.includes(selectedTooth.note)
                           ? selectedTooth.note
