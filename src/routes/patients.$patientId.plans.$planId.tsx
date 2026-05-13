@@ -312,7 +312,7 @@ function PlanPage() {
                         !!selectedTooth?.note &&
                         group.items.includes(selectedTooth.note);
                       const active = statusActive || noteActive;
-                      const disabled = !canSelectStatus;
+                      const disabled = !canSelectStatus && isToothStatus;
                       const currentLabel =
                         active && selectedTooth?.note && group.items.includes(selectedTooth.note)
                           ? selectedTooth.note
@@ -346,9 +346,9 @@ function PlanPage() {
                       );
 
                       const applySelection = (item: string) => {
-                        if (!selectedTooth) return;
                         closeAllPanels();
                         if (isToothStatus) {
+                          if (!selectedTooth) return;
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
                             status: group.id as ToothStatus,
@@ -367,24 +367,16 @@ function PlanPage() {
                             setBridgePanelOpen(true);
                           }
                         } else {
-                          patientsStore.setTooth(plan.id, {
-                            ...selectedTooth,
-                            note: item,
-                          });
+                          // General / Other... — open dialog for free text
                           if (
                             (group.id === "general" && item === "General") ||
                             (group.id === "other" && item === "Other...")
                           ) {
                             setGeneralDialogOpen(true);
-                          }
-                          if (group.id === "general" && MALOCCLUSION_VARIANTS.includes(item)) {
-                            setMalocclusionPanelOpen(true);
-                          }
-                          if (group.id === "general" && GENERAL_SEVERITY_VARIANTS.includes(item)) {
-                            setSeverityPanelOpen(true);
-                          }
-                          if (group.id === "general" && FACIAL_VARIANTS.includes(item)) {
-                            setFacialPanelOpen(true);
+                          } else {
+                            // Any predefined item — add directly as a tag in General box
+                            const next = [...(plan.generalStatuses ?? []), item];
+                            patientsStore.updatePlan(plan.id, { generalStatuses: next });
                           }
                         }
                         setPanelKey((k) => k + 1);
