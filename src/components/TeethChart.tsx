@@ -5,6 +5,7 @@ interface Props {
   teeth: Record<number, ToothState>;
   selected?: number | null;
   onSelect?: (n: number) => void;
+  highlighted?: number[];
 }
 
 type Cat = "molar" | "premolar" | "canine" | "incisor";
