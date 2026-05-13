@@ -347,6 +347,7 @@ function PlanPage() {
 
                       const applySelection = (item: string) => {
                         if (!selectedTooth) return;
+                        closeAllPanels();
                         if (isToothStatus) {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -386,6 +387,7 @@ function PlanPage() {
                             setFacialPanelOpen(true);
                           }
                         }
+                        setPanelKey((k) => k + 1);
                       };
 
                       if (isSingle) {
