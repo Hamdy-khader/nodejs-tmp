@@ -30,6 +30,8 @@ import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPanel";
 import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
+import { GeneralStatusDialog } from "@/components/GeneralStatusDialog";
+import { X } from "lucide-react";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
