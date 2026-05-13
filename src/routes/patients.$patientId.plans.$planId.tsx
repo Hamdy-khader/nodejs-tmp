@@ -26,9 +26,11 @@ import { cn } from "@/lib/utils";
 import { XrayPanel } from "@/components/XrayPanel";
 import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
+import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
+const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -112,6 +114,7 @@ function PlanPage() {
   const [xrayOpen, setXrayOpen] = useState(false);
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
+  const [implantPanelOpen, setImplantPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -313,6 +316,9 @@ function PlanPage() {
                           if (group.id === "intact" && SEVERITY_VARIANTS.includes(item)) {
                             setSeverityPanelOpen(true);
                           }
+                          if (group.id === "implant" && IMPLANT_VARIANTS.includes(item)) {
+                            setImplantPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -437,6 +443,19 @@ function PlanPage() {
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
                 onClose={() => setSeverityPanelOpen(false)}
+              />
+            )}
+
+          {implantPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "implant" &&
+            selectedTooth.note &&
+            IMPLANT_VARIANTS.includes(selectedTooth.note) && (
+              <ImplantDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setImplantPanelOpen(false)}
               />
             )}
 
