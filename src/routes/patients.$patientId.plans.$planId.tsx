@@ -245,6 +245,14 @@ function PlanPage() {
                 </div>
               </div>
 
+              {xrayOpen && (
+                <XrayPanel
+                  planId={plan.id}
+                  xrays={plan.xrays ?? []}
+                  onClose={() => setXrayOpen(false)}
+                />
+              )}
+
               {/* General section */}
               <Section
                 title="General"
