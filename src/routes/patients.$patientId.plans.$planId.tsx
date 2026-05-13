@@ -612,6 +612,45 @@ function PlanPage() {
             <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
             <div className="my-2 h-px bg-border" />
             <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={() => setXrayOpen((o) => !o)} active={xrayOpen} />
+            {step === "treatments" && (
+              <>
+                <div className="my-2 h-px bg-border" />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Visit"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "visit",
+                      items: [],
+                    })
+                  }
+                />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Healing period"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "healing",
+                    })
+                  }
+                />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Discount"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "discount",
+                      mode: "amount",
+                      value: 0,
+                    })
+                  }
+                />
+              </>
+            )}
+            <div className="my-2 h-px bg-border" />
             <RailButton
               icon={<Trash2 className="h-4 w-4" />}
               label="Delete plan"
