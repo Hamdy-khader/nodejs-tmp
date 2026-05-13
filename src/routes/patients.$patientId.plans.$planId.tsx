@@ -38,17 +38,58 @@ const STEPS = [
   { id: "overview", label: "Overview" },
 ] as const;
 
-const STATUS_OPTIONS: { value: ToothStatus | "general" | "other"; label: string }[] = [
-  { value: "missing", label: "Missing" },
-  { value: "intact", label: "Intact" },
-  { value: "filled", label: "Filled (amalgam)" },
-  { value: "caries", label: "Caries" },
-  { value: "root-treated", label: "Root treated" },
-  { value: "implant", label: "Implant + abutment" },
-  { value: "crown", label: "Crown" },
-  { value: "bridge", label: "Bridge" },
-  { value: "general", label: "General" },
-  { value: "other", label: "Other..." },
+type StatusGroupId = ToothStatus | "general" | "other";
+
+const STATUS_GROUPS: {
+  id: StatusGroupId;
+  label: string;
+  items: string[];
+}[] = [
+  { id: "missing", label: "Missing", items: ["Missing"] },
+  {
+    id: "intact",
+    label: "Intact",
+    items: [
+      "Intact", "Discolored", "Worn", "Fractured", "Fractured root",
+      "Radix", "Root resorption", "Mobility", "Necrosis",
+    ],
+  },
+  {
+    id: "filled",
+    label: "Filled (amalgam)",
+    items: ["Filled (composite)", "Inlay", "Filled (amalgam)"],
+  },
+  { id: "caries", label: "Caries", items: ["Caries"] },
+  {
+    id: "root-treated",
+    label: "Root treated",
+    items: ["Root treated", "Post", "Parapulpal pin"],
+  },
+  {
+    id: "implant",
+    label: "Implant + abutment",
+    items: ["Implant + abutment", "Implant"],
+  },
+  { id: "crown", label: "Crown", items: ["Crown", "Veneer"] },
+  { id: "bridge", label: "Bridge", items: ["Bridge", "Dentures"] },
+  {
+    id: "general",
+    label: "General",
+    items: [
+      "General", "Malocclusion", "Bruxism signs", "Facial disproportions",
+      "Plaque", "Gingivitis", "Periodontitis", "Bone loss",
+      "Gingival overgrowth", "Gingival recession", "Gummy smile",
+      "TMJ disorder", "Muscle disorder", "Large maxillary sinus",
+    ],
+  },
+  {
+    id: "other",
+    label: "Other...",
+    items: [
+      "Other...", "Drifted (front)", "Drifted (back)",
+      "Apical lesion", "Cyst", "Granuloma", "Impacted",
+    ],
+  },
 ];
 
 function PlanPage() {
