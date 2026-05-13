@@ -27,10 +27,12 @@ import { XrayPanel } from "@/components/XrayPanel";
 import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
+import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
+const BRIDGE_VARIANTS = ["Bridge"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -115,6 +117,7 @@ function PlanPage() {
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [implantPanelOpen, setImplantPanelOpen] = useState(false);
+  const [bridgePanelOpen, setBridgePanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -319,6 +322,9 @@ function PlanPage() {
                           if (group.id === "implant" && IMPLANT_VARIANTS.includes(item)) {
                             setImplantPanelOpen(true);
                           }
+                          if (group.id === "bridge" && BRIDGE_VARIANTS.includes(item)) {
+                            setBridgePanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -456,6 +462,19 @@ function PlanPage() {
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
                 onClose={() => setImplantPanelOpen(false)}
+              />
+            )}
+
+          {bridgePanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "bridge" &&
+            selectedTooth.note &&
+            BRIDGE_VARIANTS.includes(selectedTooth.note) && (
+              <BridgeDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setBridgePanelOpen(false)}
               />
             )}
 
