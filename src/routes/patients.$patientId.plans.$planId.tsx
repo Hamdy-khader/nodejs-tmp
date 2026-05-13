@@ -310,6 +310,9 @@ function PlanPage() {
                           if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
                             setFilledPanelOpen(true);
                           }
+                          if (group.id === "intact" && SEVERITY_VARIANTS.includes(item)) {
+                            setSeverityPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
