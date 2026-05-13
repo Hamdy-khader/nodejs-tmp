@@ -27,10 +27,12 @@ import { XrayPanel } from "@/components/XrayPanel";
 import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
+import { BridgeDiagnosisPanel } from "@/components/BridgeDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
 const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 const IMPLANT_VARIANTS = ["Implant + abutment", "Implant"];
+const BRIDGE_VARIANTS = ["Bridge"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
