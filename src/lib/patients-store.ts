@@ -17,6 +17,19 @@ export interface ToothState {
   diagnosis?: string[];
 }
 
+export interface TreatmentItem {
+  id: string;
+  name: string;
+  toothNumber?: number;
+  amount: number;
+  unitPrice: number;
+}
+
+export type TreatmentRow =
+  | { id: string; kind: "visit"; label?: string; items: TreatmentItem[] }
+  | { id: string; kind: "healing"; label?: string; days?: number }
+  | { id: string; kind: "discount"; mode: "amount" | "percent"; value: number };
+
 export interface TreatmentPlan {
   id: string;
   patientId: string;
@@ -25,6 +38,9 @@ export interface TreatmentPlan {
   teeth: Record<number, ToothState>;
   xrays?: string[];
   generalStatuses?: string[];
+  treatments?: TreatmentRow[];
+  treatmentNote?: string;
+  billingMode?: "insurance" | "payment";
   createdAt: number;
   updatedAt: number;
 }
