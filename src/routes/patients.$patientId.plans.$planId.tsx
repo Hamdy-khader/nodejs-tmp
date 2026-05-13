@@ -25,8 +25,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { XrayPanel } from "@/components/XrayPanel";
 import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
+import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 
 const FILLED_VARIANTS = ["Filled (composite)", "Filled (amalgam)", "Inlay"];
+const SEVERITY_VARIANTS = ["Worn", "Fractured"];
 
 export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
   component: PlanPage,
@@ -109,6 +111,7 @@ function PlanPage() {
   const [pinned, setPinned] = useState(true);
   const [xrayOpen, setXrayOpen] = useState(false);
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
+  const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const hydrated = useHydrated();
 
@@ -307,6 +310,9 @@ function PlanPage() {
                           if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
                             setFilledPanelOpen(true);
                           }
+                          if (group.id === "intact" && SEVERITY_VARIANTS.includes(item)) {
+                            setSeverityPanelOpen(true);
+                          }
                         } else {
                           patientsStore.setTooth(plan.id, {
                             ...selectedTooth,
@@ -418,6 +424,19 @@ function PlanPage() {
                 tooth={selectedTooth}
                 variant={selectedTooth.note}
                 onClose={() => setFilledPanelOpen(false)}
+              />
+            )}
+
+          {severityPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "intact" &&
+            selectedTooth.note &&
+            SEVERITY_VARIANTS.includes(selectedTooth.note) && (
+              <SeverityDiagnosisPanel
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setSeverityPanelOpen(false)}
               />
             )}
 
