@@ -160,6 +160,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [customText, setCustomText] = useState("");
   const [bridgeMode, setBridgeMode] = useState(false);
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
+  const [insOpen, setInsOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const rows = plan.treatments ?? [];
   const billingMode = plan.billingMode ?? "insurance";
