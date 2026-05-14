@@ -27,7 +27,7 @@ const steps = [
 const tiles: { title: string; icon: typeof UserPlus; primary?: boolean; to: string }[] = [
   { title: "New Patient", icon: UserPlus, primary: true, to: "/patients" },
   { title: "All Patients", icon: UsersIcon, to: "/patients" },
-  { title: "Your Clinic Fees", icon: Wallet, to: "/" },
+  { title: "Your Clinic Fees", icon: Wallet, to: "/clinic-fees" },
   { title: "Help Center", icon: HelpCircle, to: "/" },
   { title: "Live Support", icon: MessageCircle, to: "/" },
 ];
