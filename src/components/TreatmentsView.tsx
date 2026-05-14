@@ -557,6 +557,34 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
       )}
+
+      {insOpen && (
+        <InsuranceDialog
+          initial={plan.insurance ?? { unusedMax: 100, deductible: 0 }}
+          onClose={() => setInsOpen(false)}
+          onSave={(v) => {
+            patientsStore.updatePlan(plan.id, { insurance: v, billingMode: "insurance" });
+            setInsOpen(false);
+          }}
+        />
+      )}
+
+      {payOpen && (
+        <PaymentPlanDialog
+          initial={
+            plan.paymentPlan ?? {
+              amount: totals.total > 0 ? totals.total : 500,
+              term: 2,
+              interest: 0,
+            }
+          }
+          onClose={() => setPayOpen(false)}
+          onSave={(v) => {
+            patientsStore.updatePlan(plan.id, { paymentPlan: v, billingMode: "payment" });
+            setPayOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }
