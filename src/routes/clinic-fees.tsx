@@ -76,166 +76,30 @@ const DEFAULT_CURRENCIES: Currency[] = [
   { code: "GBP", label: "British pound", symbol: "£" },
 ];
 
-/* ---------------- Pricelist data ---------------- */
+/* ---------------- Pricelist data (types re-exported from store) ---------------- */
 
-type Item = { id: string; name: string; price: number; note?: string };
-type SubGroup = { id: string; title: string; priceLabel?: string; items: Item[] };
-type Section = { id: string; n: number | null; label: string; icon: React.ComponentType<{ className?: string }>; groups: SubGroup[] };
+type Item = PriceItem;
+type SubGroup = PriceSubGroup;
+type Section = Omit<PriceSection, "icon"> & { icon: React.ComponentType<{ className?: string }> };
 
-const uid = () => Math.random().toString(36).slice(2, 9);
-const mk = (name: string, price = 0, note = ""): Item => ({ id: uid(), name, price, note });
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  scissors: Scissors,
+  layers: Layers,
+  droplet: Droplet,
+  smile: Smile,
+  activity: Activity,
+  anchor: Anchor,
+  crown: CrownIcon,
+  wrench: Wrench,
+  package: Package,
+  more: MoreHorizontal,
+  sparkles: Sparkles,
+};
 
-const INITIAL: Section[] = [
-  {
-    id: "extraction", n: 1, label: "Extraction", icon: Scissors,
-    groups: [
-      { id: uid(), title: "Extraction", items: [
-        mk("Wisdom Extraction", 100), mk("Surgical extraction", 200), mk("Remove existing implant", 0),
-      ]},
-      { id: uid(), title: "Other treatments", items: [] },
-    ],
-  },
-  {
-    id: "prosthesis", n: 2, label: "Prosthesis removal", icon: Layers,
-    groups: [
-      { id: uid(), title: "Prosthesis removal", items: [
-        mk("Bridge removal", 10), mk("Crown removal", 10),
-      ]},
-    ],
-  },
-  {
-    id: "filling", n: 3, label: "Filling", icon: Droplet,
-    groups: [
-      { id: uid(), title: "Filling", items: [
-        mk("Filling", 150), mk("Temporary filling", 0), mk("Medicated filling", 0),
-      ]},
-      { id: uid(), title: "Inlay", items: [mk("Inlay", 300)] },
-      { id: uid(), title: "Onlay", items: [mk("Onlay", 300)] },
-      { id: uid(), title: "Other treatments", items: [] },
-    ],
-  },
-  {
-    id: "dentures", n: 4, label: "Dentures", icon: Smile,
-    groups: [
-      { id: uid(), title: "Dentures", priceLabel: "Package price", items: [
-        mk("Temporary bridge", 20), mk("Temporary crown", 20), mk("Overdenture", 0), mk("Overdentures", 0),
-      ]},
-      { id: uid(), title: "Other treatments", items: [mk("Preci-vertix", 0)] },
-    ],
-  },
-  {
-    id: "rct", n: 5, label: "Root canal treatment", icon: Activity,
-    groups: [
-      { id: uid(), title: "Root canal treatments (by roots)", items: [
-        mk("Root canal treatment - 1 root", 400),
-        mk("Root canal treatment - 2 root", 500),
-        mk("Root canal treatment - 3 root", 600),
-        mk("Root canal re-treatment", 500),
-      ]},
-      { id: uid(), title: "Post (composite)", items: [mk("Post", 200)] },
-      { id: uid(), title: "Post (metal)", items: [] },
-      { id: uid(), title: "Other treatments", items: [mk("Parapulpal pin", 0)] },
-    ],
-  },
-  {
-    id: "implant", n: 6, label: "Implant", icon: Anchor,
-    groups: [
-      { id: uid(), title: "Implant", items: [
-        mk("Implant - Nobel Biocare", 1500),
-        mk("Implant - Neodent", 1000),
-        mk("Implant - Straumann", 0),
-        mk("Implant - Astra", 0),
-        mk("Implant - Megagen", 0),
-        mk("Implant - Nobel Alpha Bio", 0),
-      ]},
-      { id: uid(), title: "Implant abutment", items: [
-        mk("Implant abutment - Titanium", 300),
-        mk("Implant abutment - Zirconium", 500),
-      ]},
-      { id: uid(), title: "Implant (one-phase)", items: [mk("Implant - BCS/KOS", 1000)] },
-      { id: uid(), title: "Other treatments", items: [
-        mk("Healing screw", 0), mk("Gingiva former", 0), mk("Bar", 0),
-        mk("Prosthetic screw (lateral)", 0), mk("Prosthetic screw", 0),
-      ]},
-    ],
-  },
-  {
-    id: "crown", n: 7, label: "Crown", icon: CrownIcon,
-    groups: [
-      { id: uid(), title: "Crown", items: [
-        mk("Crown - Metal-ceramic", 400),
-        mk("Crown - Zirconium", 700),
-        mk("Crown - Emax", 0),
-        mk("Crown - Gold-ceramic", 0),
-      ]},
-      { id: uid(), title: "Veneer", items: [mk("Veneer", 500)] },
-      { id: uid(), title: "Other treatments", items: [
-        mk("Telescopic crown", 0), mk("Filing", 0),
-      ]},
-    ],
-  },
-  {
-    id: "bridge", n: 8, label: "Bridge", icon: Wrench,
-    groups: [
-      { id: uid(), title: "Bridge", items: [
-        mk("Bridge - Metal-ceramic", 400),
-        mk("Bridge - Zirconium", 700),
-        mk("Bridge - Press Ceramic", 0),
-        mk("Bridge - Emax", 0),
-      ]},
-    ],
-  },
-  {
-    id: "general", n: 9, label: "General (fixed price)", icon: Package,
-    groups: [
-      { id: uid(), title: "Packages", priceLabel: "Package price", items: [
-        mk("All on 6 Bredent German", 0, "All Inclusive (6 pcs Bredent Implant - Temporary)"),
-        mk("All on 6 Straumann Swiss", 0, "All Inclusive (6 pcs Straumann Implant - Temporary)"),
-        mk("All on 4 Nobel Swiss", 0, "All Inclusive (4 pcs Nobel Implant - Temporary)"),
-        mk("Premium Hollywood Smile", 0, "All Inclusive (All Transfers - 5 Stars Radisson)"),
-        mk("Standard Smile Design", 0, "All Inclusive (All Transfers - 5 Stars Radisson)"),
-      ]},
-      { id: uid(), title: "General (fixed price)", priceLabel: "Package price", items: [
-        mk("Panoramic X-ray", 50),
-        mk("Impression", 0),
-        mk("Sinus lift", 1000),
-        mk("IV sedation", 1200),
-        mk("Medical Pack", 200),
-      ]},
-      { id: uid(), title: "Diagnostics", priceLabel: "Package price", items: [] },
-      { id: uid(), title: "Orthodontics (fixed price)", priceLabel: "Package price", items: [
-        mk("Clear Aligners", 0), mk("Fixed ceramic braces", 0), mk("Fixed metal braces", 0),
-        mk("Functional appliance", 0), mk("Removable appliance", 0), mk("Lingual braces", 0),
-        mk("Orthodontic retainer", 0),
-      ]},
-      { id: uid(), title: "Dental Hygiene (fixed price)", priceLabel: "Package price", items: [
-        mk("Teeth whitening - external bleach", 500),
-        mk("Teeth whitening - internal bleach", 400),
-        mk("Dental Hygiene Treatment", 100),
-        mk("Prevention & hygiene", 150),
-        mk("Topical fluoride", 50),
-      ]},
-      { id: uid(), title: "Hotel / Transfer", priceLabel: "Package price", items: [] },
-    ],
-  },
-  {
-    id: "other", n: 10, label: "Other", icon: MoreHorizontal,
-    groups: [
-      { id: uid(), title: "Other", items: [
-        mk("Local X-ray", 0), mk("Accommodation", 0), mk("Transportation (Airport-Hotel-Clinic)", 0),
-        mk("Apicoectomy", 0), mk("Core build-up", 0), mk("Crown lengthening", 0),
-        mk("Gingival graft", 0), mk("Gingivectomy", 0), mk("Laser gingivectomy", 0),
-        mk("Pocket reduction", 0), mk("Scaling / root planing", 0),
-      ]},
-    ],
-  },
-  {
-    id: "hair", n: null, label: "Hair Transplant", icon: Sparkles,
-    groups: [
-      { id: uid(), title: "Packages & additional treatments", items: [] },
-    ],
-  },
-];
+function withIcons(rows: PriceSection[]): Section[] {
+  return rows.map((s) => ({ ...s, icon: ICON_MAP[s.icon] ?? Package }));
+}
+
 
 /* ---------------- Page ---------------- */
 
