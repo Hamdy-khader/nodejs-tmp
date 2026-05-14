@@ -523,11 +523,12 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               className="mt-3"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && customText.trim()) {
+                  const name = customText.trim();
                   patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name: customText.trim(),
+                    name,
                     toothNumber: selected ?? undefined,
                     amount: 1,
-                    unitPrice: 0,
+                    unitPrice: pricelistStore.getPriceFor(name),
                   });
                   setCustomOpen(null);
                 }
