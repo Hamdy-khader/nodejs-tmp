@@ -225,10 +225,11 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       }
     }
     // Add a treatment line summarizing the bridge span
+    const bridgeName = `Bridge ${lo}–${hi}`;
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
-      name: `Bridge ${lo}–${hi}`,
+      name: bridgeName,
       amount: 1,
-      unitPrice: 0,
+      unitPrice: pricelistStore.getPriceFor("Bridge"),
     });
     cancelBridge();
   };
