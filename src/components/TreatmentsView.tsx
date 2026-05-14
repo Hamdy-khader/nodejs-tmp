@@ -441,6 +441,49 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
               </div>
             )}
+            {billingMode === "insurance" && plan.insurance && (() => {
+              const coverage = Math.max(
+                0,
+                Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
+              );
+              const oop = Math.max(0, totals.total - coverage);
+              return (
+                <>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Insurance coverage (estimated)</span>
+                    <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Out of pocket costs (estimated)</span>
+                    <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
+                  </div>
+                </>
+              );
+            })()}
+            {billingMode === "payment" && plan.paymentPlan && (() => {
+              const { amount, term, interest } = plan.paymentPlan;
+              const safeTerm = Math.max(1, term);
+              const monthly =
+                interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+              const totalPaid = monthly * safeTerm;
+              const totalInterest = Math.max(0, totalPaid - amount);
+              return (
+                <>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Monthly payments</span>
+                    <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Total interest</span>
+                    <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Total ({safeTerm} months)</span>
+                    <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div>
             <Textarea
