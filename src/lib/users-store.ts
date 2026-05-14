@@ -235,7 +235,7 @@ const log = (entry: Omit<AuditLog, "id" | "at">) => {
 
 export const usersStore = {
   get: () => load(),
-  subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); },
+  subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
 
   upsertUser(user: ClinicUser, actor = "Admin") {
     const s = load();
