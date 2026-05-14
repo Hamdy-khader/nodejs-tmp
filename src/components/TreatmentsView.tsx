@@ -160,6 +160,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [customText, setCustomText] = useState("");
   const [bridgeMode, setBridgeMode] = useState(false);
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
+  const [insOpen, setInsOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const rows = plan.treatments ?? [];
   const billingMode = plan.billingMode ?? "insurance";
@@ -370,7 +372,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           <h2 className="text-base font-bold tracking-tight">Your suggested treatment</h2>
           <div className="inline-flex rounded-full border border-border/60 p-0.5">
             <button
-              onClick={() => patientsStore.updatePlan(plan.id, { billingMode: "insurance" })}
+              onClick={() => {
+                patientsStore.updatePlan(plan.id, { billingMode: "insurance" });
+                setInsOpen(true);
+              }}
               className={cn(
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
                 billingMode === "insurance"
@@ -381,7 +386,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               Insurance
             </button>
             <button
-              onClick={() => patientsStore.updatePlan(plan.id, { billingMode: "payment" })}
+              onClick={() => {
+                patientsStore.updatePlan(plan.id, { billingMode: "payment" });
+                setPayOpen(true);
+              }}
               className={cn(
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
                 billingMode === "payment"
@@ -433,6 +441,49 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
               </div>
             )}
+            {billingMode === "insurance" && plan.insurance && (() => {
+              const coverage = Math.max(
+                0,
+                Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
+              );
+              const oop = Math.max(0, totals.total - coverage);
+              return (
+                <>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Insurance coverage (estimated)</span>
+                    <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Out of pocket costs (estimated)</span>
+                    <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
+                  </div>
+                </>
+              );
+            })()}
+            {billingMode === "payment" && plan.paymentPlan && (() => {
+              const { amount, term, interest } = plan.paymentPlan;
+              const safeTerm = Math.max(1, term);
+              const monthly =
+                interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+              const totalPaid = monthly * safeTerm;
+              const totalInterest = Math.max(0, totalPaid - amount);
+              return (
+                <>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Monthly payments</span>
+                    <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Total interest</span>
+                    <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm">
+                    <span className="text-foreground">Total ({safeTerm} months)</span>
+                    <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <div>
             <Textarea
@@ -505,6 +556,34 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             </div>
           </div>
         </div>
+      )}
+
+      {insOpen && (
+        <InsuranceDialog
+          initial={plan.insurance ?? { unusedMax: 100, deductible: 0 }}
+          onClose={() => setInsOpen(false)}
+          onSave={(v) => {
+            patientsStore.updatePlan(plan.id, { insurance: v, billingMode: "insurance" });
+            setInsOpen(false);
+          }}
+        />
+      )}
+
+      {payOpen && (
+        <PaymentPlanDialog
+          initial={
+            plan.paymentPlan ?? {
+              amount: totals.total > 0 ? totals.total : 500,
+              term: 2,
+              interest: 0,
+            }
+          }
+          onClose={() => setPayOpen(false)}
+          onSave={(v) => {
+            patientsStore.updatePlan(plan.id, { paymentPlan: v, billingMode: "payment" });
+            setPayOpen(false);
+          }}
+        />
       )}
     </>
   );
@@ -854,4 +933,183 @@ function DiscountRow({
 
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+function ModalShell({
+  title,
+  onClose,
+  children,
+  width = "max-w-md",
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  width?: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className={cn("w-full rounded-2xl bg-background shadow-xl", width)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border/50 px-5 py-3">
+          <h3 className="text-base font-semibold">{title}</h3>
+          <button
+            onClick={onClose}
+            className="rounded p-1 text-muted-foreground hover:bg-muted"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-5 py-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function InsuranceDialog({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: { unusedMax: number; deductible: number };
+  onClose: () => void;
+  onSave: (v: { unusedMax: number; deductible: number }) => void;
+}) {
+  const [unusedMax, setUnusedMax] = useState(initial.unusedMax);
+  const [deductible, setDeductible] = useState(initial.deductible);
+  return (
+    <ModalShell title="Insurance settings" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <label className="text-sm">Unused annual max for patient:</label>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-muted-foreground">$</span>
+            <Input
+              type="number"
+              min={0}
+              value={unusedMax}
+              onChange={(e) => setUnusedMax(Math.max(0, Number(e.target.value) || 0))}
+              className="h-8 w-28 text-right"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <label className="text-sm">Deductible:</label>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-muted-foreground">$</span>
+            <Input
+              type="number"
+              min={0}
+              value={deductible}
+              onChange={(e) => setDeductible(Math.max(0, Number(e.target.value) || 0))}
+              className="h-8 w-28 text-right"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={() => onSave({ unusedMax, deductible })}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/10"
+          >
+            <Check className="h-4 w-4" /> OK
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+function PaymentPlanDialog({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: { amount: number; term: number; interest: number };
+  onClose: () => void;
+  onSave: (v: { amount: number; term: number; interest: number }) => void;
+}) {
+  const [amount, setAmount] = useState(initial.amount);
+  const [term, setTerm] = useState(initial.term);
+  const [interest, setInterest] = useState(initial.interest);
+  const safeTerm = Math.max(1, term);
+  const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+  const totalPaid = monthly * safeTerm;
+  const totalInterest = Math.max(0, totalPaid - amount);
+  return (
+    <ModalShell title="Payment plan" onClose={onClose} width="max-w-2xl">
+      <div className="space-y-5">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <div className="text-xs text-muted-foreground">Amount to loan</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-lg font-semibold">$</span>
+              <Input
+                type="number"
+                min={0}
+                value={amount}
+                onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+                className="h-9 border-0 border-b border-border/60 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+              />
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Term (months)</div>
+            <Input
+              type="number"
+              min={1}
+              value={term}
+              onChange={(e) => setTerm(Math.max(1, Number(e.target.value) || 1))}
+              className="mt-1 h-9 border-0 border-b border-border/60 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+            />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Interest rate</div>
+            <div className="mt-1 flex items-baseline gap-1">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={interest}
+                onChange={(e) => setInterest(Math.max(0, Number(e.target.value) || 0))}
+                className="h-9 border-0 border-b border-border/60 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-muted/40 p-4">
+          <h4 className="text-sm font-bold text-primary">Calculations</h4>
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+              <span>Monthly payments</span>
+              <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+              <span>Total interest</span>
+              <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Total</span>
+              <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => onSave({ amount, term, interest })}
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/10"
+          >
+            <Check className="h-4 w-4" /> OK
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
 }

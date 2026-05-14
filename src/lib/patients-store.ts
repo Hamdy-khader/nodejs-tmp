@@ -41,6 +41,8 @@ export interface TreatmentPlan {
   treatments?: TreatmentRow[];
   treatmentNote?: string;
   billingMode?: "insurance" | "payment";
+  insurance?: { unusedMax: number; deductible: number };
+  paymentPlan?: { amount: number; term: number; interest: number };
   createdAt: number;
   updatedAt: number;
 }
