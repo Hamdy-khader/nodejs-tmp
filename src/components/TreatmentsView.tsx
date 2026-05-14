@@ -544,11 +544,12 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               <button
                 onClick={() => {
                   if (!customText.trim()) return;
+                  const name = customText.trim();
                   patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name: customText.trim(),
+                    name,
                     toothNumber: selected ?? undefined,
                     amount: 1,
-                    unitPrice: 0,
+                    unitPrice: pricelistStore.getPriceFor(name),
                   });
                   setCustomOpen(null);
                 }}
