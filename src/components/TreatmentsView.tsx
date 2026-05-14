@@ -433,16 +433,23 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         {/* Totals + Note */}
         <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/40 pt-4 lg:grid-cols-[1fr_320px]">
           <div className="rounded-md bg-muted/40 px-4 py-4">
+            {totals.discount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">$ {totals.subtotal.toFixed(0)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Discount</span>
+                  <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
+                </div>
+                <div className="my-2 h-px bg-border/60" />
+              </>
+            )}
             <div className="flex items-center justify-between text-base font-bold uppercase text-primary">
               <span>Total</span>
               <span className="text-foreground tabular-nums">$ {totals.total.toFixed(0)}</span>
             </div>
-            {totals.discount > 0 && (
-              <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Discount</span>
-                <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
-              </div>
-            )}
             {billingMode === "insurance" && plan.insurance && (() => {
               const coverage = Math.max(
                 0,
