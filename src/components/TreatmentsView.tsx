@@ -8,6 +8,7 @@ import {
   UPPER_TEETH,
   LOWER_TEETH,
 } from "@/lib/patients-store";
+import { pricelistStore } from "@/lib/pricelist-store";
 import { TeethChart } from "@/components/TeethChart";
 import {
   DropdownMenu,
