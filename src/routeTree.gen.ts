@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as ClinicFeesRouteImport } from './routes/clinic-fees'
 import { Route as IndexRouteImport } from './routes/index'
@@ -21,6 +22,11 @@ import { Route as PatientsPatientIdPlansPlanIdRouteImport } from './routes/patie
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientsRoute = PatientsRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/patients': typeof PatientsRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/patients/': typeof PatientsIndexRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
+  '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/patients': typeof PatientsIndexRoute
   '/patients/$patientId': typeof PatientsPatientIdIndexRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/patients': typeof PatientsRouteWithChildren
+  '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/patients/': typeof PatientsIndexRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/patients'
+    | '/templates'
     | '/users'
     | '/patients/$patientId'
     | '/patients/'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/clinic-fees'
+    | '/templates'
     | '/users'
     | '/patients'
     | '/patients/$patientId'
@@ -113,6 +124,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/patients'
+    | '/templates'
     | '/users'
     | '/patients/$patientId'
     | '/patients/'
@@ -124,6 +136,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClinicFeesRoute: typeof ClinicFeesRoute
   PatientsRoute: typeof PatientsRouteWithChildren
+  TemplatesRoute: typeof TemplatesRoute
   UsersRoute: typeof UsersRoute
 }
 
@@ -134,6 +147,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patients': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClinicFeesRoute: ClinicFeesRoute,
   PatientsRoute: PatientsRouteWithChildren,
+  TemplatesRoute: TemplatesRoute,
   UsersRoute: UsersRoute,
 }
 export const routeTree = rootRouteImport
