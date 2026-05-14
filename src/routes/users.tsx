@@ -788,8 +788,8 @@ function PermissionsTab({ roles }: { roles: Role[] }) {
           </thead>
           <tbody>
             {Object.entries(grouped).map(([group, perms]) => (
-              <>
-                <tr key={`g-${group}`} className="bg-muted/20">
+              <Fragment key={group}>
+                <tr className="bg-muted/20">
                   <td colSpan={roles.length + 1} className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{group}</td>
                 </tr>
                 {perms.map((p) => (
@@ -807,7 +807,7 @@ function PermissionsTab({ roles }: { roles: Role[] }) {
                     })}
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
