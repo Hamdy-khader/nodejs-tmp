@@ -372,7 +372,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           <h2 className="text-base font-bold tracking-tight">Your suggested treatment</h2>
           <div className="inline-flex rounded-full border border-border/60 p-0.5">
             <button
-              onClick={() => patientsStore.updatePlan(plan.id, { billingMode: "insurance" })}
+              onClick={() => {
+                patientsStore.updatePlan(plan.id, { billingMode: "insurance" });
+                setInsOpen(true);
+              }}
               className={cn(
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
                 billingMode === "insurance"
@@ -383,7 +386,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               Insurance
             </button>
             <button
-              onClick={() => patientsStore.updatePlan(plan.id, { billingMode: "payment" })}
+              onClick={() => {
+                patientsStore.updatePlan(plan.id, { billingMode: "payment" });
+                setPayOpen(true);
+              }}
               className={cn(
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
                 billingMode === "payment"
