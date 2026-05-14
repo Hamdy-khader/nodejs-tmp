@@ -209,20 +209,18 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       }
       return a - b;
     });
-    // Selected teeth become abutments (bridge crowns); intact teeth between
-    // them become missing pontics. Already-missing teeth stay missing.
+    // Selected teeth become abutments; teeth between them become pontics.
+    // Both render as "bridge" so the connector is one continuous span.
     const lo = sorted[0];
     const hi = sorted[sorted.length - 1];
     const between = teethBetween(lo, hi);
-    for (const n of sorted) {
+    const span = [...sorted, ...between];
+    for (const n of span) {
       const t = plan.teeth[n];
-      patientsStore.setTooth(plan.id, { ...(t ?? { number: n, status: "intact" }), status: "bridge" });
-    }
-    for (const n of between) {
-      const t = plan.teeth[n];
-      if (!t || t.status === "intact") {
-        patientsStore.setTooth(plan.id, { number: n, status: "missing" });
-      }
+      patientsStore.setTooth(plan.id, {
+        ...(t ?? { number: n, status: "intact" }),
+        status: "bridge",
+      });
     }
     // Add a treatment line summarizing the bridge span
     const bridgeName = `Bridge ${lo}–${hi}`;
