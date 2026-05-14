@@ -18,8 +18,16 @@ function categoryOf(n: number): Cat {
   return "incisor";
 }
 
-// Upper-oriented shapes: crown on TOP (y ≈ 8–38), roots BELOW (y ≈ 38–78).
-// viewBox 0 0 40 80
+// Bridge palette — medical green
+const BRIDGE = {
+  band: "oklch(0.86 0.13 150)",
+  bandSoft: "oklch(0.92 0.08 150)",
+  bar: "oklch(0.55 0.18 150)",
+  outline: "oklch(0.45 0.18 150)",
+  crownTint: "oklch(0.93 0.07 150)",
+} as const;
+
+// viewBox 0 0 40 80 — crown TOP (y 8–38), roots BELOW (y 38–78).
 const SHAPES: Record<Cat, { crown: string; roots: string[] }> = {
   molar: {
     crown:
@@ -54,33 +62,32 @@ const SHAPES: Record<Cat, { crown: string; roots: string[] }> = {
   },
 };
 
-function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
+function ToothSVG({
+  number,
+  status,
+  bridgePosition,
+}: {
+  number: number;
+  status: ToothStatus;
+  /** Where this tooth sits inside a bridge run, undefined when not bridged. */
+  bridgePosition?: "single" | "left" | "middle" | "right";
+}) {
   const cat = categoryOf(number);
   const isUpper = number < 30;
   const meta = STATUS_META[status];
   const shape = SHAPES[cat];
 
-  // light "crown indicator" (the pale blue area in the reference image)
   const indicatorFill = "oklch(0.92 0.04 230)"; // soft blue
   const rootFill = "#ffffff";
   const stroke = "oklch(0.42 0.04 240)";
   const strokeW = 1.1;
 
-  // Status-driven fills
   const crownFill = (() => {
     switch (status) {
-      case "intact":
-        return rootFill;
-      case "filled":
-        return rootFill;
-      case "caries":
-        return rootFill;
       case "crown":
         return meta.color;
-      case "implant":
       case "bridge":
-      case "root-treated":
-        return rootFill;
+        return BRIDGE.crownTint;
       default:
         return rootFill;
     }
@@ -98,9 +105,7 @@ function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
   if (status === "implant") {
     return (
       <svg viewBox="0 0 40 80" className="h-full w-full" style={isUpper ? undefined : { transform: "rotate(180deg)" }}>
-        {/* abutment */}
         <rect x="14" y="8" width="12" height="14" rx="2" fill={meta.color} stroke={meta.ring} strokeWidth="1.4" />
-        {/* screw body */}
         <path d="M11 22 L29 22 L26 70 Q23 76 20 76 Q17 76 14 70 Z" fill={meta.color} stroke={meta.ring} strokeWidth="1.4" />
         {[28, 34, 40, 46, 52, 58, 64].map((y) => (
           <line key={y} x1="14" y1={y} x2="26" y2={y} stroke={meta.ring} strokeWidth="0.7" />
@@ -109,20 +114,52 @@ function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
     );
   }
 
+  // Bridge connector geometry (extends past the viewBox to bridge the row gap)
+  const isBridge = status === "bridge" && bridgePosition !== undefined;
+  const barLeft = bridgePosition === "left" || bridgePosition === "single" ? 4 : -4;
+  const barRight = bridgePosition === "right" || bridgePosition === "single" ? 36 : 44;
+
   return (
     <svg
       viewBox="0 0 40 80"
       className="h-full w-full"
-      style={isUpper ? undefined : { transform: "rotate(180deg)" }}
+      style={{
+        overflow: "visible",
+        ...(isUpper ? null : { transform: "rotate(180deg)" }),
+      }}
     >
-      {/* roots (drawn first so crown sits on top) */}
+      {/* Bridge connector bar at the gum line (drawn first so crown sits on top). */}
+      {isBridge && (
+        <>
+          <rect
+            x={barLeft}
+            y={34}
+            width={barRight - barLeft}
+            height={9}
+            rx={2}
+            fill={BRIDGE.band}
+            opacity={0.55}
+          />
+          <line
+            x1={barLeft}
+            y1={38.5}
+            x2={barRight}
+            y2={38.5}
+            stroke={BRIDGE.bar}
+            strokeWidth={2.4}
+            strokeLinecap={bridgePosition === "middle" ? "butt" : "round"}
+          />
+        </>
+      )}
+
+      {/* roots */}
       {shape.roots.map((d, i) => (
         <path key={i} d={d} fill={rootFill} stroke={stroke} strokeWidth={strokeW} strokeLinejoin="round" />
       ))}
-      {/* crown (white base) */}
+      {/* crown */}
       <path d={shape.crown} fill={crownFill} stroke={stroke} strokeWidth={strokeW} strokeLinejoin="round" />
-      {/* light-blue crown indicator (the pale area inside the crown in the reference) */}
-      {status !== "crown" && (
+      {/* light blue indicator */}
+      {status !== "crown" && status !== "bridge" && (
         <path
           d={shape.crown}
           fill={indicatorFill}
@@ -130,7 +167,6 @@ function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
         />
       )}
 
-      {/* status overlays on the crown */}
       {status === "caries" && (
         <circle cx="20" cy={cat === "molar" ? 22 : 20} r="3.6" fill="oklch(0.55 0.18 40)" stroke="oklch(0.35 0.1 30)" strokeWidth="0.8" />
       )}
@@ -149,13 +185,26 @@ function ToothSVG({ number, status }: { number: number; status: ToothStatus }) {
         </>
       )}
       {status === "bridge" && (
-        <>
-          <line x1="0" y1="38" x2="40" y2="38" stroke="oklch(0.45 0.13 280)" strokeWidth="2.4" strokeLinecap="round" />
-          <path d={shape.crown} fill="none" stroke="oklch(0.45 0.13 280)" strokeWidth="1.6" />
-        </>
+        <path d={shape.crown} fill="none" stroke={BRIDGE.outline} strokeWidth={1.6} strokeLinejoin="round" />
       )}
     </svg>
   );
+}
+
+/** Find runs of consecutive bridge-status teeth in a row. */
+function bridgeRuns(numbers: number[], teeth: Record<number, ToothState>) {
+  const runs: { start: number; end: number }[] = [];
+  let i = 0;
+  while (i < numbers.length) {
+    if (teeth[numbers[i]]?.status === "bridge") {
+      const start = i;
+      while (i < numbers.length && teeth[numbers[i]]?.status === "bridge") i++;
+      runs.push({ start, end: i - 1 });
+    } else {
+      i++;
+    }
+  }
+  return runs;
 }
 
 function Row({
@@ -167,19 +216,57 @@ function Row({
   highlighted,
 }: { numbers: number[]; isUpper: boolean } & Props) {
   const hSet = new Set(highlighted ?? []);
+  const runs = bridgeRuns(numbers, teeth);
+  const runLookup = new Map<number, "single" | "left" | "middle" | "right">();
+  for (const r of runs) {
+    if (r.start === r.end) {
+      runLookup.set(r.start, "single");
+    } else {
+      runLookup.set(r.start, "left");
+      runLookup.set(r.end, "right");
+      for (let k = r.start + 1; k < r.end; k++) runLookup.set(k, "middle");
+    }
+  }
+
+  const N = numbers.length;
+
   return (
-    <div className="flex w-full items-end justify-center gap-0.5 sm:gap-1">
-      {numbers.map((n) => {
+    <div className="relative flex w-full items-end justify-center gap-0.5 sm:gap-1">
+      {/* Bridge band overlay — sits behind the teeth */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        {runs.map((r, i) => {
+          const left = (r.start / N) * 100;
+          const width = ((r.end - r.start + 1) / N) * 100;
+          return (
+            <div
+              key={i}
+              className="absolute rounded-md"
+              style={{
+                left: `calc(${left}% + 1px)`,
+                width: `calc(${width}% - 2px)`,
+                top: isUpper ? "0%" : "12%",
+                bottom: isUpper ? "12%" : "0%",
+                background: `linear-gradient(${isUpper ? "180deg" : "0deg"}, ${BRIDGE.bandSoft} 0%, ${BRIDGE.band} 100%)`,
+                opacity: 0.35,
+                boxShadow: `inset 0 0 0 1px ${BRIDGE.bar}55`,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {numbers.map((n, idx) => {
         const t = teeth[n];
         const isSel = selected === n;
         const isHi = hSet.has(n);
+        const bridgePos = runLookup.get(idx);
         return (
           <button
             key={n}
             type="button"
             onClick={() => onSelect?.(n)}
             className={cn(
-              "group flex min-w-0 flex-1 flex-col items-center",
+              "group relative z-10 flex min-w-0 flex-1 flex-col items-center",
               isUpper ? "flex-col" : "flex-col-reverse",
             )}
           >
@@ -193,7 +280,7 @@ function Row({
                     : "hover:scale-105",
               )}
             >
-              <ToothSVG number={n} status={t?.status ?? "intact"} />
+              <ToothSVG number={n} status={t?.status ?? "intact"} bridgePosition={bridgePos} />
             </div>
             <span
               className={cn(
@@ -202,7 +289,9 @@ function Row({
                   ? "text-primary font-bold"
                   : isHi
                     ? "font-bold text-[oklch(0.45_0.18_290)]"
-                    : "text-muted-foreground",
+                    : bridgePos
+                      ? "font-bold text-[oklch(0.4_0.16_150)]"
+                      : "text-muted-foreground",
               )}
             >
               {n}
