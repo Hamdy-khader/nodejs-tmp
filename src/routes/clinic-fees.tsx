@@ -114,7 +114,8 @@ function ClinicFeesPage() {
   const [pendingLang, setPendingLang] = useState(language);
   const [pendingCurrency, setPendingCurrency] = useState(currencyCode);
 
-  const [sections, setSections] = useState<Section[]>(INITIAL);
+  const rawSections = usePricelist();
+  const sections = useMemo(() => withIcons(rawSections), [rawSections]);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const currentCurrency = currencies.find((c) => c.code === currencyCode) ?? currencies[0];
@@ -131,8 +132,12 @@ function ClinicFeesPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const mutate = (fn: (prev: PriceSection[]) => PriceSection[]) => {
+    pricelistStore.setSections(fn(pricelistStore.get()));
+  };
+
   const updateItem = (sectionId: string, groupId: string, itemId: string, patch: Partial<Item>) => {
-    setSections((prev) => prev.map((s) =>
+    mutate((prev) => prev.map((s) =>
       s.id !== sectionId ? s : {
         ...s,
         groups: s.groups.map((g) =>
@@ -143,18 +148,18 @@ function ClinicFeesPage() {
   };
 
   const addItem = (sectionId: string, groupId: string) => {
-    setSections((prev) => prev.map((s) =>
+    mutate((prev) => prev.map((s) =>
       s.id !== sectionId ? s : {
         ...s,
         groups: s.groups.map((g) =>
-          g.id !== groupId ? g : { ...g, items: [...g.items, mk("New treatment", 0)] },
+          g.id !== groupId ? g : { ...g, items: [...g.items, pricelistStore.newItem("New treatment", 0)] },
         ),
       },
     ));
   };
 
   const removeItem = (sectionId: string, groupId: string, itemId: string) => {
-    setSections((prev) => prev.map((s) =>
+    mutate((prev) => prev.map((s) =>
       s.id !== sectionId ? s : {
         ...s,
         groups: s.groups.map((g) =>
@@ -163,6 +168,7 @@ function ClinicFeesPage() {
       },
     ));
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-secondary/40 to-background">
