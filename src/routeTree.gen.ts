@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as ClinicFeesRouteImport } from './routes/clinic-fees'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patien
 import { Route as PatientsPatientIdIndexRouteImport } from './routes/patients.$patientId.index'
 import { Route as PatientsPatientIdPlansPlanIdRouteImport } from './routes/patients.$patientId.plans.$planId'
 
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientsRoute = PatientsRouteImport.update({
   id: '/patients',
   path: '/patients',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/patients': typeof PatientsRouteWithChildren
+  '/users': typeof UsersRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/patients/': typeof PatientsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
+  '/users': typeof UsersRoute
   '/patients': typeof PatientsIndexRoute
   '/patients/$patientId': typeof PatientsPatientIdIndexRoute
   '/patients/$patientId/plans/$planId': typeof PatientsPatientIdPlansPlanIdRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/patients': typeof PatientsRouteWithChildren
+  '/users': typeof UsersRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/patients/': typeof PatientsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/patients'
+    | '/users'
     | '/patients/$patientId'
     | '/patients/'
     | '/patients/$patientId/'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/clinic-fees'
+    | '/users'
     | '/patients'
     | '/patients/$patientId'
     | '/patients/$patientId/plans/$planId'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/patients'
+    | '/users'
     | '/patients/$patientId'
     | '/patients/'
     | '/patients/$patientId/'
@@ -112,10 +124,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClinicFeesRoute: typeof ClinicFeesRoute
   PatientsRoute: typeof PatientsRouteWithChildren
+  UsersRoute: typeof UsersRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patients': {
       id: '/patients'
       path: '/patients'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClinicFeesRoute: ClinicFeesRoute,
   PatientsRoute: PatientsRouteWithChildren,
+  UsersRoute: UsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
