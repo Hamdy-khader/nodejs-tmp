@@ -8,6 +8,7 @@ import {
   UPPER_TEETH,
   LOWER_TEETH,
 } from "@/lib/patients-store";
+import { pricelistStore } from "@/lib/pricelist-store";
 import { TeethChart } from "@/components/TeethChart";
 import {
   DropdownMenu,
@@ -182,7 +183,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       name: item,
       toothNumber: selected ?? undefined,
       amount: 1,
-      unitPrice: 0,
+      unitPrice: pricelistStore.getPriceFor(item),
     });
   };
 
@@ -224,10 +225,11 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       }
     }
     // Add a treatment line summarizing the bridge span
+    const bridgeName = `Bridge ${lo}–${hi}`;
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
-      name: `Bridge ${lo}–${hi}`,
+      name: bridgeName,
       amount: 1,
-      unitPrice: 0,
+      unitPrice: pricelistStore.getPriceFor("Bridge"),
     });
     cancelBridge();
   };
@@ -431,16 +433,23 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         {/* Totals + Note */}
         <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/40 pt-4 lg:grid-cols-[1fr_320px]">
           <div className="rounded-md bg-muted/40 px-4 py-4">
+            {totals.discount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">$ {totals.subtotal.toFixed(0)}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Discount</span>
+                  <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
+                </div>
+                <div className="my-2 h-px bg-border/60" />
+              </>
+            )}
             <div className="flex items-center justify-between text-base font-bold uppercase text-primary">
               <span>Total</span>
               <span className="text-foreground tabular-nums">$ {totals.total.toFixed(0)}</span>
             </div>
-            {totals.discount > 0 && (
-              <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Discount</span>
-                <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
-              </div>
-            )}
             {billingMode === "insurance" && plan.insurance && (() => {
               const coverage = Math.max(
                 0,
@@ -521,11 +530,12 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               className="mt-3"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && customText.trim()) {
+                  const name = customText.trim();
                   patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name: customText.trim(),
+                    name,
                     toothNumber: selected ?? undefined,
                     amount: 1,
-                    unitPrice: 0,
+                    unitPrice: pricelistStore.getPriceFor(name),
                   });
                   setCustomOpen(null);
                 }
@@ -541,11 +551,12 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               <button
                 onClick={() => {
                   if (!customText.trim()) return;
+                  const name = customText.trim();
                   patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name: customText.trim(),
+                    name,
                     toothNumber: selected ?? undefined,
                     amount: 1,
-                    unitPrice: 0,
+                    unitPrice: pricelistStore.getPriceFor(name),
                   });
                   setCustomOpen(null);
                 }}
