@@ -183,7 +183,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       name: item,
       toothNumber: selected ?? undefined,
       amount: 1,
-      unitPrice: 0,
+      unitPrice: pricelistStore.getPriceFor(item),
     });
   };
 
