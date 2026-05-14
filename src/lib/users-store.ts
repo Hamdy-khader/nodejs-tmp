@@ -299,10 +299,7 @@ export const usersStore = {
 
 export function useUsersStore(): State {
   const [, force] = useState(0);
-  useEffect(() => {
-    const unsub = usersStore.subscribe(() => force((n) => n + 1));
-    return () => { unsub; };
-  }, []);
+  useEffect(() => usersStore.subscribe(() => force((n) => n + 1)), []);
   return usersStore.get();
 }
 
