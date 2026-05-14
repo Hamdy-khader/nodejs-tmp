@@ -265,6 +265,14 @@ function PlanPage() {
             </div>
           </div>
 
+          {xrayOpen && step === "treatments" && (
+            <XrayPanel
+              planId={plan.id}
+              xrays={plan.xrays ?? []}
+              onClose={() => setXrayOpen(false)}
+            />
+          )}
+
           {step === "treatments" ? (
             <TreatmentsView plan={plan} />
           ) : step !== "diagnosis" ? (
