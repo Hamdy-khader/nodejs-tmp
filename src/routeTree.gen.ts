@@ -13,6 +13,7 @@ import { Route as UsersRouteImport } from './routes/users'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as PlanSettingsRouteImport } from './routes/plan-settings'
 import { Route as PatientsRouteImport } from './routes/patients'
+import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as ClinicFeesRouteImport } from './routes/clinic-fees'
 import { Route as IndexRouteImport } from './routes/index'
@@ -39,6 +40,11 @@ const PlanSettingsRoute = PlanSettingsRouteImport.update({
 const PatientsRoute = PatientsRouteImport.update({
   id: '/patients',
   path: '/patients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OverviewRoute = OverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/overview': typeof OverviewRoute
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/overview'
     | '/patients'
     | '/plan-settings'
     | '/templates'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/overview'
     | '/plan-settings'
     | '/templates'
     | '/users'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/overview'
     | '/patients'
     | '/plan-settings'
     | '/templates'
@@ -160,6 +172,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClinicFeesRoute: typeof ClinicFeesRoute
   DocumentsRoute: typeof DocumentsRoute
+  OverviewRoute: typeof OverviewRoute
   PatientsRoute: typeof PatientsRouteWithChildren
   PlanSettingsRoute: typeof PlanSettingsRoute
   TemplatesRoute: typeof TemplatesRoute
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/patients'
       fullPath: '/patients'
       preLoaderRoute: typeof PatientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/overview': {
+      id: '/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof OverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClinicFeesRoute: ClinicFeesRoute,
   DocumentsRoute: DocumentsRoute,
+  OverviewRoute: OverviewRoute,
   PatientsRoute: PatientsRouteWithChildren,
   PlanSettingsRoute: PlanSettingsRoute,
   TemplatesRoute: TemplatesRoute,
@@ -287,3 +308,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

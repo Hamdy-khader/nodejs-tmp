@@ -14,10 +14,12 @@ export interface PlanSettings {
   pageSize: PageSize;
   priceListDesign: "compact" | "detailed" | "minimal";
   pricePage: {
+    showPrices: boolean;
     showSubtotal: boolean;
     showDiscount: boolean;
     showTax: boolean;
     showTotal: boolean;
+    showInsurance: boolean;
     currency: string;
   };
   planSections: {
@@ -38,10 +40,12 @@ const defaults: PlanSettings = {
   pageSize: "A4",
   priceListDesign: "detailed",
   pricePage: {
+    showPrices: true,
     showSubtotal: true,
     showDiscount: true,
     showTax: false,
     showTotal: true,
+    showInsurance: true,
     currency: "USD",
   },
   planSections: {
