@@ -72,8 +72,8 @@ export function DocumentsPanel() {
 
   const previewDocs = useMemo(() => {
     const out: DocRow[] = [];
-    (["clinic", "diagnosis", "treatments", "other"] as DocSectionId[]).forEach((s) => {
-      sections[s].forEach((r) => { if (selectedSet.has(r.id)) out.push(r); });
+    (["clinic", "diagnosis", "treatments", "other"] as const).forEach((s) => {
+      sections[s].forEach((r: DocRow) => { if (selectedSet.has(r.id)) out.push(r); });
     });
     return out;
   }, [sections, selectedSet]);
