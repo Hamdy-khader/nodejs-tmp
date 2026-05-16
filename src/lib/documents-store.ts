@@ -84,12 +84,18 @@ export function useSectionOrder() {
   return useSyncExternalStore(sub, () => state.order, () => state.order);
 }
 
+let historyCache = { canUndo: false, canRedo: false };
+function getHistory() {
+  const canUndo = state.history.length > 0;
+  const canRedo = state.future.length > 0;
+  if (canUndo !== historyCache.canUndo || canRedo !== historyCache.canRedo) {
+    historyCache = { canUndo, canRedo };
+  }
+  return historyCache;
+}
+
 export function useDocsHistoryState() {
-  return useSyncExternalStore(
-    sub,
-    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
-    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
-  );
+  return useSyncExternalStore(sub, getHistory, getHistory);
 }
 
 export const documentsStore = {
