@@ -14,15 +14,18 @@ import {
   FileText,
   Sparkles,
   ScrollText,
+  Pencil,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   documentsStore,
-  useDocuments,
+  useSelectedIds,
+  useSectionOrder,
   useDocsHistoryState,
   type DocSectionId,
-  type DocumentItem,
 } from "@/lib/documents-store";
+import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 
 export const Route = createFileRoute("/documents")({
   head: () => ({
@@ -42,57 +45,162 @@ const STEPS = [
   { id: "overview", label: "Overview", icon: ScrollText },
 ] as const;
 
-const SECTIONS: { id: DocSectionId; label: string }[] = [
-  { id: "clinic", label: "THE CLINIC" },
-  { id: "opg", label: "OPG X-RAYS" },
-  { id: "diagnosis", label: "DIAGNOSIS DESCRIPTIONS" },
-  { id: "treatments", label: "TREATMENT DESCRIPTIONS" },
-  { id: "other", label: "OTHER DOCUMENTS" },
-];
+/* ============== Item model ============== */
+
+interface DocRow {
+  id: string;
+  title: string;
+  hasVideo?: boolean;
+  isCustomNote?: boolean;
+  fromTemplate?: ClinicTemplate;
+}
+
+const VIDEO_HINT = /(crown|implant|bridge|veneer|inlay|onlay|maryland|zirconium|titanium)/i;
+
+function buildSection(
+  sectionId: DocSectionId,
+  templates: ClinicTemplate[],
+  order: string[],
+): DocRow[] {
+  let rows: DocRow[] = [];
+
+  if (sectionId === "clinic") {
+    rows = [
+      { id: "fixed:clinic:demo", title: "Demo Dentist" },
+      { id: "fixed:clinic:note", title: "Custom note", isCustomNote: true },
+    ];
+  } else if (sectionId === "diagnosis") {
+    rows = [
+      { id: "fixed:diagnosis:note", title: "Custom note", isCustomNote: true },
+      ...templates
+        .filter((t) => t.category === "diagnosis")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({ id: t.id, title: t.title, fromTemplate: t })),
+    ];
+  } else if (sectionId === "treatments") {
+    rows = [
+      { id: "fixed:treatments:note", title: "Custom note", isCustomNote: true },
+      ...templates
+        .filter((t) => t.category === "treatments")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({
+          id: t.id,
+          title: t.title,
+          hasVideo: VIDEO_HINT.test(t.title),
+          fromTemplate: t,
+        })),
+    ];
+  } else if (sectionId === "other") {
+    rows = [
+      { id: "fixed:other:guarantee", title: "Guarantee and Brief Info" },
+      { id: "fixed:other:ourclinic", title: "Our Clinic" },
+      ...templates
+        .filter((t) => t.category === "other" || t.category === "dentists")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({ id: t.id, title: t.title, fromTemplate: t })),
+      { id: "fixed:other:note", title: "Custom note", isCustomNote: true },
+    ];
+  }
+
+  if (order.length === 0) return rows;
+  const map = new Map(rows.map((r) => [r.id, r]));
+  const ordered: DocRow[] = [];
+  for (const id of order) if (map.has(id)) ordered.push(map.get(id)!);
+  for (const r of rows) if (!order.includes(r.id)) ordered.push(r);
+  return ordered;
+}
+
+/* ============== Page ============== */
 
 function DocumentsPage() {
-  const items = useDocuments();
+  const templates = useTemplates();
+  const selectedIds = useSelectedIds();
+  const order = useSectionOrder();
   const { canUndo, canRedo } = useDocsHistoryState();
 
-  const selected = useMemo(
-    () => items.filter((i) => i.selected).sort((a, b) => a.order - b.order),
-    [items],
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const sections = useMemo(
+    () => ({
+      clinic: buildSection("clinic", templates, order.clinic),
+      diagnosis: buildSection("diagnosis", templates, order.diagnosis),
+      treatments: buildSection("treatments", templates, order.treatments),
+      other: buildSection("other", templates, order.other),
+    }),
+    [templates, order],
   );
+
+  // Preview docs in selection order, respecting section order
+  const previewDocs = useMemo(() => {
+    const out: DocRow[] = [];
+    (["clinic", "diagnosis", "treatments", "other"] as DocSectionId[]).forEach((s) => {
+      const list = sections[s as keyof typeof sections];
+      list.forEach((r) => {
+        if (selectedSet.has(r.id)) out.push(r);
+      });
+    });
+    return out;
+  }, [sections, selectedSet]);
 
   return (
     <div className="min-h-screen bg-[oklch(0.96_0.005_160)]">
       {/* Top navbar */}
-      <header className="bg-[oklch(0.23_0.06_240)] px-6 py-4">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between">
-          <div className="flex items-center gap-6 text-white">
-            <Link to="/" className="text-lg font-semibold tracking-tight">BrightPlans</Link>
+      <header className="bg-[oklch(0.23_0.06_240)] px-6 py-3">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between">
+          <div className="flex items-center gap-4 text-white">
+            <Link to="/" className="text-lg font-semibold tracking-tight">
+              BrightPlans
+            </Link>
             <span className="text-sm text-white/80">Elene</span>
+            <div className="ml-4 flex items-center gap-1">
+              <span className="flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs">
+                Your suggested treat…
+                <button className="opacity-70 hover:opacity-100">×</button>
+              </span>
+              <button className="grid size-6 place-items-center rounded text-white/80 hover:bg-white/10">
+                +
+              </button>
+            </div>
           </div>
           <button className="grid size-9 place-items-center rounded-md text-white/90 hover:bg-white/10">
-            <span className="block h-0.5 w-5 bg-current shadow-[0_-6px_0_currentColor,0_6px_0_currentColor]" />
+            <Menu className="size-5" />
           </button>
         </div>
       </header>
 
-      {/* Step progress */}
       <StepProgress active="documents" />
 
-      <div className="mx-auto grid max-w-[1500px] gap-5 px-6 py-6 lg:grid-cols-[280px_1fr_220px]">
-        {/* PDF Preview */}
-        <PdfPreviewPanel documents={selected} />
+      <div className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 lg:grid-cols-[300px_1fr_220px]">
+        <PdfPreviewPanel documents={previewDocs} />
 
-        {/* Main */}
         <main className="space-y-6 rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-          {SECTIONS.map((s) => (
-            <DocumentSection
-              key={s.id}
-              section={s}
-              items={items.filter((i) => i.section === s.id).sort((a, b) => a.order - b.order)}
-            />
-          ))}
+          <DocumentSection
+            section={{ id: "clinic", label: "THE CLINIC" }}
+            items={sections.clinic}
+            selectedSet={selectedSet}
+          />
+
+          <OpgSection />
+
+          <DocumentSection
+            section={{ id: "diagnosis", label: "DIAGNOSIS DESCRIPTIONS", subtitle: "Based upon the patient's diagnosis" }}
+            items={sections.diagnosis}
+            selectedSet={selectedSet}
+          />
+
+          <DocumentSection
+            section={{ id: "treatments", label: "TREATMENT DESCRIPTIONS", subtitle: "Based upon the added treatments" }}
+            items={sections.treatments}
+            selectedSet={selectedSet}
+          />
+
+          <DocumentSection
+            section={{ id: "other", label: "OTHER DOCUMENTS" }}
+            items={sections.other}
+            selectedSet={selectedSet}
+          />
         </main>
 
-        {/* Right action sidebar */}
         <RightActionSidebar canUndo={canUndo} canRedo={canRedo} />
       </div>
     </div>
@@ -104,7 +212,7 @@ function DocumentsPage() {
 function StepProgress({ active }: { active: string }) {
   return (
     <nav className="border-b border-border/60 bg-white">
-      <div className="mx-auto flex max-w-[1500px] items-stretch">
+      <div className="mx-auto flex max-w-[1600px] items-stretch">
         {STEPS.map((s, i) => {
           const isActive = s.id === active;
           return (
@@ -139,43 +247,72 @@ function StepProgress({ active }: { active: string }) {
 
 /* ---------- PdfPreviewPanel ---------- */
 
-function PdfPreviewPanel({ documents }: { documents: DocumentItem[] }) {
+// Deterministic widths so SSR === client (no Math.random)
+const LINE_WIDTHS = [92, 78, 88, 70, 95, 82, 65, 90, 74, 86];
+
+function PdfPreviewPanel({ documents }: { documents: DocRow[] }) {
   return (
-    <aside className="self-start rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+    <aside
+      className="self-start rounded-2xl border border-border/60 bg-[oklch(0.93_0.005_240)] p-4 shadow-inner"
+      style={{ maxHeight: "calc(100vh - 180px)" }}
+    >
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">
           PDF Preview
         </span>
         <span className="text-[11px] text-muted-foreground">{documents.length} pages</span>
       </div>
-      <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: "70vh" }}>
+      <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 240px)" }}>
         {documents.length === 0 && (
-          <p className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+          <p className="rounded-md border border-dashed border-border bg-white p-4 text-center text-xs text-muted-foreground">
             No documents selected.
           </p>
         )}
         {documents.map((d, i) => (
           <div
             key={d.id}
-            className="group relative flex aspect-[1/1.3] flex-col rounded-md border border-border bg-white p-2 shadow-sm transition hover:shadow-md"
+            className="group relative rounded-md border border-border bg-white shadow-sm transition hover:shadow-md"
+            style={{ aspectRatio: "1 / 1.35" }}
           >
-            <div className="border-b border-border/60 pb-1 text-[8px] font-semibold uppercase tracking-wider text-foreground/70">
-              {d.title}
+            {/* Page title chip */}
+            <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-[oklch(0.55_0.18_245)] px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
+              <span className="max-w-[140px] truncate">{d.title}</span>
+              <Pencil className="size-2.5 opacity-80" />
             </div>
-            <div className="flex-1 space-y-1 pt-2">
-              {Array.from({ length: 8 }).map((_, k) => (
+
+            {/* fake page lines */}
+            <div className="flex h-full flex-col gap-1 px-3 pb-2 pt-8">
+              {LINE_WIDTHS.map((w, k) => (
                 <div
                   key={k}
-                  className="h-0.5 rounded bg-muted"
-                  style={{ width: `${50 + Math.random() * 50}%` }}
+                  className="h-[3px] rounded bg-muted"
+                  style={{ width: `${w}%` }}
                 />
               ))}
             </div>
-            <div className="text-right text-[7px] text-muted-foreground">{i + 1}</div>
+
+            <div className="absolute bottom-1 right-2 text-[8px] text-muted-foreground">
+              {i + 1}
+            </div>
           </div>
         ))}
       </div>
     </aside>
+  );
+}
+
+/* ---------- OPG (read-only info) ---------- */
+
+function OpgSection() {
+  return (
+    <section>
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+        OPG X-RAYS
+      </h3>
+      <p className="rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+        Upload an OPG X-ray in the diagnosis tab
+      </p>
+    </section>
   );
 }
 
@@ -184,9 +321,11 @@ function PdfPreviewPanel({ documents }: { documents: DocumentItem[] }) {
 function DocumentSection({
   section,
   items,
+  selectedSet,
 }: {
-  section: { id: DocSectionId; label: string };
-  items: DocumentItem[];
+  section: { id: DocSectionId; label: string; subtitle?: string };
+  items: DocRow[];
+  selectedSet: Set<string>;
 }) {
   const dragId = useRef<string | null>(null);
 
@@ -203,14 +342,18 @@ function DocumentSection({
 
   return (
     <section>
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
         {section.label}
       </h3>
-      <ul className="divide-y divide-border/50 rounded-lg border border-border/60">
+      {section.subtitle && (
+        <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>
+      )}
+      <ul className="mt-3 divide-y divide-border/50 rounded-lg border border-border/60">
         {items.map((it) => (
           <DocumentRow
             key={it.id}
             item={it}
+            selected={selectedSet.has(it.id)}
             onDragStart={() => (dragId.current = it.id)}
             onDrop={() => onDrop(it.id)}
           />
@@ -229,10 +372,12 @@ function DocumentSection({
 
 function DocumentRow({
   item,
+  selected,
   onDragStart,
   onDrop,
 }: {
-  item: DocumentItem;
+  item: DocRow;
+  selected: boolean;
   onDragStart: () => void;
   onDrop: () => void;
 }) {
@@ -247,26 +392,27 @@ function DocumentRow({
       <GripVertical className="size-4 cursor-grab text-muted-foreground/60" />
       <button
         onClick={() => documentsStore.toggle(item.id)}
+        aria-pressed={selected}
         className={cn(
           "grid size-5 place-items-center rounded border transition",
-          item.selected
+          selected
             ? "border-primary bg-primary text-primary-foreground"
             : "border-border bg-white hover:border-primary",
         )}
       >
-        {item.selected && <Check className="size-3.5" />}
+        {selected && <Check className="size-3.5" />}
       </button>
-      <FileText className="size-4 text-muted-foreground/80" />
       <span
         className={cn(
           "flex-1 text-sm",
-          item.selected ? "text-foreground" : "text-muted-foreground",
+          selected ? "text-foreground" : "text-muted-foreground",
+          item.isCustomNote && "italic",
         )}
       >
         {item.title}
       </span>
       {item.hasVideo && (
-        <span className="grid size-6 place-items-center rounded-full bg-destructive/10 text-destructive">
+        <span className="grid size-6 place-items-center rounded bg-muted text-muted-foreground">
           <Youtube className="size-3.5" />
         </span>
       )}
@@ -281,11 +427,15 @@ function RightActionSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: b
     <aside className="self-start rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
       <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
         <Globe className="size-4 text-muted-foreground" />
-        <span>Language</span>
+        <span>English</span>
       </button>
-      <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-        <DollarSign className="size-4 text-muted-foreground" />
-        <span>Currency</span>
+      <button className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
+        <DollarSign className="size-4 text-muted-foreground mt-0.5" />
+        <span className="leading-tight text-left">
+          USD
+          <br />
+          <span className="text-[11px] text-muted-foreground">United States do…</span>
+        </span>
       </button>
       <div className="my-2 h-px bg-border/60" />
       <button

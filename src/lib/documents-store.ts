@@ -2,60 +2,37 @@ import { useSyncExternalStore } from "react";
 
 export type DocSectionId = "clinic" | "opg" | "diagnosis" | "treatments" | "other";
 
-export interface DocumentItem {
-  id: string;
-  section: DocSectionId;
-  title: string;
-  selected: boolean;
-  order: number;
-  hasVideo?: boolean;
-  badge?: string;
-}
-
 interface StoreData {
-  items: DocumentItem[];
-  history: DocumentItem[][];
-  future: DocumentItem[][];
+  // Set of selected item IDs (template IDs or synthetic fixed IDs like "fixed:clinic:demo")
+  selectedIds: string[];
+  // Per-section custom order overrides (subset of ids in their preferred order)
+  order: Record<DocSectionId, string[]>;
+  history: Pick<StoreData, "selectedIds" | "order">[];
+  future: Pick<StoreData, "selectedIds" | "order">[];
 }
 
-const KEY = "brightplans:documents:v1";
+const KEY = "brightplans:documents:v2";
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-
-const SEED: Omit<DocumentItem, "id" | "order">[] = [
-  { section: "clinic", title: "Demo Dentist", selected: true, hasVideo: true },
-  { section: "clinic", title: "Custom note", selected: true },
-  { section: "clinic", title: "Our Clinic", selected: false },
-  { section: "clinic", title: "Guarantee and Brief Info", selected: false },
-
-  { section: "opg", title: "OPG X-Ray (panoramic)", selected: true },
-  { section: "opg", title: "Periapical X-Rays", selected: false },
-
-  { section: "diagnosis", title: "Bridge, general", selected: true },
-  { section: "diagnosis", title: "Caries, general", selected: false },
-  { section: "diagnosis", title: "Missing tooth", selected: false },
-
-  { section: "treatments", title: "Inlay, Onlay, Crown", selected: true },
-  { section: "treatments", title: "Crowns (porcelain fused to metal)", selected: true, hasVideo: true },
-  { section: "treatments", title: "Implant + Crown", selected: true, hasVideo: true },
-  { section: "treatments", title: "Bridge", selected: false },
-  { section: "treatments", title: "Root canal treatment", selected: false, hasVideo: true },
-
-  { section: "other", title: "Dental post", selected: false },
-  { section: "other", title: "Dental veneers", selected: false },
-  { section: "other", title: "Implant information", selected: true },
-  { section: "other", title: "Things to do after extraction", selected: true },
+const DEFAULT_SELECTED = [
+  "fixed:clinic:demo",
+  "fixed:clinic:note",
+  "fixed:diagnosis:note",
+  "fixed:treatments:note",
+  "fixed:other:guarantee",
+  "fixed:other:ourclinic",
 ];
 
 function seed(): StoreData {
-  const items: DocumentItem[] = SEED.map((s, i) => ({ ...s, id: uid(), order: i }));
-  return { items, history: [], future: [] };
+  return {
+    selectedIds: [...DEFAULT_SELECTED],
+    order: { clinic: [], opg: [], diagnosis: [], treatments: [], other: [] },
+    history: [],
+    future: [],
+  };
 }
 
 function load(): StoreData {
-  if (typeof window === "undefined") return { items: [], history: [], future: [] };
+  if (typeof window === "undefined") return seed();
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) {
@@ -77,31 +54,39 @@ function persist() {
   listeners.forEach((l) => l());
 }
 
-function subscribe(fn: () => void) {
+function sub(fn: () => void) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-function snapshot() {
-  return JSON.parse(JSON.stringify(state.items)) as DocumentItem[];
+function snap() {
+  return {
+    selectedIds: [...state.selectedIds],
+    order: JSON.parse(JSON.stringify(state.order)) as StoreData["order"],
+  };
 }
 
-function commit(nextItems: DocumentItem[]) {
+function commit(next: Partial<Pick<StoreData, "selectedIds" | "order">>) {
   state = {
-    items: nextItems,
-    history: [...state.history, snapshot()].slice(-50),
+    ...state,
+    ...next,
+    history: [...state.history, snap()].slice(-50),
     future: [],
   };
   persist();
 }
 
-export function useDocuments() {
-  return useSyncExternalStore(subscribe, () => state.items, () => state.items);
+export function useSelectedIds() {
+  return useSyncExternalStore(sub, () => state.selectedIds, () => state.selectedIds);
+}
+
+export function useSectionOrder() {
+  return useSyncExternalStore(sub, () => state.order, () => state.order);
 }
 
 export function useDocsHistoryState() {
   return useSyncExternalStore(
-    subscribe,
+    sub,
     () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
     () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
   );
@@ -109,27 +94,26 @@ export function useDocsHistoryState() {
 
 export const documentsStore = {
   toggle(id: string) {
-    commit(state.items.map((it) => (it.id === id ? { ...it, selected: !it.selected } : it)));
+    const has = state.selectedIds.includes(id);
+    commit({
+      selectedIds: has ? state.selectedIds.filter((x) => x !== id) : [...state.selectedIds, id],
+    });
   },
   reorder(section: DocSectionId, orderedIds: string[]) {
-    const map = new Map(orderedIds.map((id, i) => [id, i]));
-    const next = state.items.map((it) =>
-      it.section === section && map.has(it.id) ? { ...it, order: map.get(it.id)! } : it,
-    );
-    commit(next);
+    commit({ order: { ...state.order, [section]: orderedIds } });
   },
   reset() {
-    const s = seed();
-    state = { items: s.items, history: [...state.history, snapshot()], future: [] };
+    state = { ...seed(), history: [...state.history, snap()], future: [] };
     persist();
   },
   undo() {
     const prev = state.history[state.history.length - 1];
     if (!prev) return;
     state = {
-      items: prev,
+      ...state,
+      ...prev,
       history: state.history.slice(0, -1),
-      future: [snapshot(), ...state.future].slice(0, 50),
+      future: [snap(), ...state.future].slice(0, 50),
     };
     persist();
   },
@@ -137,8 +121,9 @@ export const documentsStore = {
     const next = state.future[0];
     if (!next) return;
     state = {
-      items: next,
-      history: [...state.history, snapshot()],
+      ...state,
+      ...next,
+      history: [...state.history, snap()],
       future: state.future.slice(1),
     };
     persist();
