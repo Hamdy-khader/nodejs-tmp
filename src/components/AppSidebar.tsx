@@ -28,7 +28,7 @@ const items = [
   { title: "Account", url: "/", icon: User },
   { title: "Patients", url: "/patients", icon: UserPlus },
   { title: "Users", url: "/users", icon: Users },
-  { title: "Price list", url: "/price-list", icon: Tag },
+  { title: "Price list", url: "/clinic-fees", icon: Tag },
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
   { title: "Plan settings", url: "/plan-settings", icon: Settings },
   { title: "Statistics", url: "/statistics", icon: BarChart3 },
