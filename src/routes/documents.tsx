@@ -11,7 +11,6 @@ import {
   Check,
   Stethoscope,
   Activity,
-  Image as ImageIcon,
   FileText,
   Sparkles,
   ScrollText,

@@ -3,14 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   Youtube,
   Save,
-  Pencil,
-  Settings as SettingsIcon,
   DollarSign,
   ArrowUpDown,
   QrCode,
-  Image as ImageIcon,
   FileText,
-  ChevronDown,
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
