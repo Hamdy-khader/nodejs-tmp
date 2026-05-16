@@ -32,6 +32,8 @@ import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPa
 import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
 import { GeneralStatusDialog } from "@/components/GeneralStatusDialog";
 import { TreatmentsView } from "@/components/TreatmentsView";
+import { DocumentsPanel } from "@/components/DocumentsPanel";
+import { OverviewPanel } from "@/components/OverviewPanel";
 import { X } from "lucide-react";
 
 function uid() {
@@ -275,6 +277,10 @@ function PlanPage() {
 
           {step === "treatments" ? (
             <TreatmentsView plan={plan} />
+          ) : step === "documents" ? (
+            <DocumentsPanel />
+          ) : step === "overview" ? (
+            <OverviewPanel />
           ) : step !== "diagnosis" ? (
             <div className="rounded-2xl border border-dashed border-border/60 bg-card p-12 text-center shadow-[var(--shadow-soft)]">
               <p className="text-sm text-muted-foreground">
