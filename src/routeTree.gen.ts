@@ -14,6 +14,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as PlanSettingsRouteImport } from './routes/plan-settings'
 import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as OverviewRouteImport } from './routes/overview'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as ClinicFeesRouteImport } from './routes/clinic-fees'
 import { Route as IndexRouteImport } from './routes/index'
@@ -45,6 +46,11 @@ const PatientsRoute = PatientsRouteImport.update({
 const OverviewRoute = OverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/clinic-fees': typeof ClinicFeesRoute
   '/documents': typeof DocumentsRoute
+  '/login': typeof LoginRoute
   '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/login'
     | '/overview'
     | '/patients'
     | '/plan-settings'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/login'
     | '/overview'
     | '/plan-settings'
     | '/templates'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/'
     | '/clinic-fees'
     | '/documents'
+    | '/login'
     | '/overview'
     | '/patients'
     | '/plan-settings'
@@ -172,6 +184,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClinicFeesRoute: typeof ClinicFeesRoute
   DocumentsRoute: typeof DocumentsRoute
+  LoginRoute: typeof LoginRoute
   OverviewRoute: typeof OverviewRoute
   PatientsRoute: typeof PatientsRouteWithChildren
   PlanSettingsRoute: typeof PlanSettingsRoute
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/overview'
       fullPath: '/overview'
       preLoaderRoute: typeof OverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClinicFeesRoute: ClinicFeesRoute,
   DocumentsRoute: DocumentsRoute,
+  LoginRoute: LoginRoute,
   OverviewRoute: OverviewRoute,
   PatientsRoute: PatientsRouteWithChildren,
   PlanSettingsRoute: PlanSettingsRoute,
@@ -308,3 +329,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
