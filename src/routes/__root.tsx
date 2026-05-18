@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -103,7 +104,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+     <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -122,6 +123,18 @@ import { PatientTabs } from "@/components/PatientTabs";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isClinicLogin = pathname === "/clinic/login";
+
+  if (isAdminRoute || isClinicLogin) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

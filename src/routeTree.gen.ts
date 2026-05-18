@@ -19,9 +19,18 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as ClinicFeesRouteImport } from './routes/clinic-fees'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatientsIndexRouteImport } from './routes/patients.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
+import { Route as ClinicLoginRouteImport } from './routes/clinic.login'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as PatientsPatientIdIndexRouteImport } from './routes/patients.$patientId.index'
+import { Route as AdminClinicsIndexRouteImport } from './routes/admin.clinics.index'
+import { Route as AdminClinicsCreateRouteImport } from './routes/admin.clinics.create'
+import { Route as AdminClinicsIdIndexRouteImport } from './routes/admin.clinics.$id.index'
 import { Route as PatientsPatientIdPlansPlanIdRouteImport } from './routes/patients.$patientId.plans.$planId'
+import { Route as AdminClinicsIdUsersRouteImport } from './routes/admin.clinics.$id.users'
+import { Route as AdminClinicsIdEditRouteImport } from './routes/admin.clinics.$id.edit'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -73,15 +82,50 @@ const PatientsIndexRoute = PatientsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => PatientsRoute,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientsPatientIdRoute = PatientsPatientIdRouteImport.update({
   id: '/$patientId',
   path: '/$patientId',
   getParentRoute: () => PatientsRoute,
 } as any)
+const ClinicLoginRoute = ClinicLoginRouteImport.update({
+  id: '/clinic/login',
+  path: '/clinic/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/admin/dashboard',
+  path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PatientsPatientIdIndexRoute = PatientsPatientIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => PatientsPatientIdRoute,
+} as any)
+const AdminClinicsIndexRoute = AdminClinicsIndexRouteImport.update({
+  id: '/admin/clinics/',
+  path: '/admin/clinics/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminClinicsCreateRoute = AdminClinicsCreateRouteImport.update({
+  id: '/admin/clinics/create',
+  path: '/admin/clinics/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminClinicsIdIndexRoute = AdminClinicsIdIndexRouteImport.update({
+  id: '/admin/clinics/$id/',
+  path: '/admin/clinics/$id/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PatientsPatientIdPlansPlanIdRoute =
   PatientsPatientIdPlansPlanIdRouteImport.update({
@@ -89,6 +133,16 @@ const PatientsPatientIdPlansPlanIdRoute =
     path: '/plans/$planId',
     getParentRoute: () => PatientsPatientIdRoute,
   } as any)
+const AdminClinicsIdUsersRoute = AdminClinicsIdUsersRouteImport.update({
+  id: '/admin/clinics/$id/users',
+  path: '/admin/clinics/$id/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminClinicsIdEditRoute = AdminClinicsIdEditRouteImport.update({
+  id: '/admin/clinics/$id/edit',
+  path: '/admin/clinics/$id/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,10 +154,19 @@ export interface FileRoutesByFullPath {
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/clinic/login': typeof ClinicLoginRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/patients/': typeof PatientsIndexRoute
+  '/admin/clinics/create': typeof AdminClinicsCreateRoute
+  '/admin/clinics/': typeof AdminClinicsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
+  '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
+  '/admin/clinics/$id/users': typeof AdminClinicsIdUsersRoute
   '/patients/$patientId/plans/$planId': typeof PatientsPatientIdPlansPlanIdRoute
+  '/admin/clinics/$id/': typeof AdminClinicsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -114,9 +177,18 @@ export interface FileRoutesByTo {
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/clinic/login': typeof ClinicLoginRoute
+  '/admin': typeof AdminIndexRoute
   '/patients': typeof PatientsIndexRoute
+  '/admin/clinics/create': typeof AdminClinicsCreateRoute
+  '/admin/clinics': typeof AdminClinicsIndexRoute
   '/patients/$patientId': typeof PatientsPatientIdIndexRoute
+  '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
+  '/admin/clinics/$id/users': typeof AdminClinicsIdUsersRoute
   '/patients/$patientId/plans/$planId': typeof PatientsPatientIdPlansPlanIdRoute
+  '/admin/clinics/$id': typeof AdminClinicsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -129,10 +201,19 @@ export interface FileRoutesById {
   '/plan-settings': typeof PlanSettingsRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/clinic/login': typeof ClinicLoginRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/patients/': typeof PatientsIndexRoute
+  '/admin/clinics/create': typeof AdminClinicsCreateRoute
+  '/admin/clinics/': typeof AdminClinicsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
+  '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
+  '/admin/clinics/$id/users': typeof AdminClinicsIdUsersRoute
   '/patients/$patientId/plans/$planId': typeof PatientsPatientIdPlansPlanIdRoute
+  '/admin/clinics/$id/': typeof AdminClinicsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -146,10 +227,19 @@ export interface FileRouteTypes {
     | '/plan-settings'
     | '/templates'
     | '/users'
+    | '/admin/dashboard'
+    | '/admin/login'
+    | '/clinic/login'
     | '/patients/$patientId'
+    | '/admin/'
     | '/patients/'
+    | '/admin/clinics/create'
+    | '/admin/clinics/'
     | '/patients/$patientId/'
+    | '/admin/clinics/$id/edit'
+    | '/admin/clinics/$id/users'
     | '/patients/$patientId/plans/$planId'
+    | '/admin/clinics/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -160,9 +250,18 @@ export interface FileRouteTypes {
     | '/plan-settings'
     | '/templates'
     | '/users'
+    | '/admin/dashboard'
+    | '/admin/login'
+    | '/clinic/login'
+    | '/admin'
     | '/patients'
+    | '/admin/clinics/create'
+    | '/admin/clinics'
     | '/patients/$patientId'
+    | '/admin/clinics/$id/edit'
+    | '/admin/clinics/$id/users'
     | '/patients/$patientId/plans/$planId'
+    | '/admin/clinics/$id'
   id:
     | '__root__'
     | '/'
@@ -174,10 +273,19 @@ export interface FileRouteTypes {
     | '/plan-settings'
     | '/templates'
     | '/users'
+    | '/admin/dashboard'
+    | '/admin/login'
+    | '/clinic/login'
     | '/patients/$patientId'
+    | '/admin/'
     | '/patients/'
+    | '/admin/clinics/create'
+    | '/admin/clinics/'
     | '/patients/$patientId/'
+    | '/admin/clinics/$id/edit'
+    | '/admin/clinics/$id/users'
     | '/patients/$patientId/plans/$planId'
+    | '/admin/clinics/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -190,6 +298,15 @@ export interface RootRouteChildren {
   PlanSettingsRoute: typeof PlanSettingsRoute
   TemplatesRoute: typeof TemplatesRoute
   UsersRoute: typeof UsersRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  ClinicLoginRoute: typeof ClinicLoginRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminClinicsCreateRoute: typeof AdminClinicsCreateRoute
+  AdminClinicsIndexRoute: typeof AdminClinicsIndexRoute
+  AdminClinicsIdEditRoute: typeof AdminClinicsIdEditRoute
+  AdminClinicsIdUsersRoute: typeof AdminClinicsIdUsersRoute
+  AdminClinicsIdIndexRoute: typeof AdminClinicsIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -264,12 +381,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientsIndexRouteImport
       parentRoute: typeof PatientsRoute
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patients/$patientId': {
       id: '/patients/$patientId'
       path: '/$patientId'
       fullPath: '/patients/$patientId'
       preLoaderRoute: typeof PatientsPatientIdRouteImport
       parentRoute: typeof PatientsRoute
+    }
+    '/clinic/login': {
+      id: '/clinic/login'
+      path: '/clinic/login'
+      fullPath: '/clinic/login'
+      preLoaderRoute: typeof ClinicLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/patients/$patientId/': {
       id: '/patients/$patientId/'
@@ -278,12 +423,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientsPatientIdIndexRouteImport
       parentRoute: typeof PatientsPatientIdRoute
     }
+    '/admin/clinics/': {
+      id: '/admin/clinics/'
+      path: '/admin/clinics'
+      fullPath: '/admin/clinics/'
+      preLoaderRoute: typeof AdminClinicsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/clinics/create': {
+      id: '/admin/clinics/create'
+      path: '/admin/clinics/create'
+      fullPath: '/admin/clinics/create'
+      preLoaderRoute: typeof AdminClinicsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/clinics/$id/': {
+      id: '/admin/clinics/$id/'
+      path: '/admin/clinics/$id'
+      fullPath: '/admin/clinics/$id/'
+      preLoaderRoute: typeof AdminClinicsIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/patients/$patientId/plans/$planId': {
       id: '/patients/$patientId/plans/$planId'
       path: '/plans/$planId'
       fullPath: '/patients/$patientId/plans/$planId'
       preLoaderRoute: typeof PatientsPatientIdPlansPlanIdRouteImport
       parentRoute: typeof PatientsPatientIdRoute
+    }
+    '/admin/clinics/$id/users': {
+      id: '/admin/clinics/$id/users'
+      path: '/admin/clinics/$id/users'
+      fullPath: '/admin/clinics/$id/users'
+      preLoaderRoute: typeof AdminClinicsIdUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/clinics/$id/edit': {
+      id: '/admin/clinics/$id/edit'
+      path: '/admin/clinics/$id/edit'
+      fullPath: '/admin/clinics/$id/edit'
+      preLoaderRoute: typeof AdminClinicsIdEditRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -325,7 +505,26 @@ const rootRouteChildren: RootRouteChildren = {
   PlanSettingsRoute: PlanSettingsRoute,
   TemplatesRoute: TemplatesRoute,
   UsersRoute: UsersRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  ClinicLoginRoute: ClinicLoginRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminClinicsCreateRoute: AdminClinicsCreateRoute,
+  AdminClinicsIndexRoute: AdminClinicsIndexRoute,
+  AdminClinicsIdEditRoute: AdminClinicsIdEditRoute,
+  AdminClinicsIdUsersRoute: AdminClinicsIdUsersRoute,
+  AdminClinicsIdIndexRoute: AdminClinicsIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
