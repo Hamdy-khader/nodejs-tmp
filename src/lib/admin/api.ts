@@ -269,6 +269,44 @@ export interface ClinicAuthData {
   clinic: Clinic;
 }
 
+// ─── Pricelist Types ──────────────────────────────────────────────────────────
+
+export interface PricelistSettings {
+  language: string;
+  currency_code: string;
+  currency_label: string;
+  currency_symbol: string;
+}
+
+export interface PricelistItem {
+  id: string;
+  name: string;
+  price: number;
+  note: string;
+}
+
+export interface PricelistGroup {
+  id: string;
+  title: string;
+  price_label: string | null;
+  items: PricelistItem[];
+}
+
+export interface PricelistSection {
+  id: string;
+  n: number | null;
+  label: string;
+  icon: string;
+  groups: PricelistGroup[];
+}
+
+export interface PricelistData {
+  settings: PricelistSettings;
+  sections: PricelistSection[];
+}
+
+// ─── Clinic API ───────────────────────────────────────────────────────────────
+
 export const clinicApi = {
   login: async (email: string, password: string): Promise<ClinicAuthData> => {
     const res = await request<ClinicAuthData>("POST", "/clinic/login", null, { email, password });
@@ -283,4 +321,21 @@ export const clinicApi = {
 
   me: (): Promise<{ clinic_user: ClinicUser; clinic: Clinic }> =>
     clinicReq("GET", "/clinic/me"),
+
+  pricelist: {
+    get: (): Promise<PricelistData> =>
+      clinicReq("GET", "/clinic/pricelist"),
+
+    save: (data: PricelistData): Promise<PricelistData> =>
+      clinicReq("PUT", "/clinic/pricelist", data),
+
+    addItem: (body: { group_id: string; name: string; price: number; note: string }): Promise<PricelistItem> =>
+      clinicReq("POST", "/clinic/pricelist/items", body),
+
+    updateItem: (id: string, patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>): Promise<PricelistItem> =>
+      clinicReq("PATCH", `/clinic/pricelist/items/${id}`, patch),
+
+    deleteItem: (id: string): Promise<void> =>
+      clinicReq("DELETE", `/clinic/pricelist/items/${id}`),
+  },
 };

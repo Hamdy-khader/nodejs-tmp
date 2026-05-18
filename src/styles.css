@@ -70,7 +70,7 @@
 :root {
   --radius: 0.875rem;
 
-  /* Brand palette */
+  /* نفس لوحة الألوان الأصلية */
   --navy: #0d1520;
   --navy2: #111c2e;
   --navy3: #162038;
@@ -82,28 +82,27 @@
   --cream2: #ede7d9;
   --gold: #c9a84c;
   --coral: #e85d6b;
-  --text: #eef2f7;
-  --muted-text: #8898b3;
-  --muted-text-2: #5a6e8a;
 
-  /* Semantic tokens (dark by default) */
-  --background: #0d1520;
-  --foreground: #eef2f7;
-  --card: rgba(22, 32, 56, 0.55);
-  --card-foreground: #eef2f7;
-  --popover: #111c2e;
-  --popover-foreground: #eef2f7;
+  /* Light theme — نفس الهوية البصرية لكن فاتح */
+  --background: #f4f7fc;
+  --foreground: #0d1520;
+
+  --card: #ffffff;
+  --card-foreground: #0d1520;
+
+  --popover: #ffffff;
+  --popover-foreground: #0d1520;
 
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --primary-deep: #1d4ed8;
-  --primary-soft: rgba(37, 99, 235, 0.15);
+  --primary-soft: rgba(37, 99, 235, 0.10);
 
-  --secondary: #162038;
-  --secondary-foreground: #eef2f7;
+  --secondary: #eef2fa;
+  --secondary-foreground: #111c2e;
 
-  --muted: #111c2e;
-  --muted-foreground: #8898b3;
+  --muted: #eef2fa;
+  --muted-foreground: #5a6e8a;
 
   --accent: #2dd4a7;
   --accent-foreground: #0d1520;
@@ -114,8 +113,8 @@
   --destructive: #e85d6b;
   --destructive-foreground: #ffffff;
 
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.1);
+  --border: rgba(13, 21, 32, 0.08);
+  --input: rgba(13, 21, 32, 0.06);
   --ring: #3b82f6;
 
   --chart-1: #2563eb;
@@ -124,6 +123,7 @@
   --chart-4: #e85d6b;
   --chart-5: #3b82f6;
 
+  /* Sidebar — نفس اللون الداكن الأصلي للتباين */
   --sidebar: #0b121c;
   --sidebar-foreground: #eef2f7;
   --sidebar-primary: #2563eb;
@@ -135,14 +135,13 @@
 
   --gradient-hero: linear-gradient(135deg, #2563eb 0%, #2dd4a7 100%);
   --gradient-accent: linear-gradient(135deg, #3b82f6, #2dd4a7);
-  --gradient-surface: linear-gradient(180deg, rgba(22, 32, 56, 0.6), rgba(17, 28, 46, 0.4));
-  --shadow-soft: 0 10px 30px -12px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 40px -10px rgba(45, 212, 167, 0.35);
-  --shadow-blue-glow: 0 0 40px -10px rgba(37, 99, 235, 0.45);
+  --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(238,242,250,0.6));
+  --shadow-soft: 0 4px 24px -6px rgba(13, 21, 32, 0.08);
+  --shadow-glow: 0 0 40px -10px rgba(45, 212, 167, 0.30);
+  --shadow-blue-glow: 0 0 40px -10px rgba(37, 99, 235, 0.35);
 }
 
 .dark {
-  /* Same as root — dark is the default theme */
   --background: #0d1520;
   --foreground: #eef2f7;
   --card: rgba(22, 32, 56, 0.55);
@@ -193,7 +192,6 @@
     letter-spacing: -0.01em;
   }
 
-  /* Monospace numeric/data classes */
   .font-mono,
   .tabular-nums,
   [data-numeric="true"] {
@@ -204,15 +202,15 @@
 
 @layer utilities {
   .glass {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    background: linear-gradient(180deg, rgba(255,255,255,0.75), rgba(255,255,255,0.50));
     border: 1px solid var(--border);
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
   }
 
   .glass-strong {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(255,255,255,0.90), rgba(255,255,255,0.70));
+    border: 1px solid rgba(13,21,32,0.10);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
@@ -229,18 +227,18 @@
   }
 
   .glow-blue {
-    box-shadow: 0 0 32px -8px rgba(37, 99, 235, 0.5);
+    box-shadow: 0 0 32px -8px rgba(37, 99, 235, 0.35);
   }
 
   .glow-teal {
-    box-shadow: 0 0 32px -8px rgba(45, 212, 167, 0.45);
+    box-shadow: 0 0 32px -8px rgba(45, 212, 167, 0.30);
   }
 
   .hover-glow {
     transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
   }
   .hover-glow:hover {
-    box-shadow: 0 0 40px -10px rgba(59, 130, 246, 0.45);
-    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0 40px -10px rgba(37, 99, 235, 0.25);
+    border-color: rgba(37, 99, 235, 0.15);
   }
 }
