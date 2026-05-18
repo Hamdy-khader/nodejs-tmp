@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   User,
   Users,
@@ -13,6 +13,7 @@ import {
   LogOut,
   Sparkle,
 } from "lucide-react";
+import { clinicApi } from "@/lib/admin/api";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +42,12 @@ const items = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await clinicApi.logout();
+    navigate({ to: "/login" });
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -89,7 +96,10 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border/40 p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="h-10 rounded-lg text-sidebar-foreground/70 hover:bg-destructive/15 hover:text-destructive">
+            <SidebarMenuButton
+              onClick={handleLogout}
+              className="h-10 rounded-lg text-sidebar-foreground/70 hover:bg-destructive/15 hover:text-destructive cursor-pointer"
+            >
               <LogOut className="h-[18px] w-[18px]" />
               <span className="font-medium">Logout</span>
             </SidebarMenuButton>

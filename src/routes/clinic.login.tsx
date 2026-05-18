@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 
@@ -15,6 +16,7 @@ function ClinicLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (clinicTokenStore.exists()) navigate({ to: "/" });
@@ -92,14 +94,37 @@ function ClinicLoginPage() {
 
           <div className="adm-field" style={{ marginBottom: 28 }}>
             <label className="adm-label">Password</label>
-            <input
-              className={`adm-input${fieldErrors.password ? " err" : ""}`}
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(""); }}
-              autoComplete="current-password"
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                className={`adm-input${fieldErrors.password ? " err" : ""}`}
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                autoComplete="current-password"
+                style={{ paddingRight: 40 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  color: "var(--adm-muted2)",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             {fieldErrors.password && <div className="adm-field-err">{fieldErrors.password}</div>}
           </div>
 

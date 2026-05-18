@@ -3,7 +3,11 @@
     "allow": [
       "Bash(Get-ChildItem *)",
       "Bash(npx tsc *)",
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "Bash(php C:\\\\laragon\\\\www\\\\dent\\\\dent back end\\\\artisan *)",
+      "Bash(curl *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\)\\)\")",
+      "Bash(findstr /i \"access-control\")"
     ]
   }
 }

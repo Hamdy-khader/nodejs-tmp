@@ -17,6 +17,16 @@ import {
   Search,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { clinicApi, type ClinicUser } from "@/lib/admin/api";
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
 
 const steps = [
   { n: 1, title: "Synopsis", state: "done" as const },
@@ -48,10 +58,18 @@ const tutorials = [
 ];
 
 export function Dashboard() {
+  const [clinicUser, setClinicUser] = useState<ClinicUser | null>(null);
   const progress = 89;
   const radius = 56;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (progress / 100) * circ;
+
+  useEffect(() => {
+    clinicApi.me().then(({ clinic_user }) => setClinicUser(clinic_user)).catch(() => null);
+  }, []);
+
+  const displayName = clinicUser?.full_name ?? "";
+  const initials    = displayName ? getInitials(displayName) : "??";
 
   return (
     <div className="space-y-8 p-6 lg:p-8">
@@ -59,7 +77,7 @@ export function Dashboard() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Welcome back, Dr. Khaled
+            Welcome back{displayName ? `, ${displayName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Let's keep your clinic shining today.
@@ -76,8 +94,11 @@ export function Dashboard() {
           <button className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:text-foreground">
             <Bell className="h-4 w-4" />
           </button>
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-accent)] text-sm font-semibold text-accent-foreground">
-            KH
+          <div
+            className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-accent)] text-sm font-semibold text-accent-foreground"
+            title={displayName}
+          >
+            {initials}
           </div>
         </div>
       </div>

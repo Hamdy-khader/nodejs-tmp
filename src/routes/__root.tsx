@@ -127,8 +127,9 @@ function RootComponent() {
 
   const isAdminRoute = pathname.startsWith("/admin");
   const isClinicLogin = pathname === "/clinic/login";
+  const isLogin = pathname === "/login";
 
-  if (isAdminRoute || isClinicLogin) {
+  if (isAdminRoute || isClinicLogin || isLogin) {
     return (
       <QueryClientProvider client={queryClient}>
         <Outlet />

@@ -1,14 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { z } from "zod";
-import { toast } from "sonner";
-import { Loader2, Mail, Lock, ArrowRight } from "lucide-react";
+import { Loader2, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -23,56 +20,43 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
-const credsSchema = z.object({
-  email: z.string().trim().email("Enter a valid email").max(255),
-  password: z.string().min(6, "At least 6 characters").max(72),
-});
-
 function LoginPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  // If already signed in, bounce to home
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/" });
-    });
+    if (clinicTokenStore.exists()) navigate({ to: "/" });
   }, [navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const parsed = credsSchema.safeParse({ email, password });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
+    setError("");
+
+    if (!email.trim()) { setError("Email is required"); return; }
+    if (!password)      { setError("Password is required"); return; }
 
     setLoading(true);
     try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: parsed.data.email,
-          password: parsed.data.password,
-        });
-        if (error) throw error;
-        toast.success("Welcome back");
-        navigate({ to: "/" });
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: parsed.data.email,
-          password: parsed.data.password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
-        });
-        if (error) throw error;
-        toast.success("Account created. Check your email to confirm.");
-        setMode("signin");
-      }
+      await clinicApi.login(email.trim(), password);
+      navigate({ to: "/" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      toast.error(message);
+      if (err instanceof ApiError) {
+        if (err.code === "CLINIC_SUSPENDED") {
+          setError("Access to this clinic is currently suspended. Please contact your administrator.");
+        } else if (err.code === "ACCOUNT_INACTIVE") {
+          setError("Your account has been deactivated. Contact your clinic administrator.");
+        } else if (err.code === "TOO_MANY_ATTEMPTS") {
+          setError(err.message);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Unable to connect. Please check your connection and try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -111,81 +95,78 @@ function LoginPage() {
             </span>
           </Link>
           <h1 className="mt-6 font-serif text-3xl tracking-tight text-foreground">
-            {mode === "signin" ? "Welcome back" : "Create your account"}
+            Welcome back
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {mode === "signin"
-              ? "Sign in to continue to your clinic workspace."
-              : "Start building treatment plans in minutes."}
+            Sign in to continue to your clinic workspace.
           </p>
         </div>
 
         {/* Card */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-[0_20px_60px_-30px_rgba(13,21,32,0.25)]">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
-            </TabsList>
+          {error && (
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@clinic.com"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  className="pl-9"
+                  autoFocus
+                />
+              </div>
+            </div>
 
-            <TabsContent value={mode} className="mt-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@clinic.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-9"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    {mode === "signin" && (
-                      <span className="text-xs text-muted-foreground">Min. 6 characters</span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type="password"
-                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-9"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="group h-11 w-full gradient-brand text-white shadow-[0_10px_30px_-10px_rgba(37,99,235,0.45)] transition-shadow hover:shadow-[0_14px_36px_-10px_rgba(45,212,167,0.5)]"
-                  disabled={loading}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  className="pl-9 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
                 >
-                  {loading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <>
-                      {mode === "signin" ? "Sign in" : "Create account"}
-                      <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                    </>
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="group h-11 w-full gradient-brand text-white shadow-[0_10px_30px_-10px_rgba(37,99,235,0.45)] transition-shadow hover:shadow-[0_14px_36px_-10px_rgba(45,212,167,0.5)]"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                </>
+              )}
+            </Button>
+          </form>
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
