@@ -700,12 +700,6 @@ function SubGroupBlock({
           onChange={(event) => onGroupPatch({ title: event.target.value })}
           className="h-8 min-w-[180px] flex-1 bg-background text-sm font-semibold"
         />
-        <Input
-          value={group.price_label ?? ""}
-          onChange={(event) => onGroupPatch({ price_label: event.target.value })}
-          className="h-8 w-36 bg-background text-xs"
-          placeholder="Unit price"
-        />
         <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={onGroupRemove}>
           <Trash2 className="h-4 w-4" />
         </Button>
