@@ -5,7 +5,10 @@ import {
   createRootRouteWithContext,
   useRouter,
   useRouterState,
+  useNavigate,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { adminTokenStore, clinicTokenStore } from "@/lib/admin/api";
 
 function NotFoundComponent() {
   return (
@@ -101,17 +104,71 @@ import { PatientTabs } from "@/components/PatientTabs";
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
 
   const isAdminRoute = pathname.startsWith("/admin");
+  const isAdminLogin = pathname === "/admin/login";
+  const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
   const isClinicLogin = pathname === "/clinic/login";
   const isLogin = pathname === "/login";
+  const isAuthPage = isAdminLogin || isClinicLogin || isLogin;
+  const hasAdminToken = adminTokenStore.exists();
+  const hasClinicToken = clinicTokenStore.exists();
 
-  if (isAdminRoute || isClinicLogin || isLogin) {
+  useEffect(() => {
+    if (isAdminLogin) {
+      if (hasAdminToken) {
+        navigate({ to: "/admin/dashboard", replace: true });
+      }
+      return;
+    }
+
+    if (isClinicLogin || isLogin) {
+      if (hasClinicToken) {
+        navigate({ to: "/", replace: true });
+      }
+      return;
+    }
+
+    if (isAdminRoute) {
+      if (!hasAdminToken) {
+        navigate({ to: "/admin/login", replace: true });
+        return;
+      }
+      if (isAdminIndex) {
+        navigate({ to: "/admin/dashboard", replace: true });
+      }
+      return;
+    }
+
+    if (!hasClinicToken) {
+      navigate({ to: "/login", replace: true });
+    }
+  }, [
+    hasAdminToken,
+    hasClinicToken,
+    isAdminIndex,
+    isAdminLogin,
+    isAdminRoute,
+    isClinicLogin,
+    isLogin,
+    navigate,
+  ]);
+
+  if (isAuthPage) {
     return (
       <QueryClientProvider client={queryClient}>
         <Outlet />
       </QueryClientProvider>
     );
+  }
+
+  if (isAdminRoute && !hasAdminToken) {
+    return <QueryClientProvider client={queryClient} />;
+  }
+
+  if (!isAdminRoute && !hasClinicToken) {
+    return <QueryClientProvider client={queryClient} />;
   }
 
   return (
