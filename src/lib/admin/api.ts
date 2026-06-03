@@ -8,20 +8,32 @@
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "https://backend.treatlyonline.de/api";
 
+function storageAvailable() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
 export const adminTokenStore = {
   key: "bp_admin_token",
-  get: (): string | null => localStorage.getItem("bp_admin_token"),
-  set: (t: string): void => localStorage.setItem("bp_admin_token", t),
-  clear: (): void => localStorage.removeItem("bp_admin_token"),
-  exists: (): boolean => Boolean(localStorage.getItem("bp_admin_token")),
+  get: (): string | null => (storageAvailable() ? window.localStorage.getItem("bp_admin_token") : null),
+  set: (t: string): void => {
+    if (storageAvailable()) window.localStorage.setItem("bp_admin_token", t);
+  },
+  clear: (): void => {
+    if (storageAvailable()) window.localStorage.removeItem("bp_admin_token");
+  },
+  exists: (): boolean => Boolean(adminTokenStore.get()),
 };
 
 export const clinicTokenStore = {
   key: "bp_clinic_token",
-  get: (): string | null => localStorage.getItem("bp_clinic_token"),
-  set: (t: string): void => localStorage.setItem("bp_clinic_token", t),
-  clear: (): void => localStorage.removeItem("bp_clinic_token"),
-  exists: (): boolean => Boolean(localStorage.getItem("bp_clinic_token")),
+  get: (): string | null => (storageAvailable() ? window.localStorage.getItem("bp_clinic_token") : null),
+  set: (t: string): void => {
+    if (storageAvailable()) window.localStorage.setItem("bp_clinic_token", t);
+  },
+  clear: (): void => {
+    if (storageAvailable()) window.localStorage.removeItem("bp_clinic_token");
+  },
+  exists: (): boolean => Boolean(clinicTokenStore.get()),
 };
 
 export class ApiError extends Error {
