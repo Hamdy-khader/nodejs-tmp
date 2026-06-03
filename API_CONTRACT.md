@@ -418,6 +418,35 @@ deleted_at
 
 ### GET `/clinic/me`
 
+Suggested response additions for account defaults:
+
+```json
+{
+  "success": true,
+  "data": {
+    "clinic_user": {
+      "id": 100,
+      "clinic_id": 12,
+      "full_name": "Dr Ahmed Mohamed",
+      "email": "doctor@clinic.com",
+      "role": "clinic_admin",
+      "status": "active",
+      "preferred_language": "English (EN)",
+      "preferred_currency": "USD"
+    }
+  }
+}
+```
+
+### PUT `/clinic/me/preferences`
+
+```json
+{
+  "preferred_language": "English (EN)",
+  "preferred_currency": "USD"
+}
+```
+
 يعيد:
 
 - المستخدم الحالي
@@ -453,8 +482,6 @@ order?    asc | desc
       "email": "patient@email.com",
       "phone": "+20123456789",
       "date_of_birth": "1990-05-15",
-      "language": "ar",
-      "currency": "EGP",
       "created_at": "2026-06-03T10:00:00Z",
       "updated_at": "2026-06-03T10:00:00Z"
     }
@@ -475,17 +502,13 @@ order?    asc | desc
   "name": "Mohamed Ahmed",
   "email": "patient@email.com",
   "phone": "+20123456789",
-  "date_of_birth": "1990-05-15",
-  "language": "ar",
-  "currency": "EGP"
+  "date_of_birth": "1990-05-15"
 }
 ```
 
 ### Required
 
 - `name`
-- `language`
-- `currency`
 
 ### GET `/clinic/patients/{patientId}`
 
@@ -508,8 +531,6 @@ name
 email
 phone
 date_of_birth
-language
-currency
 created_at
 updated_at
 deleted_at
@@ -701,10 +722,7 @@ deleted_at
 
 ```json
 {
-  "items": [
-    { "label": "Bone Loss" },
-    { "label": "Gum Disease" }
-  ]
+  "items": [{ "label": "Bone Loss" }, { "label": "Gum Disease" }]
 }
 ```
 
@@ -1072,11 +1090,7 @@ other
 
 ```json
 {
-  "selected_ids": [
-    "fixed:clinic:demo",
-    "fixed:diagnosis:note",
-    "tmp_001"
-  ],
+  "selected_ids": ["fixed:clinic:demo", "fixed:diagnosis:note", "tmp_001"],
   "order": {
     "clinic": ["fixed:clinic:demo", "fixed:clinic:note"],
     "opg": [],
@@ -1324,13 +1338,7 @@ online
   "name": "Senior Dentist",
   "description": "Advanced dentist role",
   "color": "purple",
-  "permissions": [
-    "patients.read",
-    "patients.write",
-    "plans.read",
-    "plans.write",
-    "users.read"
-  ]
+  "permissions": ["patients.read", "patients.write", "plans.read", "plans.write", "users.read"]
 }
 ```
 
@@ -1590,8 +1598,6 @@ suspended
 - `email`: nullable, valid email
 - `phone`: nullable, max 30
 - `date_of_birth`: nullable, valid date
-- `language`: required, max 20
-- `currency`: required, max 10
 
 ### Treatment plans
 

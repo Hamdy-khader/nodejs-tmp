@@ -48,7 +48,7 @@ function toTemplate(raw: Record<string, unknown>): ClinicTemplate {
 }
 
 async function loadTemplates(force = false) {
-  if (!clinicApi || !window) return;
+  if (typeof window === "undefined") return;
   if (!force && state.loaded) return;
   if (inflight) return inflight;
 

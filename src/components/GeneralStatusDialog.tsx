@@ -63,7 +63,7 @@ export function GeneralStatusDialog({ open, toothNumber, onClose, onSubmit }: Pr
             className="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
             <Check className="h-4 w-4" />
-            OK
+            Save
           </button>
         </div>
       </div>

@@ -54,9 +54,16 @@ export interface Patient {
   email?: string;
   phone?: string;
   dateOfBirth?: string;
-  language: string;
-  currency: string;
+  language?: string;
+  currency?: string;
   createdAt: number;
+}
+
+export interface PatientInput {
+  name: string;
+  email?: string;
+  phone?: string;
+  dateOfBirth?: string;
 }
 
 interface StoreData {
@@ -65,8 +72,8 @@ interface StoreData {
 }
 
 const FDI_NUMBERS = [
-  18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
-  48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
+  18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28, 48, 47, 46, 45, 44, 43, 42, 41,
+  31, 32, 33, 34, 35, 36, 37, 38,
 ];
 
 export const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -86,7 +93,10 @@ const planLoaded = new Set<string>();
 let patientsInflight: Promise<void> | null = null;
 const plansInflight = new Map<string, Promise<void>>();
 const EMPTY_PLANS: TreatmentPlan[] = [];
-const plansSnapshotCache = new Map<string, { plansRef: TreatmentPlan[]; result: TreatmentPlan[] }>();
+const plansSnapshotCache = new Map<
+  string,
+  { plansRef: TreatmentPlan[]; result: TreatmentPlan[] }
+>();
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -108,8 +118,8 @@ function toPatient(raw: Record<string, unknown>): Patient {
     email: raw.email ? String(raw.email) : undefined,
     phone: raw.phone ? String(raw.phone) : undefined,
     dateOfBirth: raw.date_of_birth ? String(raw.date_of_birth) : undefined,
-    language: String(raw.language ?? "en"),
-    currency: String(raw.currency ?? "USD"),
+    language: raw.language ? String(raw.language) : undefined,
+    currency: raw.currency ? String(raw.currency) : undefined,
     createdAt: new Date(String(raw.created_at ?? new Date().toISOString())).getTime(),
   };
 }
@@ -144,7 +154,9 @@ function toTreatmentRow(raw: Record<string, unknown>): TreatmentRow {
       kind,
       label: raw.label ? String(raw.label) : undefined,
       note: raw.note ? String(raw.note) : undefined,
-      items: Array.isArray(raw.items) ? raw.items.map((item) => toTreatmentItem(item as Record<string, unknown>)) : [],
+      items: Array.isArray(raw.items)
+        ? raw.items.map((item) => toTreatmentItem(item as Record<string, unknown>))
+        : [],
     };
   }
   if (kind === "healing") {
@@ -195,19 +207,21 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
     name: String(raw.name ?? "Your suggested treatment"),
     notes: String(raw.notes ?? ""),
     teeth,
-    xrays: xraysRaw.map((item) =>
-      typeof item === "string"
-        ? item
-        : String((item as Record<string, unknown>).file_url ?? ""),
-    ).filter(Boolean),
-    generalStatuses: generalStatusesRaw.map((item) =>
-      typeof item === "string"
-        ? item
-        : String((item as Record<string, unknown>).label ?? ""),
-    ).filter(Boolean),
+    xrays: xraysRaw
+      .map((item) =>
+        typeof item === "string" ? item : String((item as Record<string, unknown>).file_url ?? ""),
+      )
+      .filter(Boolean),
+    generalStatuses: generalStatusesRaw
+      .map((item) =>
+        typeof item === "string" ? item : String((item as Record<string, unknown>).label ?? ""),
+      )
+      .filter(Boolean),
     treatments: treatmentRowsRaw.map((item) => toTreatmentRow(item as Record<string, unknown>)),
     treatmentNote: raw.treatment_note ? String(raw.treatment_note) : undefined,
-    billingMode: raw.billing_mode ? String(raw.billing_mode) as "insurance" | "payment" : undefined,
+    billingMode: raw.billing_mode
+      ? (String(raw.billing_mode) as "insurance" | "payment")
+      : undefined,
     insurance:
       raw.insurance && typeof raw.insurance === "object"
         ? {
@@ -224,7 +238,9 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
           }
         : undefined,
     createdAt: new Date(String(raw.created_at ?? new Date().toISOString())).getTime(),
-    updatedAt: new Date(String(raw.updated_at ?? raw.created_at ?? new Date().toISOString())).getTime(),
+    updatedAt: new Date(
+      String(raw.updated_at ?? raw.created_at ?? new Date().toISOString()),
+    ).getTime(),
   };
 }
 
@@ -301,7 +317,9 @@ async function loadPlan(patientId: string, id: string, force = false) {
 function updateLocalPatient(id: string, patch: Partial<Patient>) {
   state = {
     ...state,
-    patients: state.patients.map((patient) => (patient.id === id ? { ...patient, ...patch } : patient)),
+    patients: state.patients.map((patient) =>
+      patient.id === id ? { ...patient, ...patch } : patient,
+    ),
   };
   emit();
 }
@@ -337,7 +355,11 @@ export function usePatients() {
   useEffect(() => {
     void loadPatients();
   }, []);
-  return useSyncExternalStore(subscribe, () => state.patients, () => state.patients);
+  return useSyncExternalStore(
+    subscribe,
+    () => state.patients,
+    () => state.patients,
+  );
 }
 
 export function usePatient(id: string | undefined) {
@@ -367,7 +389,11 @@ export function usePlan(id: string | undefined) {
   useEffect(() => {
     if (plan?.patientId && id) void loadPlan(plan.patientId, id);
   }, [plan?.patientId, id]);
-  return useSyncExternalStore(subscribe, () => getPlanById(id), () => getPlanById(id));
+  return useSyncExternalStore(
+    subscribe,
+    () => getPlanById(id),
+    () => getPlanById(id),
+  );
 }
 
 export const patientsStore = {
@@ -375,14 +401,12 @@ export const patientsStore = {
     await loadPatients(true);
   },
 
-  async createPatient(input: Omit<Patient, "id" | "createdAt">) {
+  async createPatient(input: PatientInput) {
     const raw = await clinicApi.patients.create({
       name: input.name,
       email: input.email ?? null,
       phone: input.phone ?? null,
       date_of_birth: input.dateOfBirth ?? null,
-      language: input.language,
-      currency: input.currency,
     });
     const patient = toPatient(raw);
     state = { ...state, patients: [patient, ...state.patients] };
@@ -390,15 +414,13 @@ export const patientsStore = {
     return patient;
   },
 
-  updatePatient(id: string, input: Partial<Omit<Patient, "id" | "createdAt">>) {
+  updatePatient(id: string, input: Partial<PatientInput>) {
     updateLocalPatient(id, input as Partial<Patient>);
     void clinicApi.patients.update(id, {
       name: input.name,
       email: input.email ?? null,
       phone: input.phone ?? null,
       date_of_birth: input.dateOfBirth ?? null,
-      language: input.language,
-      currency: input.currency,
     });
   },
 
@@ -473,9 +495,9 @@ export const patientsStore = {
       treatments.map((row, index) => ({
         id: row.id,
         kind: row.kind,
-        label: "label" in row ? row.label ?? null : null,
+        label: "label" in row ? (row.label ?? null) : null,
         note: row.note ?? null,
-        days: row.kind === "healing" ? row.days ?? null : null,
+        days: row.kind === "healing" ? (row.days ?? null) : null,
         mode: row.kind === "discount" ? row.mode : null,
         value: row.kind === "discount" ? row.value : null,
         sort_order: index + 1,
@@ -499,15 +521,18 @@ export const patientsStore = {
     if (!plan) return;
     const next = [...(plan.treatments ?? []), row];
     updateLocalPlan(planId, { treatments: next });
-    void clinicApi.plans.createRow(planId, {
-      kind: row.kind,
-      label: "label" in row ? row.label ?? null : null,
-      note: row.note ?? null,
-      days: row.kind === "healing" ? row.days ?? null : null,
-      mode: row.kind === "discount" ? row.mode : null,
-      value: row.kind === "discount" ? row.value : null,
-      sort_order: next.length,
-    }).then(() => loadPlan(plan.patientId, planId, true)).catch(() => null);
+    void clinicApi.plans
+      .createRow(planId, {
+        kind: row.kind,
+        label: "label" in row ? (row.label ?? null) : null,
+        note: row.note ?? null,
+        days: row.kind === "healing" ? (row.days ?? null) : null,
+        mode: row.kind === "discount" ? row.mode : null,
+        value: row.kind === "discount" ? row.value : null,
+        sort_order: next.length,
+      })
+      .then(() => loadPlan(plan.patientId, planId, true))
+      .catch(() => null);
   },
 
   updateTreatmentRow(planId: string, rowId: string, patch: Partial<TreatmentRow>) {
@@ -521,9 +546,9 @@ export const patientsStore = {
     if (!row) return;
     void clinicApi.plans.updateRow(planId, rowId, {
       kind: row.kind,
-      label: "label" in row ? row.label ?? null : null,
+      label: "label" in row ? (row.label ?? null) : null,
       note: row.note ?? null,
-      days: row.kind === "healing" ? row.days ?? null : null,
+      days: row.kind === "healing" ? (row.days ?? null) : null,
       mode: row.kind === "discount" ? row.mode : null,
       value: row.kind === "discount" ? row.value : null,
     });
@@ -568,13 +593,15 @@ export const patientsStore = {
     const row = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
     rows[lastVisitIndex] = { ...row, items: [...row.items, newItem] };
     updateLocalPlan(planId, { treatments: rows });
-    void clinicApi.plans.createItem(planId, row.id, {
-      name: newItem.name,
-      tooth_number: newItem.toothNumber ?? null,
-      amount: newItem.amount,
-      unit_price: newItem.unitPrice,
-      sort_order: row.items.length + 1,
-    }).catch(() => null);
+    void clinicApi.plans
+      .createItem(planId, row.id, {
+        name: newItem.name,
+        tooth_number: newItem.toothNumber ?? null,
+        amount: newItem.amount,
+        unit_price: newItem.unitPrice,
+        sort_order: row.items.length + 1,
+      })
+      .catch(() => null);
   },
 
   removeTreatmentItem(planId: string, rowId: string, itemId: string) {
@@ -590,16 +617,26 @@ export const patientsStore = {
     void clinicApi.plans.deleteItem(planId, rowId, itemId);
   },
 
-  updateTreatmentItem(planId: string, rowId: string, itemId: string, patch: Partial<TreatmentItem>) {
+  updateTreatmentItem(
+    planId: string,
+    rowId: string,
+    itemId: string,
+    patch: Partial<TreatmentItem>,
+  ) {
     const plan = getPlanById(planId);
     if (!plan) return;
     const treatments = (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
-        ? { ...row, items: row.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)) }
+        ? {
+            ...row,
+            items: row.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+          }
         : row,
     );
     updateLocalPlan(planId, { treatments });
-    const row = treatments.find((item) => item.kind === "visit" && item.id === rowId) as Extract<TreatmentRow, { kind: "visit" }> | undefined;
+    const row = treatments.find((item) => item.kind === "visit" && item.id === rowId) as
+      | Extract<TreatmentRow, { kind: "visit" }>
+      | undefined;
     const item = row?.items.find((entry) => entry.id === itemId);
     if (!item) return;
     void clinicApi.plans.updateItem(planId, rowId, itemId, {
@@ -648,7 +685,11 @@ export const STATUS_META: Record<ToothStatus, { label: string; color: string; ri
   caries: { label: "Caries", color: "oklch(0.78 0.16 50)", ring: "oklch(0.55 0.18 40)" },
   filled: { label: "Filled", color: "oklch(0.55 0.05 250)", ring: "oklch(0.35 0.04 250)" },
   crown: { label: "Crown", color: "oklch(0.85 0.14 90)", ring: "oklch(0.6 0.13 80)" },
-  "root-treated": { label: "Root treated", color: "oklch(0.65 0.18 25)", ring: "oklch(0.45 0.16 25)" },
+  "root-treated": {
+    label: "Root treated",
+    color: "oklch(0.65 0.18 25)",
+    ring: "oklch(0.45 0.16 25)",
+  },
   implant: { label: "Implant", color: "oklch(0.45 0.04 250)", ring: "oklch(0.25 0.03 250)" },
   bridge: { label: "Bridge", color: "oklch(0.7 0.13 280)", ring: "oklch(0.45 0.13 280)" },
 };

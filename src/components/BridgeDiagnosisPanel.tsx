@@ -30,9 +30,7 @@ export function BridgeDiagnosisPanel({ planId, tooth, variant, onClose }: Props)
   }, [tooth.number, tooth.diagnosis]);
 
   const toggle = (item: string) => {
-    setSelected((prev) =>
-      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item],
-    );
+    setSelected((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
   const save = () => {
@@ -52,10 +50,7 @@ export function BridgeDiagnosisPanel({ planId, tooth, variant, onClose }: Props)
       <div className="space-y-2.5">
         {ITEMS.map((l) => (
           <label key={l} className="flex cursor-pointer items-center gap-2.5 text-sm">
-            <Checkbox
-              checked={selected.includes(l)}
-              onCheckedChange={() => toggle(l)}
-            />
+            <Checkbox checked={selected.includes(l)} onCheckedChange={() => toggle(l)} />
             <span>{l}</span>
           </label>
         ))}
@@ -64,7 +59,7 @@ export function BridgeDiagnosisPanel({ planId, tooth, variant, onClose }: Props)
       <div className="my-3 h-px bg-border" />
 
       <Button onClick={save} className="w-full rounded-full" size="sm">
-        OK
+        Save
       </Button>
     </div>
   );

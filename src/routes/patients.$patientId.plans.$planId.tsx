@@ -35,6 +35,7 @@ import { TreatmentsView } from "@/components/TreatmentsView";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { OverviewPanel } from "@/components/OverviewPanel";
 import { X } from "lucide-react";
+import { usePlanSettings } from "@/lib/plan-settings-store";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -125,6 +126,7 @@ function PlanPage() {
   const patient = usePatient(patientId);
   usePlansFor(patientId);
   const plan = usePlan(planId);
+  const accountSettings = usePlanSettings();
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");
   const [selected, setSelected] = useState<number | null>(null);
@@ -619,8 +621,8 @@ function PlanPage() {
             )}
 
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
-            <RailRow icon={<Globe className="h-4 w-4" />} label="English" />
-            <RailRow icon={<DollarSign className="h-4 w-4" />} label={patient.currency} sub="United States do…" />
+            <RailRow icon={<Globe className="h-4 w-4" />} label={accountSettings.language} sub="Account default" />
+            <RailRow icon={<DollarSign className="h-4 w-4" />} label={accountSettings.pricePage.currency} sub="Account default" />
             <div className="my-2 h-px bg-border" />
             <RailButton icon={<Undo2 className="h-4 w-4" />} label="Undo" disabled />
             <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />

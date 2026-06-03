@@ -43,6 +43,12 @@ let state: StoreData = {
 
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
+const docsHistoryStateCache = {
+  canUndo: false,
+  canRedo: false,
+  historyLength: 0,
+  futureLength: 0,
+};
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -70,7 +76,9 @@ function applyRemote(raw: Record<string, unknown>) {
   const order = (raw.order ?? {}) as Record<string, string[]>;
   state = {
     ...state,
-    selectedIds: Array.isArray(raw.selected_ids) ? raw.selected_ids.map(String) : [...DEFAULT_SELECTED],
+    selectedIds: Array.isArray(raw.selected_ids)
+      ? raw.selected_ids.map(String)
+      : [...DEFAULT_SELECTED],
     order: {
       clinic: Array.isArray(order.clinic) ? order.clinic.map(String) : [],
       opg: Array.isArray(order.opg) ? order.opg.map(String) : [],
@@ -118,14 +126,22 @@ export function useSelectedIds() {
   useEffect(() => {
     void loadDocuments();
   }, []);
-  return useSyncExternalStore(subscribe, () => state.selectedIds, () => state.selectedIds);
+  return useSyncExternalStore(
+    subscribe,
+    () => state.selectedIds,
+    () => state.selectedIds,
+  );
 }
 
 export function useSectionOrder() {
   useEffect(() => {
     void loadDocuments();
   }, []);
-  return useSyncExternalStore(subscribe, () => state.order, () => state.order);
+  return useSyncExternalStore(
+    subscribe,
+    () => state.order,
+    () => state.order,
+  );
 }
 
 export function useDocsHistoryState() {
@@ -134,8 +150,32 @@ export function useDocsHistoryState() {
   }, []);
   return useSyncExternalStore(
     subscribe,
-    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
-    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
+    () => {
+      if (
+        docsHistoryStateCache.historyLength !== state.history.length ||
+        docsHistoryStateCache.futureLength !== state.future.length
+      ) {
+        docsHistoryStateCache.historyLength = state.history.length;
+        docsHistoryStateCache.futureLength = state.future.length;
+        docsHistoryStateCache.canUndo = state.history.length > 0;
+        docsHistoryStateCache.canRedo = state.future.length > 0;
+      }
+
+      return docsHistoryStateCache;
+    },
+    () => {
+      if (
+        docsHistoryStateCache.historyLength !== state.history.length ||
+        docsHistoryStateCache.futureLength !== state.future.length
+      ) {
+        docsHistoryStateCache.historyLength = state.history.length;
+        docsHistoryStateCache.futureLength = state.future.length;
+        docsHistoryStateCache.canUndo = state.history.length > 0;
+        docsHistoryStateCache.canRedo = state.future.length > 0;
+      }
+
+      return docsHistoryStateCache;
+    },
   );
 }
 
@@ -173,7 +213,10 @@ export const documentsStore = {
       future: [],
     };
     emit();
-    void clinicApi.documents.reset().then((res) => applyRemote(res)).catch(() => void persist());
+    void clinicApi.documents
+      .reset()
+      .then((res) => applyRemote(res))
+      .catch(() => void persist());
   },
 
   undo() {

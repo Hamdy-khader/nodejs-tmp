@@ -20,9 +20,7 @@ export function SeverityDiagnosisPanel({ planId, tooth, variant, onClose }: Prop
   }, [tooth.number, tooth.diagnosis]);
 
   const toggle = (item: string) => {
-    setSelected((prev) =>
-      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item],
-    );
+    setSelected((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
   const save = () => {
@@ -42,10 +40,7 @@ export function SeverityDiagnosisPanel({ planId, tooth, variant, onClose }: Prop
       <div className="space-y-2.5">
         {LEVELS.map((l) => (
           <label key={l} className="flex cursor-pointer items-center gap-2.5 text-sm">
-            <Checkbox
-              checked={selected.includes(l)}
-              onCheckedChange={() => toggle(l)}
-            />
+            <Checkbox checked={selected.includes(l)} onCheckedChange={() => toggle(l)} />
             <span>{l}</span>
           </label>
         ))}
@@ -54,7 +49,7 @@ export function SeverityDiagnosisPanel({ planId, tooth, variant, onClose }: Prop
       <div className="my-3 h-px bg-border" />
 
       <Button onClick={save} className="w-full rounded-full" size="sm">
-        OK
+        Save
       </Button>
     </div>
   );

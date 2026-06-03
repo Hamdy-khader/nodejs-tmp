@@ -14,7 +14,8 @@ function storageAvailable() {
 
 export const adminTokenStore = {
   key: "bp_admin_token",
-  get: (): string | null => (storageAvailable() ? window.localStorage.getItem("bp_admin_token") : null),
+  get: (): string | null =>
+    storageAvailable() ? window.localStorage.getItem("bp_admin_token") : null,
   set: (t: string): void => {
     if (storageAvailable()) window.localStorage.setItem("bp_admin_token", t);
   },
@@ -26,7 +27,8 @@ export const adminTokenStore = {
 
 export const clinicTokenStore = {
   key: "bp_clinic_token",
-  get: (): string | null => (storageAvailable() ? window.localStorage.getItem("bp_clinic_token") : null),
+  get: (): string | null =>
+    storageAvailable() ? window.localStorage.getItem("bp_clinic_token") : null,
   set: (t: string): void => {
     if (storageAvailable()) window.localStorage.setItem("bp_clinic_token", t);
   },
@@ -113,6 +115,16 @@ export interface DashboardStats {
   newClinicsThisMonth: number;
 }
 
+function toDashboardStats(raw: Record<string, unknown>): DashboardStats {
+  return {
+    totalClinics: Number(raw.totalClinics ?? raw.total_clinics ?? 0),
+    activeClinics: Number(raw.activeClinics ?? raw.active_clinics ?? 0),
+    suspendedClinics: Number(raw.suspendedClinics ?? raw.suspended_clinics ?? 0),
+    totalClinicUsers: Number(raw.totalClinicUsers ?? raw.total_clinic_users ?? 0),
+    newClinicsThisMonth: Number(raw.newClinicsThisMonth ?? raw.new_clinics_this_month ?? 0),
+  };
+}
+
 export interface PricelistSettings {
   language: string;
   currency_code: string;
@@ -190,10 +202,13 @@ async function request<T>(
       ? undefined
       : bodyEncoding === "form"
         ? new URLSearchParams(
-            Object.entries(body as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
-              if (value != null) acc[key] = String(value);
-              return acc;
-            }, {}),
+            Object.entries(body as Record<string, unknown>).reduce<Record<string, string>>(
+              (acc, [key, value]) => {
+                if (value != null) acc[key] = String(value);
+                return acc;
+              },
+              {},
+            ),
           ).toString()
         : JSON.stringify(body);
 
@@ -263,7 +278,10 @@ export const adminApi = {
 
   me: (): Promise<AdminUser> => adminReq("GET", "/admin/me"),
 
-  dashboard: (): Promise<DashboardStats> => adminReq("GET", "/admin/stats"),
+  dashboard: async (): Promise<DashboardStats> => {
+    const raw = await adminReq<Record<string, unknown>>("GET", "/admin/stats");
+    return toDashboardStats(raw);
+  },
 
   clinics: {
     list: (params?: {
@@ -280,7 +298,8 @@ export const adminApi = {
       ),
 
     get: (id: number): Promise<Clinic> => adminReq("GET", `/admin/clinics/${id}`),
-    create: (data: Record<string, unknown>): Promise<Clinic> => adminReq("POST", "/admin/clinics", data),
+    create: (data: Record<string, unknown>): Promise<Clinic> =>
+      adminReq("POST", "/admin/clinics", data),
     update: (id: number, data: Record<string, unknown>): Promise<Clinic> =>
       adminReq("PUT", `/admin/clinics/${id}`, data),
     delete: (id: number): Promise<void> => adminReq("DELETE", `/admin/clinics/${id}`),
@@ -305,7 +324,8 @@ export const adminApi = {
     update: (id: number, data: Record<string, unknown>): Promise<ClinicUser> =>
       adminReq("PUT", `/admin/clinic-users/${id}`, data),
     delete: (id: number): Promise<void> => adminReq("DELETE", `/admin/clinic-users/${id}`),
-    activate: (id: number): Promise<ClinicUser> => adminReq("PATCH", `/admin/clinic-users/${id}/activate`),
+    activate: (id: number): Promise<ClinicUser> =>
+      adminReq("PATCH", `/admin/clinic-users/${id}/activate`),
     deactivate: (id: number): Promise<ClinicUser> =>
       adminReq("PATCH", `/admin/clinic-users/${id}/deactivate`),
   },
@@ -334,9 +354,14 @@ export const clinicApi = {
 
   pricelist: {
     get: (): Promise<PricelistData> => clinicReq("GET", "/clinic/pricelist"),
-    save: (data: PricelistData): Promise<PricelistData> => clinicReq("PUT", "/clinic/pricelist", data),
-    addItem: (body: { group_id: string; name: string; price: number; note: string }): Promise<PricelistItem> =>
-      clinicReq("POST", "/clinic/pricelist/items", body),
+    save: (data: PricelistData): Promise<PricelistData> =>
+      clinicReq("PUT", "/clinic/pricelist", data),
+    addItem: (body: {
+      group_id: string;
+      name: string;
+      price: number;
+      note: string;
+    }): Promise<PricelistItem> => clinicReq("POST", "/clinic/pricelist/items", body),
     updateItem: (
       id: string,
       patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>,
@@ -358,7 +383,8 @@ export const clinicApi = {
         undefined,
         params as Record<string, string | number | boolean | undefined>,
       ),
-    get: (id: string): Promise<Record<string, unknown>> => clinicReq("GET", `/clinic/patients/${id}`),
+    get: (id: string): Promise<Record<string, unknown>> =>
+      clinicReq("GET", `/clinic/patients/${id}`),
     create: (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("POST", "/clinic/patients", body),
     update: (id: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
@@ -367,20 +393,29 @@ export const clinicApi = {
   },
 
   plans: {
-    list: (patientId: string): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
+    list: (
+      patientId: string,
+    ): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
       clinicReq("GET", `/clinic/patients/${patientId}/plans`),
     get: (patientId: string, planId: string): Promise<Record<string, unknown>> =>
       clinicReq("GET", `/clinic/patients/${patientId}/plans/${planId}`),
     create: (patientId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("POST", `/clinic/patients/${patientId}/plans`, body),
-    update: (patientId: string, planId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
+    update: (
+      patientId: string,
+      planId: string,
+      body: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> =>
       clinicReq("PUT", `/clinic/patients/${patientId}/plans/${planId}`, body),
     delete: (patientId: string, planId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/patients/${patientId}/plans/${planId}`),
     saveTeeth: (planId: string, teeth: unknown[]): Promise<unknown> =>
       clinicReq("PUT", `/clinic/plans/${planId}/teeth`, { teeth }),
-    updateTooth: (planId: string, toothNumber: number, body: Record<string, unknown>): Promise<unknown> =>
-      clinicReq("PATCH", `/clinic/plans/${planId}/teeth/${toothNumber}`, body),
+    updateTooth: (
+      planId: string,
+      toothNumber: number,
+      body: Record<string, unknown>,
+    ): Promise<unknown> => clinicReq("PATCH", `/clinic/plans/${planId}/teeth/${toothNumber}`, body),
     addXray: (planId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("POST", `/clinic/plans/${planId}/xrays`, body),
     deleteXray: (planId: string, xrayId: string): Promise<void> =>
@@ -391,11 +426,19 @@ export const clinicApi = {
       clinicReq("PUT", `/clinic/plans/${planId}/rows`, { rows }),
     createRow: (planId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("POST", `/clinic/plans/${planId}/rows`, body),
-    updateRow: (planId: string, rowId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
+    updateRow: (
+      planId: string,
+      rowId: string,
+      body: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> =>
       clinicReq("PATCH", `/clinic/plans/${planId}/rows/${rowId}`, body),
     deleteRow: (planId: string, rowId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/plans/${planId}/rows/${rowId}`),
-    createItem: (planId: string, rowId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
+    createItem: (
+      planId: string,
+      rowId: string,
+      body: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> =>
       clinicReq("POST", `/clinic/plans/${planId}/rows/${rowId}/items`, body),
     updateItem: (
       planId: string,
@@ -409,14 +452,18 @@ export const clinicApi = {
   },
 
   templates: {
-    list: (params?: { category?: string; language?: string }): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
+    list: (params?: {
+      category?: string;
+      language?: string;
+    }): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
       clinicReq(
         "GET",
         "/clinic/templates",
         undefined,
         params as Record<string, string | number | boolean | undefined>,
       ),
-    get: (id: string): Promise<Record<string, unknown>> => clinicReq("GET", `/clinic/templates/${id}`),
+    get: (id: string): Promise<Record<string, unknown>> =>
+      clinicReq("GET", `/clinic/templates/${id}`),
     create: (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("POST", "/clinic/templates", body),
     update: (id: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
@@ -430,7 +477,8 @@ export const clinicApi = {
     get: (): Promise<Record<string, unknown>> => clinicReq("GET", "/clinic/document-presets"),
     save: (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("PUT", "/clinic/document-presets", body),
-    reset: (): Promise<Record<string, unknown>> => clinicReq("POST", "/clinic/document-presets/reset"),
+    reset: (): Promise<Record<string, unknown>> =>
+      clinicReq("POST", "/clinic/document-presets/reset"),
   },
 
   planSettings: {
@@ -502,7 +550,11 @@ export const clinicApi = {
 
   overview: {
     stats: (): Promise<Record<string, unknown>> => clinicReq("GET", "/clinic/overview/stats"),
-    revenue: (params?: { from?: string; to?: string; group?: string }): Promise<Record<string, unknown>> =>
+    revenue: (params?: {
+      from?: string;
+      to?: string;
+      group?: string;
+    }): Promise<Record<string, unknown>> =>
       clinicReq(
         "GET",
         "/clinic/overview/revenue",

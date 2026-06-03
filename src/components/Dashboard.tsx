@@ -15,10 +15,21 @@ import {
   Play,
   Bell,
   Search,
+  Save,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { clinicApi, type ClinicUser } from "@/lib/admin/api";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
+import { toast } from "sonner";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -44,7 +55,11 @@ const tiles: { title: string; icon: typeof UserPlus; primary?: boolean; to: stri
 
 const utilities = [
   { title: "PDF Settings", desc: "Edit the appearance of the cover and the pages", icon: FileText },
-  { title: "Documents, Videos", desc: "About your clinic, dentists, treatments, etc.", icon: FolderOpen },
+  {
+    title: "Documents, Videos",
+    desc: "About your clinic, dentists, treatments, etc.",
+    icon: FolderOpen,
+  },
   { title: "Smart Plans", desc: "Create complex plans with just a few clicks", icon: Lightbulb },
   { title: "User Manager", desc: "Add users and manage permissions", icon: UserCog },
   { title: "Integrations", desc: "Connect BrightPlans to your other systems", icon: Workflow },
@@ -57,19 +72,57 @@ const tutorials = [
   { title: "Smart Plans", duration: "2:06", state: "watched" as const },
 ];
 
+const ACCOUNT_LANGUAGES = [
+  { value: "English (EN)", label: "English (EN)" },
+  { value: "Arabic (AR)", label: "Arabic (AR)" },
+  { value: "Deutsch (DE)", label: "Deutsch (DE)" },
+  { value: "Francais (FR)", label: "Francais (FR)" },
+  { value: "Espanol (ES)", label: "Espanol (ES)" },
+];
+
+const ACCOUNT_CURRENCIES = ["USD", "EUR", "GBP", "SAR", "AED", "TRY", "EGP"];
+
 export function Dashboard() {
   const [clinicUser, setClinicUser] = useState<ClinicUser | null>(null);
+  const settings = usePlanSettings();
+  const [language, setLanguage] = useState(settings.language);
+  const [currency, setCurrency] = useState(settings.pricePage.currency);
+  const [savingPrefs, setSavingPrefs] = useState(false);
   const progress = 89;
   const radius = 56;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (progress / 100) * circ;
 
   useEffect(() => {
-    clinicApi.me().then(({ clinic_user }) => setClinicUser(clinic_user)).catch(() => null);
+    clinicApi
+      .me()
+      .then(({ clinic_user }) => setClinicUser(clinic_user))
+      .catch(() => null);
   }, []);
 
+  useEffect(() => {
+    setLanguage(settings.language);
+    setCurrency(settings.pricePage.currency);
+  }, [settings.language, settings.pricePage.currency]);
+
   const displayName = clinicUser?.full_name ?? "";
-  const initials    = displayName ? getInitials(displayName) : "??";
+  const initials = displayName ? getInitials(displayName) : "??";
+
+  const savePreferences = async () => {
+    setSavingPrefs(true);
+    try {
+      planSettingsStore.update({
+        language,
+        pricePage: {
+          ...settings.pricePage,
+          currency,
+        },
+      });
+      toast.success("Account defaults saved");
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
 
   return (
     <div className="space-y-8 p-6 lg:p-8">
@@ -104,6 +157,54 @@ export function Dashboard() {
       </div>
 
       {/* Hero / Onboarding */}
+      <section className="rounded-3xl border border-border/60 bg-card p-6 shadow-[var(--shadow-soft)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              Account defaults
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Diagnosis and patient flows now use one shared language and currency from your
+              account.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <div className="min-w-[190px]">
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCOUNT_LANGUAGES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-[140px]">
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCOUNT_CURRENCIES.map((item) => (
+                    <SelectItem key={item} value={item}>
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={savePreferences} className="gap-2" disabled={savingPrefs}>
+              <Save className="h-4 w-4" />
+              {savingPrefs ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <section
         className="relative overflow-hidden rounded-3xl p-8 shadow-[var(--shadow-soft)]"
         style={{ background: "var(--gradient-hero)" }}
@@ -113,8 +214,7 @@ export function Dashboard() {
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.07]"
           style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+            backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
             backgroundSize: "22px 22px",
           }}
         />
@@ -179,9 +279,7 @@ export function Dashboard() {
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
                     Step {s.n}
                   </div>
-                  <div className="mt-0.5 text-base font-semibold text-white">
-                    {s.title}
-                  </div>
+                  <div className="mt-0.5 text-base font-semibold text-white">{s.title}</div>
                   {s.state === "done" ? (
                     <span className="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
                       Completed
@@ -217,13 +315,9 @@ export function Dashboard() {
                     }`}
                   >
                     <Icon
-                      className={`mb-3 h-7 w-7 ${
-                        t.primary ? "text-accent" : "text-primary/70"
-                      }`}
+                      className={`mb-3 h-7 w-7 ${t.primary ? "text-accent" : "text-primary/70"}`}
                     />
-                    <span className="text-sm font-semibold leading-tight">
-                      {t.title}
-                    </span>
+                    <span className="text-sm font-semibold leading-tight">{t.title}</span>
                     {t.primary && (
                       <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
                         +
@@ -249,9 +343,7 @@ export function Dashboard() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-foreground">
-                        {u.title}
-                      </div>
+                      <div className="text-sm font-semibold text-foreground">{u.title}</div>
                       <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                         {u.desc}
                       </p>
@@ -267,9 +359,7 @@ export function Dashboard() {
         <aside className="rounded-2xl bg-card p-5 shadow-[var(--shadow-soft)]">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Tutorials</h2>
-            <button className="text-xs font-medium text-primary hover:underline">
-              View all
-            </button>
+            <button className="text-xs font-medium text-primary hover:underline">View all</button>
           </div>
           <div className="space-y-3">
             {tutorials.map((t) => (
@@ -287,9 +377,7 @@ export function Dashboard() {
                   <Play className="h-4 w-4 fill-current" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-foreground">
-                    {t.title}
-                  </div>
+                  <div className="text-sm font-semibold text-foreground">{t.title}</div>
                   <div
                     className={`text-[11px] font-semibold uppercase tracking-wider ${
                       t.state === "new" ? "text-accent" : "text-muted-foreground"
@@ -298,9 +386,7 @@ export function Dashboard() {
                     {t.state === "new" ? "Watch now" : "Watch again"}
                   </div>
                 </div>
-                <span className="text-xs font-mono text-muted-foreground">
-                  {t.duration}
-                </span>
+                <span className="text-xs font-mono text-muted-foreground">{t.duration}</span>
               </div>
             ))}
           </div>

@@ -32,9 +32,7 @@ export function MalocclusionDiagnosisPanel({ planId, tooth, variant, onClose }: 
   }, [tooth.number, tooth.diagnosis]);
 
   const toggle = (item: string) => {
-    setSelected((prev) =>
-      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item],
-    );
+    setSelected((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
   const save = () => {
@@ -67,7 +65,7 @@ export function MalocclusionDiagnosisPanel({ planId, tooth, variant, onClose }: 
       <div className="my-3 h-px bg-border" />
 
       <Button onClick={save} className="w-full rounded-full" size="sm">
-        OK
+        Save
       </Button>
     </div>
   );

@@ -77,9 +77,6 @@ function PatientPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">{patient.name}</h1>
-                <p className="mt-1 text-sm text-primary-foreground/80">
-                  {patient.currency} · {patient.language.toUpperCase()}
-                </p>
               </div>
             </div>
             <div className="flex gap-2">
