@@ -6,7 +6,10 @@
  *  - Clinic -> /clinic/*
  */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "https://backend.treatlyonline.de/api";
+const API_BASE =
+  typeof window === "undefined"
+    ? import.meta.env.VITE_API_URL?.trim() || "/api/proxy"
+    : "/api/proxy";
 
 export const adminTokenStore = {
   key: "bp_admin_token",
