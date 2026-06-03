@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clinicApi } from "@/lib/admin/api";
 
 export type UserStatus = "active" | "inactive" | "suspended";
 
@@ -11,7 +12,7 @@ export type RoleKey =
   | "accountant"
   | "lab_technician"
   | "viewer"
-  | string; // custom
+  | string;
 
 export interface Permission {
   key: string;
@@ -23,9 +24,9 @@ export interface Role {
   key: RoleKey;
   name: string;
   description: string;
-  color: string; // tailwind class fragment
+  color: string;
   builtIn: boolean;
-  permissions: string[]; // permission keys
+  permissions: string[];
 }
 
 export interface ClinicUser {
@@ -46,8 +47,8 @@ export interface ClinicUser {
   dob?: string;
   workingHours?: string;
   calendarColor?: string;
-  lastLogin?: string; // ISO
-  createdAt: string; // ISO
+  lastLogin?: string;
+  createdAt: string;
   notes?: string;
   tags?: string[];
   twoFactor?: boolean;
@@ -63,252 +64,249 @@ export interface AuditLog {
   details?: string;
 }
 
-export const ALL_PERMISSIONS: Permission[] = [
-  { group: "Patients", key: "patients.view", label: "View Patients" },
-  { group: "Patients", key: "patients.add", label: "Add Patients" },
-  { group: "Patients", key: "patients.edit", label: "Edit Patients" },
-  { group: "Patients", key: "patients.delete", label: "Delete Patients" },
-  { group: "Appointments", key: "appt.view", label: "View Appointments" },
-  { group: "Appointments", key: "appt.create", label: "Create Appointments" },
-  { group: "Appointments", key: "appt.edit", label: "Edit Appointments" },
-  { group: "Appointments", key: "appt.cancel", label: "Cancel Appointments" },
-  { group: "Treatments", key: "tx.view", label: "View Treatments" },
-  { group: "Treatments", key: "tx.create", label: "Create Treatments" },
-  { group: "Treatments", key: "tx.edit", label: "Edit Treatments" },
-  { group: "Treatments", key: "tx.delete", label: "Delete Treatments" },
-  { group: "Billing", key: "billing.view", label: "View Invoices" },
-  { group: "Billing", key: "billing.create", label: "Create Invoice" },
-  { group: "Billing", key: "billing.refund", label: "Refund" },
-  { group: "Billing", key: "billing.export", label: "Export Financial Reports" },
-  { group: "Inventory", key: "inv.view", label: "View Inventory" },
-  { group: "Inventory", key: "inv.add", label: "Add Products" },
-  { group: "Inventory", key: "inv.edit", label: "Edit Products" },
-  { group: "Inventory", key: "inv.delete", label: "Delete Products" },
-  { group: "Reports", key: "rep.view", label: "View Reports" },
-  { group: "Reports", key: "rep.export", label: "Export Reports" },
-  { group: "Reports", key: "rep.financial", label: "Financial Reports" },
-  { group: "Reports", key: "rep.analytics", label: "Analytics Access" },
-  { group: "Admin", key: "admin.users", label: "Manage Users" },
-  { group: "Admin", key: "admin.roles", label: "Manage Roles" },
-  { group: "Admin", key: "admin.audit", label: "View Audit Logs" },
-  { group: "Admin", key: "admin.settings", label: "System Settings" },
-];
-
-const ALL_KEYS = ALL_PERMISSIONS.map((p) => p.key);
-
-export const DEFAULT_ROLES: Role[] = [
-  {
-    key: "super_admin",
-    name: "Super Admin",
-    description: "Full unrestricted access. Cannot be deleted.",
-    color: "from-rose-500 to-orange-500",
-    builtIn: true,
-    permissions: ALL_KEYS,
-  },
-  {
-    key: "admin",
-    name: "Admin",
-    description: "Manages clinic operations and staff.",
-    color: "from-violet-500 to-indigo-500",
-    builtIn: true,
-    permissions: ALL_KEYS.filter((k) => !k.startsWith("admin.settings")),
-  },
-  {
-    key: "dentist",
-    name: "Dentist",
-    description: "Clinical workflow and treatment plans.",
-    color: "from-emerald-500 to-teal-500",
-    builtIn: true,
-    permissions: [
-      "patients.view","patients.edit","appt.view","appt.create","appt.edit",
-      "tx.view","tx.create","tx.edit","billing.view","rep.view",
-    ],
-  },
-  {
-    key: "assistant",
-    name: "Assistant",
-    description: "Supports dentists, manages chairside tasks.",
-    color: "from-cyan-500 to-sky-500",
-    builtIn: true,
-    permissions: ["patients.view","appt.view","tx.view","inv.view"],
-  },
-  {
-    key: "receptionist",
-    name: "Receptionist",
-    description: "Front desk, scheduling, patient intake.",
-    color: "from-amber-500 to-yellow-500",
-    builtIn: true,
-    permissions: ["patients.view","patients.add","patients.edit","appt.view","appt.create","appt.edit","appt.cancel","billing.view"],
-  },
-  {
-    key: "accountant",
-    name: "Accountant",
-    description: "Billing, invoices and financial reports.",
-    color: "from-lime-500 to-green-500",
-    builtIn: true,
-    permissions: ["billing.view","billing.create","billing.refund","billing.export","rep.view","rep.export","rep.financial"],
-  },
-  {
-    key: "lab_technician",
-    name: "Lab Technician",
-    description: "Lab orders and prosthetics tracking.",
-    color: "from-fuchsia-500 to-pink-500",
-    builtIn: true,
-    permissions: ["tx.view","inv.view","inv.add","inv.edit"],
-  },
-  {
-    key: "viewer",
-    name: "Viewer",
-    description: "Read-only access across the clinic.",
-    color: "from-slate-400 to-slate-500",
-    builtIn: true,
-    permissions: ALL_KEYS.filter((k) => k.endsWith(".view")),
-  },
-];
-
+export const ALL_PERMISSIONS: Permission[] = [];
+export const DEFAULT_ROLES: Role[] = [];
 export const BRANCHES = ["Main Branch", "Downtown", "North Clinic", "Marina"];
-
-const seed = (): { users: ClinicUser[]; roles: Role[]; logs: AuditLog[] } => {
-  const now = Date.now();
-  const day = 86400000;
-  const users: ClinicUser[] = [
-    { id: "u1", firstName: "Layla", lastName: "Hassan", email: "layla@brightplans.io", phone: "+971 50 111 2233", role: "super_admin", status: "active", branch: "Main Branch", department: "Management", lastLogin: new Date(now - 2 * 3600_000).toISOString(), createdAt: new Date(now - 400 * day).toISOString(), online: true, twoFactor: true },
-    { id: "u2", firstName: "Omar", lastName: "Al-Sayed", email: "omar@brightplans.io", phone: "+971 50 222 3344", role: "dentist", status: "active", branch: "Main Branch", specialty: "Orthodontics", licenseNumber: "DDS-3382", experienceYears: 9, lastLogin: new Date(now - day).toISOString(), createdAt: new Date(now - 300 * day).toISOString(), online: true, calendarColor: "#10b981" },
-    { id: "u3", firstName: "Sara", lastName: "Khalil", email: "sara@brightplans.io", phone: "+971 55 333 4455", role: "receptionist", status: "active", branch: "Downtown", lastLogin: new Date(now - 3 * 3600_000).toISOString(), createdAt: new Date(now - 220 * day).toISOString() },
-    { id: "u4", firstName: "Yusuf", lastName: "Mahmoud", email: "yusuf@brightplans.io", phone: "+971 56 444 5566", role: "assistant", status: "inactive", branch: "Main Branch", lastLogin: new Date(now - 14 * day).toISOString(), createdAt: new Date(now - 180 * day).toISOString() },
-    { id: "u5", firstName: "Noor", lastName: "Tariq", email: "noor@brightplans.io", phone: "+971 52 555 6677", role: "accountant", status: "active", branch: "North Clinic", lastLogin: new Date(now - 6 * 3600_000).toISOString(), createdAt: new Date(now - 120 * day).toISOString() },
-    { id: "u6", firstName: "Hadi", lastName: "Saleh", email: "hadi@brightplans.io", phone: "+971 54 666 7788", role: "lab_technician", status: "active", branch: "Marina", lastLogin: new Date(now - 2 * day).toISOString(), createdAt: new Date(now - 90 * day).toISOString() },
-    { id: "u7", firstName: "Mona", lastName: "Idris", email: "mona@brightplans.io", phone: "+971 50 777 8899", role: "viewer", status: "suspended", branch: "Downtown", lastLogin: new Date(now - 30 * day).toISOString(), createdAt: new Date(now - 60 * day).toISOString() },
-    { id: "u8", firstName: "Karim", lastName: "Fares", email: "karim@brightplans.io", phone: "+971 58 888 9900", role: "admin", status: "active", branch: "Main Branch", lastLogin: new Date(now - 30 * 60_000).toISOString(), createdAt: new Date(now - 45 * day).toISOString(), online: true, twoFactor: true },
-  ];
-  const logs: AuditLog[] = [
-    { id: "l1", at: new Date(now - 60_000).toISOString(), actor: "Layla Hassan", action: "Updated role", target: "Karim Fares", details: "dentist → admin" },
-    { id: "l2", at: new Date(now - 3600_000).toISOString(), actor: "System", action: "Login", target: "Omar Al-Sayed", details: "IP 92.114.5.18" },
-    { id: "l3", at: new Date(now - 5 * 3600_000).toISOString(), actor: "Layla Hassan", action: "Suspended user", target: "Mona Idris" },
-    { id: "l4", at: new Date(now - 24 * 3600_000).toISOString(), actor: "Karim Fares", action: "Created user", target: "Hadi Saleh" },
-  ];
-  return { users, roles: DEFAULT_ROLES, logs };
-};
-
-const KEY = "bp.users.v1";
 
 interface State {
   users: ClinicUser[];
   roles: Role[];
   logs: AuditLog[];
+  permissions: Permission[];
 }
 
+let state: State = {
+  users: [],
+  roles: [],
+  logs: [],
+  permissions: [],
+};
+
 const listeners = new Set<() => void>();
-let state: State | null = null;
+let loaded = false;
+let inflight: Promise<void> | null = null;
 
-const load = (): State => {
-  if (state) return state;
-  if (typeof window === "undefined") return seed();
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as State;
-      // ensure default roles exist
-      const keys = new Set(parsed.roles.map((r) => r.key));
-      for (const r of DEFAULT_ROLES) if (!keys.has(r.key)) parsed.roles.push(r);
-      state = parsed;
-      return state;
+function emit() {
+  listeners.forEach((listener) => listener());
+}
+
+function toUser(raw: Record<string, unknown>): ClinicUser {
+  return {
+    id: String(raw.id ?? ""),
+    firstName: String(raw.first_name ?? raw.firstName ?? ""),
+    lastName: String(raw.last_name ?? raw.lastName ?? ""),
+    email: String(raw.email ?? ""),
+    phone: String(raw.phone ?? ""),
+    avatarUrl: raw.avatar_url ? String(raw.avatar_url) : undefined,
+    role: String(raw.role ?? "viewer"),
+    status: String(raw.status ?? "active") as UserStatus,
+    branch: String(raw.branch ?? ""),
+    department: raw.department ? String(raw.department) : undefined,
+    specialty: raw.specialty ? String(raw.specialty) : undefined,
+    licenseNumber: raw.license_number ? String(raw.license_number) : undefined,
+    experienceYears: raw.experience_years === undefined ? undefined : Number(raw.experience_years),
+    gender: raw.gender ? String(raw.gender) as ClinicUser["gender"] : undefined,
+    dob: raw.dob ? String(raw.dob) : undefined,
+    workingHours: raw.working_hours ? String(raw.working_hours) : undefined,
+    calendarColor: raw.calendar_color ? String(raw.calendar_color) : undefined,
+    lastLogin: raw.last_login ? String(raw.last_login) : raw.last_login_at ? String(raw.last_login_at) : undefined,
+    createdAt: String(raw.created_at ?? new Date().toISOString()),
+    notes: raw.notes ? String(raw.notes) : undefined,
+    tags: Array.isArray(raw.tags) ? raw.tags.map(String) : undefined,
+    twoFactor: Boolean(raw.two_factor),
+    online: Boolean(raw.online),
+  };
+}
+
+function toRole(raw: Record<string, unknown>): Role {
+  return {
+    key: String(raw.key ?? raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    description: String(raw.description ?? ""),
+    color: String(raw.color ?? "from-slate-400 to-slate-500"),
+    builtIn: Boolean(raw.built_in),
+    permissions: Array.isArray(raw.permissions) ? raw.permissions.map(String) : [],
+  };
+}
+
+function toPermission(raw: Record<string, unknown>): Permission {
+  return {
+    key: String(raw.key ?? ""),
+    group: String(raw.group ?? raw.group_name ?? "General"),
+    label: String(raw.label ?? ""),
+  };
+}
+
+function toAudit(raw: Record<string, unknown>): AuditLog {
+  return {
+    id: String(raw.id ?? ""),
+    at: String(raw.at ?? raw.created_at ?? new Date().toISOString()),
+    actor: String(raw.actor ?? ""),
+    action: String(raw.action ?? ""),
+    target: raw.target ? String(raw.target) : undefined,
+    details: raw.details ? String(raw.details) : undefined,
+  };
+}
+
+async function load(force = false) {
+  if (!force && loaded) return;
+  if (inflight) return inflight;
+
+  inflight = (async () => {
+    try {
+      const [usersRes, rolesRes, permissionsRes, logsRes] = await Promise.all([
+        clinicApi.users.list({ limit: 200 }),
+        clinicApi.roles.list(),
+        clinicApi.permissions.list(),
+        clinicApi.auditLogs.list({ limit: 200 }),
+      ]);
+
+      const rolesData = Array.isArray(rolesRes) ? rolesRes : (rolesRes.data ?? []);
+      const permissionsData = Array.isArray(permissionsRes) ? permissionsRes : (permissionsRes.data ?? []);
+
+      const mappedRoles = rolesData.map((item) => toRole(item));
+      const mappedPermissions = permissionsData.map((item) => toPermission(item));
+      state = {
+        users: usersRes.data.map((item) => toUser(item)),
+        roles: mappedRoles,
+        permissions: mappedPermissions,
+        logs: logsRes.data.map((item) => toAudit(item)),
+      };
+      DEFAULT_ROLES.splice(0, DEFAULT_ROLES.length, ...mappedRoles);
+      ALL_PERMISSIONS.splice(0, ALL_PERMISSIONS.length, ...mappedPermissions);
+
+      loaded = true;
+      emit();
+    } finally {
+      inflight = null;
     }
-  } catch {}
-  state = seed();
-  persist();
-  return state;
-};
+  })();
 
-const persist = () => {
-  if (typeof window === "undefined" || !state) return;
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
-};
-
-const emit = () => { listeners.forEach((l) => l()); };
-
-const log = (entry: Omit<AuditLog, "id" | "at">) => {
-  const s = load();
-  s.logs.unshift({ id: crypto.randomUUID(), at: new Date().toISOString(), ...entry });
-  s.logs = s.logs.slice(0, 200);
-};
+  return inflight;
+}
 
 export const usersStore = {
-  get: () => load(),
-  subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
+  get: () => state,
+  subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
 
-  upsertUser(user: ClinicUser, actor = "Admin") {
-    const s = load();
-    const idx = s.users.findIndex((u) => u.id === user.id);
-    if (idx >= 0) {
-      s.users[idx] = user;
-      log({ actor, action: "Updated user", target: `${user.firstName} ${user.lastName}` });
+  async reload() {
+    await load(true);
+  },
+
+  async upsertUser(user: ClinicUser) {
+    if (user.id) {
+      await clinicApi.users.update(user.id, {
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        avatar_url: user.avatarUrl ?? null,
+        role: user.role,
+        status: user.status,
+        branch: user.branch,
+        department: user.department ?? null,
+        specialty: user.specialty ?? null,
+        license_number: user.licenseNumber ?? null,
+        experience_years: user.experienceYears ?? null,
+        gender: user.gender ?? null,
+        dob: user.dob ?? null,
+        working_hours: user.workingHours ?? null,
+        calendar_color: user.calendarColor ?? null,
+        notes: user.notes ?? null,
+        tags: user.tags ?? [],
+        two_factor: user.twoFactor ?? false,
+      });
     } else {
-      s.users.unshift(user);
-      log({ actor, action: "Created user", target: `${user.firstName} ${user.lastName}` });
+      await clinicApi.users.create({
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        avatar_url: user.avatarUrl ?? null,
+        role: user.role,
+        status: user.status,
+        branch: user.branch,
+        department: user.department ?? null,
+        specialty: user.specialty ?? null,
+        license_number: user.licenseNumber ?? null,
+        experience_years: user.experienceYears ?? null,
+        gender: user.gender ?? null,
+        dob: user.dob ?? null,
+        working_hours: user.workingHours ?? null,
+        calendar_color: user.calendarColor ?? null,
+        notes: user.notes ?? null,
+        tags: user.tags ?? [],
+        two_factor: user.twoFactor ?? false,
+      });
     }
-    persist(); emit();
+    await load(true);
   },
 
-  deleteUsers(ids: string[], actor = "Admin") {
-    const s = load();
-    const removed = s.users.filter((u) => ids.includes(u.id) && u.role !== "super_admin");
-    s.users = s.users.filter((u) => !removed.includes(u));
-    removed.forEach((u) => log({ actor, action: "Deleted user", target: `${u.firstName} ${u.lastName}` }));
-    persist(); emit();
+  async deleteUsers(ids: string[]) {
+    await Promise.all(ids.map((id) => clinicApi.users.delete(id)));
+    await load(true);
   },
 
-  setStatus(ids: string[], status: UserStatus, actor = "Admin") {
-    const s = load();
-    s.users = s.users.map((u) => ids.includes(u.id) ? { ...u, status } : u);
-    log({ actor, action: `Set status → ${status}`, target: `${ids.length} user(s)` });
-    persist(); emit();
+  async setStatus(ids: string[], status: UserStatus) {
+    await clinicApi.users.bulkStatus({ user_ids: ids, status });
+    await load(true);
   },
 
-  changeRole(ids: string[], role: RoleKey, actor = "Admin") {
-    const s = load();
-    s.users = s.users.map((u) => ids.includes(u.id) && u.role !== "super_admin" ? { ...u, role } : u);
-    log({ actor, action: `Changed role → ${role}`, target: `${ids.length} user(s)` });
-    persist(); emit();
+  async changeRole(ids: string[], role: RoleKey) {
+    await clinicApi.users.bulkRole({ user_ids: ids, role });
+    await load(true);
   },
 
-  resetPassword(id: string, actor = "Admin") {
-    const s = load();
-    const u = s.users.find((x) => x.id === id);
-    if (u) log({ actor, action: "Reset password", target: `${u.firstName} ${u.lastName}` });
-    persist(); emit();
+  async resetPassword(id: string) {
+    await clinicApi.users.resetPassword(id);
   },
 
-  upsertRole(role: Role, actor = "Admin") {
-    const s = load();
-    const idx = s.roles.findIndex((r) => r.key === role.key);
-    if (idx >= 0) s.roles[idx] = role; else s.roles.push(role);
-    log({ actor, action: idx >= 0 ? "Updated role" : "Created role", target: role.name });
-    persist(); emit();
+  async upsertRole(role: Role) {
+    if (state.roles.some((item) => item.key === role.key)) {
+      await clinicApi.roles.update(role.key, {
+        key: role.key,
+        name: role.name,
+        description: role.description,
+        color: role.color,
+        permissions: role.permissions,
+      });
+    } else {
+      await clinicApi.roles.create({
+        key: role.key,
+        name: role.name,
+        description: role.description,
+        color: role.color,
+        permissions: role.permissions,
+      });
+    }
+    await load(true);
   },
 
-  deleteRole(key: string, actor = "Admin") {
-    const s = load();
-    const r = s.roles.find((x) => x.key === key);
-    if (!r || r.builtIn) return;
-    s.roles = s.roles.filter((x) => x.key !== key);
-    log({ actor, action: "Deleted role", target: r.name });
-    persist(); emit();
+  async deleteRole(key: string) {
+    await clinicApi.roles.delete(key);
+    await load(true);
   },
 };
 
 export function useUsersStore(): State {
   const [, force] = useState(0);
-  useEffect(() => usersStore.subscribe(() => force((n) => n + 1)), []);
+  useEffect(() => {
+    const unsub = usersStore.subscribe(() => force((count) => count + 1));
+    void load();
+    return unsub;
+  }, []);
   return usersStore.get();
 }
 
-export const fullName = (u: ClinicUser) => `${u.firstName} ${u.lastName}`.trim();
-export const initials = (u: ClinicUser) =>
-  `${u.firstName?.[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase() || "U";
+export const fullName = (user: ClinicUser) => `${user.firstName} ${user.lastName}`.trim();
+export const initials = (user: ClinicUser) =>
+  `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "U";
 
 export const formatRelative = (iso?: string) => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";

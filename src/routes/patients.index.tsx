@@ -98,8 +98,8 @@ function PatientsList() {
               >
               <button
                 type="button"
-                onClick={() => {
-                  const plan = patientsStore.ensurePlanFor(p.id);
+                onClick={async () => {
+                  const plan = await patientsStore.ensurePlanFor(p.id);
                   navigate({
                     to: "/patients/$patientId/plans/$planId",
                     params: { patientId: p.id, planId: plan.id },

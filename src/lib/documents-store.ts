@@ -1,17 +1,18 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { clinicApi } from "@/lib/admin/api";
 
 export type DocSectionId = "clinic" | "opg" | "diagnosis" | "treatments" | "other";
 
-interface StoreData {
-  // Set of selected item IDs (template IDs or synthetic fixed IDs like "fixed:clinic:demo")
+interface StoreSnapshot {
   selectedIds: string[];
-  // Per-section custom order overrides (subset of ids in their preferred order)
   order: Record<DocSectionId, string[]>;
-  history: Pick<StoreData, "selectedIds" | "order">[];
-  future: Pick<StoreData, "selectedIds" | "order">[];
 }
 
-const KEY = "brightplans:documents:v2";
+interface StoreData extends StoreSnapshot {
+  history: StoreSnapshot[];
+  future: StoreSnapshot[];
+  loaded: boolean;
+}
 
 const DEFAULT_SELECTED = [
   "fixed:clinic:demo",
@@ -22,96 +23,159 @@ const DEFAULT_SELECTED = [
   "fixed:other:ourclinic",
 ];
 
-function seed(): StoreData {
+function emptyOrder(): Record<DocSectionId, string[]> {
   return {
-    selectedIds: [...DEFAULT_SELECTED],
-    order: { clinic: [], opg: [], diagnosis: [], treatments: [], other: [] },
-    history: [],
-    future: [],
+    clinic: [],
+    opg: [],
+    diagnosis: [],
+    treatments: [],
+    other: [],
   };
 }
 
-function load(): StoreData {
-  if (typeof window === "undefined") return seed();
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) {
-      const s = seed();
-      window.localStorage.setItem(KEY, JSON.stringify(s));
-      return s;
-    }
-    return JSON.parse(raw) as StoreData;
-  } catch {
-    return seed();
-  }
-}
+let state: StoreData = {
+  selectedIds: [...DEFAULT_SELECTED],
+  order: emptyOrder(),
+  history: [],
+  future: [],
+  loaded: false,
+};
 
-let state: StoreData = load();
 const listeners = new Set<() => void>();
+let inflight: Promise<void> | null = null;
 
-function persist() {
-  if (typeof window !== "undefined") window.localStorage.setItem(KEY, JSON.stringify(state));
-  listeners.forEach((l) => l());
+function emit() {
+  listeners.forEach((listener) => listener());
 }
 
-function sub(fn: () => void) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-function snap() {
+function snapshot(): StoreSnapshot {
   return {
     selectedIds: [...state.selectedIds],
-    order: JSON.parse(JSON.stringify(state.order)) as StoreData["order"],
+    order: {
+      clinic: [...state.order.clinic],
+      opg: [...state.order.opg],
+      diagnosis: [...state.order.diagnosis],
+      treatments: [...state.order.treatments],
+      other: [...state.order.other],
+    },
   };
+}
+
+function applyRemote(raw: Record<string, unknown>) {
+  const order = (raw.order ?? {}) as Record<string, string[]>;
+  state = {
+    ...state,
+    selectedIds: Array.isArray(raw.selected_ids) ? raw.selected_ids.map(String) : [...DEFAULT_SELECTED],
+    order: {
+      clinic: Array.isArray(order.clinic) ? order.clinic.map(String) : [],
+      opg: Array.isArray(order.opg) ? order.opg.map(String) : [],
+      diagnosis: Array.isArray(order.diagnosis) ? order.diagnosis.map(String) : [],
+      treatments: Array.isArray(order.treatments) ? order.treatments.map(String) : [],
+      other: Array.isArray(order.other) ? order.other.map(String) : [],
+    },
+    loaded: true,
+  };
+  emit();
+}
+
+async function loadDocuments(force = false) {
+  if (!force && state.loaded) return;
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const res = await clinicApi.documents.get();
+      applyRemote(res);
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
+}
+
+async function persist() {
+  await clinicApi.documents.save({
+    selected_ids: state.selectedIds,
+    order: state.order,
+  });
 }
 
 function commit(next: Partial<Pick<StoreData, "selectedIds" | "order">>) {
   state = {
     ...state,
     ...next,
-    history: [...state.history, snap()].slice(-50),
+    history: [...state.history, snapshot()].slice(-50),
     future: [],
   };
-  persist();
+  emit();
 }
 
 export function useSelectedIds() {
-  return useSyncExternalStore(sub, () => state.selectedIds, () => state.selectedIds);
+  useEffect(() => {
+    void loadDocuments();
+  }, []);
+  return useSyncExternalStore(subscribe, () => state.selectedIds, () => state.selectedIds);
 }
 
 export function useSectionOrder() {
-  return useSyncExternalStore(sub, () => state.order, () => state.order);
-}
-
-let historyCache = { canUndo: false, canRedo: false };
-function getHistory() {
-  const canUndo = state.history.length > 0;
-  const canRedo = state.future.length > 0;
-  if (canUndo !== historyCache.canUndo || canRedo !== historyCache.canRedo) {
-    historyCache = { canUndo, canRedo };
-  }
-  return historyCache;
+  useEffect(() => {
+    void loadDocuments();
+  }, []);
+  return useSyncExternalStore(subscribe, () => state.order, () => state.order);
 }
 
 export function useDocsHistoryState() {
-  return useSyncExternalStore(sub, getHistory, getHistory);
+  useEffect(() => {
+    void loadDocuments();
+  }, []);
+  return useSyncExternalStore(
+    subscribe,
+    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
+    () => ({ canUndo: state.history.length > 0, canRedo: state.future.length > 0 }),
+  );
 }
 
 export const documentsStore = {
+  async reload() {
+    await loadDocuments(true);
+  },
+
   toggle(id: string) {
-    const has = state.selectedIds.includes(id);
+    const exists = state.selectedIds.includes(id);
     commit({
-      selectedIds: has ? state.selectedIds.filter((x) => x !== id) : [...state.selectedIds, id],
+      selectedIds: exists
+        ? state.selectedIds.filter((item) => item !== id)
+        : [...state.selectedIds, id],
     });
+    void persist();
   },
+
   reorder(section: DocSectionId, orderedIds: string[]) {
-    commit({ order: { ...state.order, [section]: orderedIds } });
+    commit({
+      order: {
+        ...state.order,
+        [section]: orderedIds,
+      },
+    });
+    void persist();
   },
+
   reset() {
-    state = { ...seed(), history: [...state.history, snap()], future: [] };
-    persist();
+    state = {
+      ...state,
+      selectedIds: [...DEFAULT_SELECTED],
+      order: emptyOrder(),
+      history: [...state.history, snapshot()].slice(-50),
+      future: [],
+    };
+    emit();
+    void clinicApi.documents.reset().then((res) => applyRemote(res)).catch(() => void persist());
   },
+
   undo() {
     const prev = state.history[state.history.length - 1];
     if (!prev) return;
@@ -119,19 +183,22 @@ export const documentsStore = {
       ...state,
       ...prev,
       history: state.history.slice(0, -1),
-      future: [snap(), ...state.future].slice(0, 50),
+      future: [snapshot(), ...state.future].slice(0, 50),
     };
-    persist();
+    emit();
+    void persist();
   },
+
   redo() {
     const next = state.future[0];
     if (!next) return;
     state = {
       ...state,
       ...next,
-      history: [...state.history, snap()],
+      history: [...state.history, snapshot()].slice(-50),
       future: state.future.slice(1),
     };
-    persist();
+    emit();
+    void persist();
   },
 };

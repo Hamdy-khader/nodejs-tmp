@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  patientsStore, usePatient, usePlan, defaultTeeth,
+  patientsStore, usePatient, usePlan, usePlansFor, defaultTeeth,
   STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
@@ -123,6 +123,7 @@ const STATUS_GROUPS: {
 function PlanPage() {
   const { patientId, planId } = useParams({ from: "/patients/$patientId/plans/$planId" });
   const patient = usePatient(patientId);
+  usePlansFor(patientId);
   const plan = usePlan(planId);
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");

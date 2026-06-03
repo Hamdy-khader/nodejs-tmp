@@ -45,7 +45,7 @@ export function PatientFormDialog({ open, onOpenChange, patient, onCreated }: Pr
     }
   }, [open, patient]);
 
-  function submit() {
+  async function submit() {
     setTouched(true);
     if (!name.trim()) return;
     if (editing && patient) {
@@ -60,7 +60,7 @@ export function PatientFormDialog({ open, onOpenChange, patient, onCreated }: Pr
       toast.success("Patient updated");
       onOpenChange(false);
     } else {
-      const created = patientsStore.createPatient({
+      const created = await patientsStore.createPatient({
         name: name.trim(),
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,

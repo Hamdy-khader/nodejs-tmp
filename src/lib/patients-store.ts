@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { clinicApi } from "@/lib/admin/api";
 
 export type ToothStatus =
   | "intact"
@@ -63,8 +64,6 @@ interface StoreData {
   plans: TreatmentPlan[];
 }
 
-const STORAGE_KEY = "brightplans:data:v1";
-
 const FDI_NUMBERS = [
   18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
   48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38,
@@ -79,278 +78,552 @@ export function defaultTeeth(): Record<number, ToothState> {
   return out;
 }
 
-function seedDemo(): StoreData {
-  const now = Date.now();
-  const mk = (over: Partial<Patient>): Patient => ({
-    id: Math.random().toString(36).slice(2, 10) + now.toString(36),
-    name: "",
-    language: "en",
-    currency: "USD",
-    createdAt: now,
-    ...over,
-  });
-  const patients: Patient[] = [
-    mk({ name: "Sarah Al-Hamadi", email: "sarah.h@example.com", phone: "+971 50 123 4567", dateOfBirth: "1990-04-12", language: "ar", currency: "AED" }),
-    mk({ name: "Omar Khaled", email: "omar.k@example.com", phone: "+962 79 555 0199", dateOfBirth: "1985-11-03", language: "ar", currency: "USD" }),
-    mk({ name: "Lina Haddad", email: "lina@example.com", phone: "+961 71 222 333", dateOfBirth: "1998-02-21", language: "en", currency: "EUR" }),
-    mk({ name: "John Smith", email: "john.smith@example.com", phone: "+1 415 555 0142", dateOfBirth: "1979-08-30", language: "en", currency: "USD" }),
-    mk({ name: "Fatima Noor", phone: "+966 55 444 8821", dateOfBirth: "2002-06-17", language: "ar", currency: "SAR" }),
-  ];
-  const buildTeeth = (overrides: Partial<Record<number, ToothStatus>>) => {
-    const t = defaultTeeth();
-    for (const [k, v] of Object.entries(overrides)) t[+k] = { number: +k, status: v as ToothStatus };
-    return t;
-  };
-  const plans: TreatmentPlan[] = [
-    { id: "p1" + now.toString(36), patientId: patients[0].id, name: "Initial assessment", notes: "Routine checkup with two cavities found.", teeth: buildTeeth({ 16: "caries", 26: "filled", 36: "caries", 46: "crown" }), createdAt: now, updatedAt: now },
-    { id: "p2" + now.toString(36), patientId: patients[0].id, name: "Crown replacement", notes: "Plan to replace old crown on 46.", teeth: buildTeeth({ 46: "crown", 47: "filled" }), createdAt: now - 86400000, updatedAt: now - 86400000 },
-    { id: "p3" + now.toString(36), patientId: patients[1].id, name: "Implant evaluation", notes: "Missing 36, candidate for implant.", teeth: buildTeeth({ 36: "missing", 37: "intact", 16: "root-treated" }), createdAt: now, updatedAt: now },
-    { id: "p4" + now.toString(36), patientId: patients[2].id, name: "Orthodontic baseline", notes: "Pre-ortho mapping.", teeth: buildTeeth({ 11: "intact", 21: "intact", 36: "filled" }), createdAt: now, updatedAt: now },
-    { id: "p5" + now.toString(36), patientId: patients[3].id, name: "Bridge planning", notes: "Bridge between 24-26.", teeth: buildTeeth({ 24: "bridge", 25: "missing", 26: "bridge" }), createdAt: now, updatedAt: now },
-  ];
-  return { patients, plans };
-}
-
-function load(): StoreData {
-  if (typeof window === "undefined") return { patients: [], plans: [] };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const seeded = seedDemo();
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    return JSON.parse(raw) as StoreData;
-  } catch {
-    return { patients: [], plans: [] };
-  }
-}
-
-let state: StoreData = load();
+let state: StoreData = { patients: [], plans: [] };
 const listeners = new Set<() => void>();
+let patientsLoaded = false;
+const plansLoadedFor = new Set<string>();
+const planLoaded = new Set<string>();
+let patientsInflight: Promise<void> | null = null;
+const plansInflight = new Map<string, Promise<void>>();
 
-function persist() {
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-  listeners.forEach((l) => l());
+function emit() {
+  listeners.forEach((listener) => listener());
 }
 
-function subscribe(fn: () => void) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
-}
-
-export function usePatients() {
-  return useSyncExternalStore(
-    subscribe,
-    () => state.patients,
-    () => state.patients,
-  );
-}
-
-export function usePatient(id: string | undefined) {
-  return useSyncExternalStore(
-    subscribe,
-    () => state.patients.find((p) => p.id === id),
-    () => state.patients.find((p) => p.id === id),
-  );
-}
-
-const plansForCache = new WeakMap<TreatmentPlan[], Map<string, TreatmentPlan[]>>();
-function getPlansFor(patientId: string | undefined): TreatmentPlan[] {
-  if (!patientId) return EMPTY_PLANS;
-  let bucket = plansForCache.get(state.plans);
-  if (!bucket) {
-    bucket = new Map();
-    plansForCache.set(state.plans, bucket);
-  }
-  let result = bucket.get(patientId);
-  if (!result) {
-    result = state.plans.filter((p) => p.patientId === patientId);
-    bucket.set(patientId, result);
-  }
-  return result;
-}
-const EMPTY_PLANS: TreatmentPlan[] = [];
-
-export function usePlansFor(patientId: string | undefined) {
-  return useSyncExternalStore(
-    subscribe,
-    () => getPlansFor(patientId),
-    () => getPlansFor(patientId),
-  );
-}
-
-export function usePlan(id: string | undefined) {
-  return useSyncExternalStore(
-    subscribe,
-    () => state.plans.find((p) => p.id === id),
-    () => state.plans.find((p) => p.id === id),
-  );
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+function toPatient(raw: Record<string, unknown>): Patient {
+  return {
+    id: String(raw.id ?? ""),
+    name: String(raw.name ?? ""),
+    email: raw.email ? String(raw.email) : undefined,
+    phone: raw.phone ? String(raw.phone) : undefined,
+    dateOfBirth: raw.date_of_birth ? String(raw.date_of_birth) : undefined,
+    language: String(raw.language ?? "en"),
+    currency: String(raw.currency ?? "USD"),
+    createdAt: new Date(String(raw.created_at ?? new Date().toISOString())).getTime(),
+  };
+}
+
+function toTooth(raw: Record<string, unknown>): ToothState {
+  return {
+    number: Number(raw.tooth_number ?? raw.number ?? 0),
+    status: String(raw.status ?? "intact") as ToothStatus,
+    note: raw.note ? String(raw.note) : undefined,
+    diagnosis: Array.isArray(raw.diagnosis) ? raw.diagnosis.map(String) : undefined,
+  };
+}
+
+function toTreatmentItem(raw: Record<string, unknown>): TreatmentItem {
+  return {
+    id: String(raw.id ?? uid()),
+    name: String(raw.name ?? ""),
+    toothNumber:
+      raw.tooth_number === null || raw.tooth_number === undefined
+        ? undefined
+        : Number(raw.tooth_number),
+    amount: Number(raw.amount ?? 1),
+    unitPrice: Number(raw.unit_price ?? 0),
+  };
+}
+
+function toTreatmentRow(raw: Record<string, unknown>): TreatmentRow {
+  const kind = String(raw.kind ?? "visit") as TreatmentRow["kind"];
+  if (kind === "visit") {
+    return {
+      id: String(raw.id ?? uid()),
+      kind,
+      label: raw.label ? String(raw.label) : undefined,
+      note: raw.note ? String(raw.note) : undefined,
+      items: Array.isArray(raw.items) ? raw.items.map((item) => toTreatmentItem(item as Record<string, unknown>)) : [],
+    };
+  }
+  if (kind === "healing") {
+    return {
+      id: String(raw.id ?? uid()),
+      kind,
+      label: raw.label ? String(raw.label) : undefined,
+      note: raw.note ? String(raw.note) : undefined,
+      days: raw.days === null || raw.days === undefined ? undefined : Number(raw.days),
+    };
+  }
+  return {
+    id: String(raw.id ?? uid()),
+    kind,
+    note: raw.note ? String(raw.note) : undefined,
+    mode: String(raw.mode ?? "amount") as "amount" | "percent",
+    value: Number(raw.value ?? 0),
+  };
+}
+
+function mergePlan(plan: TreatmentPlan) {
+  const next = state.plans.filter((item) => item.id !== plan.id);
+  state = { ...state, plans: [plan, ...next] };
+  emit();
+}
+
+function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): TreatmentPlan {
+  const teeth = defaultTeeth();
+  const rawTeeth = Array.isArray(raw.teeth)
+    ? raw.teeth
+    : Object.values((raw.teeth ?? {}) as Record<string, unknown>);
+  rawTeeth.forEach((item) => {
+    const tooth = toTooth(item as Record<string, unknown>);
+    if (tooth.number) teeth[tooth.number] = tooth;
+  });
+
+  const xraysRaw = Array.isArray(raw.xrays) ? raw.xrays : [];
+  const generalStatusesRaw = Array.isArray(raw.general_statuses) ? raw.general_statuses : [];
+  const treatmentRowsRaw = Array.isArray(raw.treatment_rows)
+    ? raw.treatment_rows
+    : Array.isArray(raw.treatments)
+      ? raw.treatments
+      : [];
+
+  return {
+    id: String(raw.id ?? uid()),
+    patientId: String(raw.patient_id ?? fallbackPatientId ?? ""),
+    name: String(raw.name ?? "Your suggested treatment"),
+    notes: String(raw.notes ?? ""),
+    teeth,
+    xrays: xraysRaw.map((item) =>
+      typeof item === "string"
+        ? item
+        : String((item as Record<string, unknown>).file_url ?? ""),
+    ).filter(Boolean),
+    generalStatuses: generalStatusesRaw.map((item) =>
+      typeof item === "string"
+        ? item
+        : String((item as Record<string, unknown>).label ?? ""),
+    ).filter(Boolean),
+    treatments: treatmentRowsRaw.map((item) => toTreatmentRow(item as Record<string, unknown>)),
+    treatmentNote: raw.treatment_note ? String(raw.treatment_note) : undefined,
+    billingMode: raw.billing_mode ? String(raw.billing_mode) as "insurance" | "payment" : undefined,
+    insurance:
+      raw.insurance && typeof raw.insurance === "object"
+        ? {
+            unusedMax: Number((raw.insurance as Record<string, unknown>).unused_max ?? 0),
+            deductible: Number((raw.insurance as Record<string, unknown>).deductible ?? 0),
+          }
+        : undefined,
+    paymentPlan:
+      raw.payment_plan && typeof raw.payment_plan === "object"
+        ? {
+            amount: Number((raw.payment_plan as Record<string, unknown>).amount ?? 0),
+            term: Number((raw.payment_plan as Record<string, unknown>).term ?? 0),
+            interest: Number((raw.payment_plan as Record<string, unknown>).interest ?? 0),
+          }
+        : undefined,
+    createdAt: new Date(String(raw.created_at ?? new Date().toISOString())).getTime(),
+    updatedAt: new Date(String(raw.updated_at ?? raw.created_at ?? new Date().toISOString())).getTime(),
+  };
+}
+
+function serializePlan(plan: TreatmentPlan) {
+  return {
+    name: plan.name,
+    notes: plan.notes,
+    billing_mode: plan.billingMode ?? null,
+    insurance: plan.insurance
+      ? {
+          unused_max: plan.insurance.unusedMax,
+          deductible: plan.insurance.deductible,
+        }
+      : null,
+    payment_plan: plan.paymentPlan
+      ? {
+          amount: plan.paymentPlan.amount,
+          term: plan.paymentPlan.term,
+          interest: plan.paymentPlan.interest,
+        }
+      : null,
+    treatment_note: plan.treatmentNote ?? null,
+  };
+}
+
+async function loadPatients(force = false) {
+  if (!force && patientsLoaded) return;
+  if (patientsInflight) return patientsInflight;
+  patientsInflight = (async () => {
+    try {
+      const res = await clinicApi.patients.list({ limit: 200 });
+      state = { ...state, patients: res.data.map((item) => toPatient(item)) };
+      patientsLoaded = true;
+      emit();
+    } finally {
+      patientsInflight = null;
+    }
+  })();
+  return patientsInflight;
+}
+
+async function loadPlansFor(patientId: string, force = false) {
+  if (!patientId) return;
+  if (!force && plansLoadedFor.has(patientId)) return;
+  if (plansInflight.has(patientId)) return plansInflight.get(patientId);
+  const promise = (async () => {
+    try {
+      const res = await clinicApi.plans.list(patientId);
+      const rows = Array.isArray(res) ? res : (res.data ?? []);
+      const plans = rows.map((item) => toPlan(item, patientId));
+      const rest = state.plans.filter((plan) => plan.patientId !== patientId);
+      state = { ...state, plans: [...plans, ...rest] };
+      plansLoadedFor.add(patientId);
+      plans.forEach((plan) => planLoaded.add(plan.id));
+      emit();
+    } finally {
+      plansInflight.delete(patientId);
+    }
+  })();
+  plansInflight.set(patientId, promise);
+  return promise;
+}
+
+async function loadPlan(patientId: string, id: string, force = false) {
+  if (!patientId || !id) return;
+  if (!force && planLoaded.has(id)) return;
+  const raw = await clinicApi.plans.get(patientId, id);
+  const plan = toPlan(raw, patientId);
+  mergePlan(plan);
+  plansLoadedFor.add(patientId);
+  planLoaded.add(id);
+}
+
+function updateLocalPatient(id: string, patch: Partial<Patient>) {
+  state = {
+    ...state,
+    patients: state.patients.map((patient) => (patient.id === id ? { ...patient, ...patch } : patient)),
+  };
+  emit();
+}
+
+function updateLocalPlan(id: string, patch: Partial<TreatmentPlan>) {
+  state = {
+    ...state,
+    plans: state.plans.map((plan) =>
+      plan.id === id ? { ...plan, ...patch, updatedAt: Date.now() } : plan,
+    ),
+  };
+  emit();
+}
+
+function getPlanById(id: string | undefined) {
+  return state.plans.find((plan) => plan.id === id);
+}
+
+export function usePatients() {
+  useEffect(() => {
+    void loadPatients();
+  }, []);
+  return useSyncExternalStore(subscribe, () => state.patients, () => state.patients);
+}
+
+export function usePatient(id: string | undefined) {
+  useEffect(() => {
+    void loadPatients();
+  }, []);
+  return useSyncExternalStore(
+    subscribe,
+    () => state.patients.find((patient) => patient.id === id),
+    () => state.patients.find((patient) => patient.id === id),
+  );
+}
+
+export function usePlansFor(patientId: string | undefined) {
+  useEffect(() => {
+    if (patientId) void loadPlansFor(patientId);
+  }, [patientId]);
+  return useSyncExternalStore(
+    subscribe,
+    () => state.plans.filter((plan) => plan.patientId === patientId),
+    () => state.plans.filter((plan) => plan.patientId === patientId),
+  );
+}
+
+export function usePlan(id: string | undefined) {
+  const plan = getPlanById(id);
+  useEffect(() => {
+    if (plan?.patientId && id) void loadPlan(plan.patientId, id);
+  }, [plan?.patientId, id]);
+  return useSyncExternalStore(subscribe, () => getPlanById(id), () => getPlanById(id));
+}
+
 export const patientsStore = {
-  createPatient(input: Omit<Patient, "id" | "createdAt">) {
-    const patient: Patient = { ...input, id: uid(), createdAt: Date.now() };
+  async reload() {
+    await loadPatients(true);
+  },
+
+  async createPatient(input: Omit<Patient, "id" | "createdAt">) {
+    const raw = await clinicApi.patients.create({
+      name: input.name,
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      date_of_birth: input.dateOfBirth ?? null,
+      language: input.language,
+      currency: input.currency,
+    });
+    const patient = toPatient(raw);
     state = { ...state, patients: [patient, ...state.patients] };
-    persist();
+    emit();
     return patient;
   },
+
   updatePatient(id: string, input: Partial<Omit<Patient, "id" | "createdAt">>) {
-    state = {
-      ...state,
-      patients: state.patients.map((p) => (p.id === id ? { ...p, ...input } : p)),
-    };
-    persist();
+    updateLocalPatient(id, input as Partial<Patient>);
+    void clinicApi.patients.update(id, {
+      name: input.name,
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      date_of_birth: input.dateOfBirth ?? null,
+      language: input.language,
+      currency: input.currency,
+    });
   },
+
   deletePatient(id: string) {
     state = {
-      patients: state.patients.filter((p) => p.id !== id),
-      plans: state.plans.filter((p) => p.patientId !== id),
+      patients: state.patients.filter((patient) => patient.id !== id),
+      plans: state.plans.filter((plan) => plan.patientId !== id),
     };
-    persist();
+    emit();
+    void clinicApi.patients.delete(id);
   },
-  createPlan(patientId: string, name: string) {
-    const plan: TreatmentPlan = {
-      id: uid(),
-      patientId,
-      name,
-      notes: "",
-      teeth: defaultTeeth(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    state = { ...state, plans: [plan, ...state.plans] };
-    persist();
+
+  async createPlan(patientId: string, name: string) {
+    const raw = await clinicApi.plans.create(patientId, { name, notes: "" });
+    const plan = toPlan(raw, patientId);
+    mergePlan(plan);
     return plan;
   },
-  ensurePlanFor(patientId: string): TreatmentPlan {
+
+  async ensurePlanFor(patientId: string): Promise<TreatmentPlan> {
+    await loadPlansFor(patientId);
     const existing = state.plans
-      .filter((p) => p.patientId === patientId)
+      .filter((plan) => plan.patientId === patientId)
       .sort((a, b) => b.updatedAt - a.updatedAt)[0];
     if (existing) return existing;
     return this.createPlan(patientId, "Your suggested treatment");
   },
+
   updatePlan(id: string, input: Partial<Omit<TreatmentPlan, "id" | "patientId" | "createdAt">>) {
-    state = {
-      ...state,
-      plans: state.plans.map((p) =>
-        p.id === id ? { ...p, ...input, updatedAt: Date.now() } : p,
-      ),
-    };
-    persist();
+    const plan = getPlanById(id);
+    if (!plan) return;
+    const next = { ...plan, ...input, updatedAt: Date.now() };
+    mergePlan(next);
+    if (input.generalStatuses) {
+      void clinicApi.plans.setGeneralStatuses(
+        plan.id,
+        input.generalStatuses.map((label) => ({ label })),
+      );
+    }
+    if (input.teeth) {
+      void clinicApi.plans.saveTeeth(
+        plan.id,
+        Object.values(input.teeth).map((tooth) => ({
+          tooth_number: tooth.number,
+          status: tooth.status,
+          note: tooth.note ?? null,
+          diagnosis: tooth.diagnosis ?? [],
+        })),
+      );
+    }
+    void clinicApi.plans.update(plan.patientId, plan.id, serializePlan(next));
   },
+
   setTooth(planId: string, tooth: ToothState) {
-    state = {
-      ...state,
-      plans: state.plans.map((p) =>
-        p.id === planId
-          ? { ...p, teeth: { ...p.teeth, [tooth.number]: tooth }, updatedAt: Date.now() }
-          : p,
-      ),
-    };
-    persist();
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    updateLocalPlan(planId, {
+      teeth: { ...plan.teeth, [tooth.number]: tooth },
+    });
+    void clinicApi.plans.updateTooth(planId, tooth.number, {
+      tooth_number: tooth.number,
+      status: tooth.status,
+      note: tooth.note ?? null,
+      diagnosis: tooth.diagnosis ?? [],
+    });
   },
+
   setTreatments(planId: string, treatments: TreatmentRow[]) {
-    state = {
-      ...state,
-      plans: state.plans.map((p) =>
-        p.id === planId ? { ...p, treatments, updatedAt: Date.now() } : p,
-      ),
-    };
-    persist();
-  },
-  addTreatmentRow(planId: string, row: TreatmentRow) {
-    const plan = state.plans.find((p) => p.id === planId);
-    if (!plan) return;
-    this.setTreatments(planId, [...(plan.treatments ?? []), row]);
-  },
-  updateTreatmentRow(planId: string, rowId: string, patch: Partial<TreatmentRow>) {
-    const plan = state.plans.find((p) => p.id === planId);
-    if (!plan) return;
-    this.setTreatments(
+    updateLocalPlan(planId, { treatments });
+    void clinicApi.plans.setRows(
       planId,
-      (plan.treatments ?? []).map((r) =>
-        r.id === rowId ? ({ ...r, ...patch } as TreatmentRow) : r,
-      ),
+      treatments.map((row, index) => ({
+        id: row.id,
+        kind: row.kind,
+        label: "label" in row ? row.label ?? null : null,
+        note: row.note ?? null,
+        days: row.kind === "healing" ? row.days ?? null : null,
+        mode: row.kind === "discount" ? row.mode : null,
+        value: row.kind === "discount" ? row.value : null,
+        sort_order: index + 1,
+        items:
+          row.kind === "visit"
+            ? row.items.map((item, itemIndex) => ({
+                id: item.id,
+                name: item.name,
+                tooth_number: item.toothNumber ?? null,
+                amount: item.amount,
+                unit_price: item.unitPrice,
+                sort_order: itemIndex + 1,
+              }))
+            : [],
+      })),
     );
   },
-  removeTreatmentRow(planId: string, rowId: string) {
-    const plan = state.plans.find((p) => p.id === planId);
+
+  addTreatmentRow(planId: string, row: TreatmentRow) {
+    const plan = getPlanById(planId);
     if (!plan) return;
-    this.setTreatments(planId, (plan.treatments ?? []).filter((r) => r.id !== rowId));
+    const next = [...(plan.treatments ?? []), row];
+    updateLocalPlan(planId, { treatments: next });
+    void clinicApi.plans.createRow(planId, {
+      kind: row.kind,
+      label: "label" in row ? row.label ?? null : null,
+      note: row.note ?? null,
+      days: row.kind === "healing" ? row.days ?? null : null,
+      mode: row.kind === "discount" ? row.mode : null,
+      value: row.kind === "discount" ? row.value : null,
+      sort_order: next.length,
+    }).then(() => loadPlan(plan.patientId, planId, true)).catch(() => null);
   },
+
+  updateTreatmentRow(planId: string, rowId: string, patch: Partial<TreatmentRow>) {
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    const treatments = (plan.treatments ?? []).map((row) =>
+      row.id === rowId ? ({ ...row, ...patch } as TreatmentRow) : row,
+    );
+    updateLocalPlan(planId, { treatments });
+    const row = treatments.find((item) => item.id === rowId);
+    if (!row) return;
+    void clinicApi.plans.updateRow(planId, rowId, {
+      kind: row.kind,
+      label: "label" in row ? row.label ?? null : null,
+      note: row.note ?? null,
+      days: row.kind === "healing" ? row.days ?? null : null,
+      mode: row.kind === "discount" ? row.mode : null,
+      value: row.kind === "discount" ? row.value : null,
+    });
+  },
+
+  removeTreatmentRow(planId: string, rowId: string) {
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    updateLocalPlan(planId, {
+      treatments: (plan.treatments ?? []).filter((row) => row.id !== rowId),
+    });
+    void clinicApi.plans.deleteRow(planId, rowId);
+  },
+
   addTreatmentItemToLastVisit(planId: string, item: Omit<TreatmentItem, "id">) {
-    const plan = state.plans.find((p) => p.id === planId);
+    const plan = getPlanById(planId);
     if (!plan) return;
     const rows = [...(plan.treatments ?? [])];
     let lastVisitIndex = -1;
-    for (let i = rows.length - 1; i >= 0; i--) {
-      if (rows[i].kind === "visit") { lastVisitIndex = i; break; }
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      if (rows[i].kind === "visit") {
+        lastVisitIndex = i;
+        break;
+      }
     }
     const newItem: TreatmentItem = { ...item, id: uid() };
     if (lastVisitIndex === -1) {
-      rows.push({ id: uid(), kind: "visit", items: [newItem] });
-    } else {
-      const v = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
-      rows[lastVisitIndex] = { ...v, items: [...v.items, newItem] };
+      const newRow: Extract<TreatmentRow, { kind: "visit" }> = {
+        id: uid(),
+        kind: "visit",
+        items: [newItem],
+      };
+      rows.push(newRow);
+      updateLocalPlan(planId, { treatments: rows });
+      void clinicApi.plans
+        .createRow(planId, { kind: "visit", sort_order: rows.length })
+        .then(() => loadPlan(plan.patientId, planId, true))
+        .catch(() => null);
+      return;
     }
-    this.setTreatments(planId, rows);
+
+    const row = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
+    rows[lastVisitIndex] = { ...row, items: [...row.items, newItem] };
+    updateLocalPlan(planId, { treatments: rows });
+    void clinicApi.plans.createItem(planId, row.id, {
+      name: newItem.name,
+      tooth_number: newItem.toothNumber ?? null,
+      amount: newItem.amount,
+      unit_price: newItem.unitPrice,
+      sort_order: row.items.length + 1,
+    }).catch(() => null);
   },
+
   removeTreatmentItem(planId: string, rowId: string, itemId: string) {
-    const plan = state.plans.find((p) => p.id === planId);
+    const plan = getPlanById(planId);
     if (!plan) return;
-    this.setTreatments(
-      planId,
-      (plan.treatments ?? []).map((r) =>
-        r.kind === "visit" && r.id === rowId
-          ? { ...r, items: r.items.filter((it) => it.id !== itemId) }
-          : r,
+    updateLocalPlan(planId, {
+      treatments: (plan.treatments ?? []).map((row) =>
+        row.kind === "visit" && row.id === rowId
+          ? { ...row, items: row.items.filter((item) => item.id !== itemId) }
+          : row,
       ),
-    );
+    });
+    void clinicApi.plans.deleteItem(planId, rowId, itemId);
   },
+
   updateTreatmentItem(planId: string, rowId: string, itemId: string, patch: Partial<TreatmentItem>) {
-    const plan = state.plans.find((p) => p.id === planId);
+    const plan = getPlanById(planId);
     if (!plan) return;
-    this.setTreatments(
-      planId,
-      (plan.treatments ?? []).map((r) =>
-        r.kind === "visit" && r.id === rowId
-          ? { ...r, items: r.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)) }
-          : r,
-      ),
+    const treatments = (plan.treatments ?? []).map((row) =>
+      row.kind === "visit" && row.id === rowId
+        ? { ...row, items: row.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)) }
+        : row,
     );
+    updateLocalPlan(planId, { treatments });
+    const row = treatments.find((item) => item.kind === "visit" && item.id === rowId) as Extract<TreatmentRow, { kind: "visit" }> | undefined;
+    const item = row?.items.find((entry) => entry.id === itemId);
+    if (!item) return;
+    void clinicApi.plans.updateItem(planId, rowId, itemId, {
+      name: item.name,
+      tooth_number: item.toothNumber ?? null,
+      amount: item.amount,
+      unit_price: item.unitPrice,
+    });
   },
+
   deletePlan(id: string) {
-    state = { ...state, plans: state.plans.filter((p) => p.id !== id) };
-    persist();
+    const plan = getPlanById(id);
+    if (!plan) return;
+    state = { ...state, plans: state.plans.filter((item) => item.id !== id) };
+    emit();
+    void clinicApi.plans.delete(plan.patientId, id);
   },
+
   addXrays(planId: string, dataUrls: string[]) {
-    state = {
-      ...state,
-      plans: state.plans.map((p) =>
-        p.id === planId
-          ? { ...p, xrays: [...(p.xrays ?? []), ...dataUrls], updatedAt: Date.now() }
-          : p,
-      ),
-    };
-    persist();
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    updateLocalPlan(planId, { xrays: [...(plan.xrays ?? []), ...dataUrls] });
+    dataUrls.forEach((fileUrl, index) => {
+      void clinicApi.plans.addXray(planId, {
+        file_url: fileUrl,
+        sort_order: (plan.xrays?.length ?? 0) + index + 1,
+      });
+    });
   },
+
   removeXray(planId: string, index: number) {
-    state = {
-      ...state,
-      plans: state.plans.map((p) =>
-        p.id === planId
-          ? { ...p, xrays: (p.xrays ?? []).filter((_, i) => i !== index), updatedAt: Date.now() }
-          : p,
-      ),
-    };
-    persist();
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    const xrays = [...(plan.xrays ?? [])];
+    const removed = xrays[index];
+    updateLocalPlan(planId, { xrays: xrays.filter((_, itemIndex) => itemIndex !== index) });
+    if (removed) {
+      void loadPlan(plan.patientId, planId, true).catch(() => null);
+    }
   },
 };
 

@@ -195,9 +195,9 @@ function PatientPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setNewPlanOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (!newPlanName.trim()) return;
-                const plan = patientsStore.createPlan(patient.id, newPlanName.trim());
+                const plan = await patientsStore.createPlan(patient.id, newPlanName.trim());
                 setNewPlanOpen(false);
                 toast.success("Plan created");
                 navigate({
