@@ -26,7 +26,6 @@ import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as PatientsPatientIdIndexRouteImport } from './routes/patients.$patientId.index'
 import { Route as AdminClinicsIndexRouteImport } from './routes/admin.clinics.index'
-import { Route as ApiProxySplatRouteImport } from './routes/api.proxy.$'
 import { Route as AdminClinicsCreateRouteImport } from './routes/admin.clinics.create'
 import { Route as AdminClinicsIdIndexRouteImport } from './routes/admin.clinics.$id.index'
 import { Route as PatientsPatientIdPlansPlanIdRouteImport } from './routes/patients.$patientId.plans.$planId'
@@ -118,11 +117,6 @@ const AdminClinicsIndexRoute = AdminClinicsIndexRouteImport.update({
   path: '/admin/clinics/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProxySplatRoute = ApiProxySplatRouteImport.update({
-  id: '/api/proxy/$',
-  path: '/api/proxy/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminClinicsCreateRoute = AdminClinicsCreateRouteImport.update({
   id: '/admin/clinics/create',
   path: '/admin/clinics/create',
@@ -167,7 +161,6 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/patients/': typeof PatientsIndexRoute
   '/admin/clinics/create': typeof AdminClinicsCreateRoute
-  '/api/proxy/$': typeof ApiProxySplatRoute
   '/admin/clinics/': typeof AdminClinicsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
   '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
@@ -190,7 +183,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/patients': typeof PatientsIndexRoute
   '/admin/clinics/create': typeof AdminClinicsCreateRoute
-  '/api/proxy/$': typeof ApiProxySplatRoute
   '/admin/clinics': typeof AdminClinicsIndexRoute
   '/patients/$patientId': typeof PatientsPatientIdIndexRoute
   '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
@@ -216,7 +208,6 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/patients/': typeof PatientsIndexRoute
   '/admin/clinics/create': typeof AdminClinicsCreateRoute
-  '/api/proxy/$': typeof ApiProxySplatRoute
   '/admin/clinics/': typeof AdminClinicsIndexRoute
   '/patients/$patientId/': typeof PatientsPatientIdIndexRoute
   '/admin/clinics/$id/edit': typeof AdminClinicsIdEditRoute
@@ -243,7 +234,6 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/patients/'
     | '/admin/clinics/create'
-    | '/api/proxy/$'
     | '/admin/clinics/'
     | '/patients/$patientId/'
     | '/admin/clinics/$id/edit'
@@ -266,7 +256,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/patients'
     | '/admin/clinics/create'
-    | '/api/proxy/$'
     | '/admin/clinics'
     | '/patients/$patientId'
     | '/admin/clinics/$id/edit'
@@ -291,7 +280,6 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/patients/'
     | '/admin/clinics/create'
-    | '/api/proxy/$'
     | '/admin/clinics/'
     | '/patients/$patientId/'
     | '/admin/clinics/$id/edit'
@@ -315,7 +303,6 @@ export interface RootRouteChildren {
   ClinicLoginRoute: typeof ClinicLoginRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminClinicsCreateRoute: typeof AdminClinicsCreateRoute
-  ApiProxySplatRoute: typeof ApiProxySplatRoute
   AdminClinicsIndexRoute: typeof AdminClinicsIndexRoute
   AdminClinicsIdEditRoute: typeof AdminClinicsIdEditRoute
   AdminClinicsIdUsersRoute: typeof AdminClinicsIdUsersRoute
@@ -443,13 +430,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClinicsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/proxy/$': {
-      id: '/api/proxy/$'
-      path: '/api/proxy/$'
-      fullPath: '/api/proxy/$'
-      preLoaderRoute: typeof ApiProxySplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/clinics/create': {
       id: '/admin/clinics/create'
       path: '/admin/clinics/create'
@@ -530,7 +510,6 @@ const rootRouteChildren: RootRouteChildren = {
   ClinicLoginRoute: ClinicLoginRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminClinicsCreateRoute: AdminClinicsCreateRoute,
-  ApiProxySplatRoute: ApiProxySplatRoute,
   AdminClinicsIndexRoute: AdminClinicsIndexRoute,
   AdminClinicsIdEditRoute: AdminClinicsIdEditRoute,
   AdminClinicsIdUsersRoute: AdminClinicsIdUsersRoute,

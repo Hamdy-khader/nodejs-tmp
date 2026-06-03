@@ -6,10 +6,7 @@
  *  - Clinic -> /clinic/*
  */
 
-const API_BASE =
-  typeof window === "undefined"
-    ? import.meta.env.VITE_API_URL?.trim() || "/api/proxy"
-    : "/api/proxy";
+const API_BASE = import.meta.env.VITE_API_URL ?? "https://backend.treatlyonline.de/api";
 
 export const adminTokenStore = {
   key: "bp_admin_token",
@@ -150,6 +147,7 @@ async function request<T>(
   token: string | null,
   body?: unknown,
   params?: Record<string, string | number | boolean | undefined>,
+  options?: { bodyEncoding?: "json" | "form" },
 ): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
 
@@ -165,13 +163,32 @@ async function request<T>(
     Accept: "application/json",
   };
 
-  if (body != null) headers["Content-Type"] = "application/json";
+  const bodyEncoding = options?.bodyEncoding ?? "json";
+
+  if (body != null) {
+    headers["Content-Type"] =
+      bodyEncoding === "form"
+        ? "application/x-www-form-urlencoded;charset=UTF-8"
+        : "application/json";
+  }
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  const requestBody =
+    body == null
+      ? undefined
+      : bodyEncoding === "form"
+        ? new URLSearchParams(
+            Object.entries(body as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
+              if (value != null) acc[key] = String(value);
+              return acc;
+            }, {}),
+          ).toString()
+        : JSON.stringify(body);
 
   const res = await fetch(url.toString(), {
     method,
     headers,
-    body: body != null ? JSON.stringify(body) : undefined,
+    body: requestBody,
   });
 
   if (res.status === 204) return undefined as T;
@@ -220,6 +237,8 @@ export const adminApi = {
       "/admin/login",
       null,
       { email, password },
+      undefined,
+      { bodyEncoding: "form" },
     );
     adminTokenStore.set(res.token);
     return res;
@@ -282,7 +301,14 @@ export const adminApi = {
 
 export const clinicApi = {
   login: async (email: string, password: string): Promise<ClinicAuthData> => {
-    const res = await request<ClinicAuthData>("POST", "/clinic/login", null, { email, password });
+    const res = await request<ClinicAuthData>(
+      "POST",
+      "/clinic/login",
+      null,
+      { email, password },
+      undefined,
+      { bodyEncoding: "form" },
+    );
     clinicTokenStore.set(res.token);
     return res;
   },
