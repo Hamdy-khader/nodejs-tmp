@@ -85,6 +85,8 @@ const plansLoadedFor = new Set<string>();
 const planLoaded = new Set<string>();
 let patientsInflight: Promise<void> | null = null;
 const plansInflight = new Map<string, Promise<void>>();
+const EMPTY_PLANS: TreatmentPlan[] = [];
+const plansSnapshotCache = new Map<string, { plansRef: TreatmentPlan[]; result: TreatmentPlan[] }>();
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -318,6 +320,19 @@ function getPlanById(id: string | undefined) {
   return state.plans.find((plan) => plan.id === id);
 }
 
+function getPlansForPatientId(patientId: string | undefined) {
+  if (!patientId) return EMPTY_PLANS;
+
+  const cached = plansSnapshotCache.get(patientId);
+  if (cached && cached.plansRef === state.plans) {
+    return cached.result;
+  }
+
+  const result = state.plans.filter((plan) => plan.patientId === patientId);
+  plansSnapshotCache.set(patientId, { plansRef: state.plans, result });
+  return result;
+}
+
 export function usePatients() {
   useEffect(() => {
     void loadPatients();
@@ -342,8 +357,8 @@ export function usePlansFor(patientId: string | undefined) {
   }, [patientId]);
   return useSyncExternalStore(
     subscribe,
-    () => state.plans.filter((plan) => plan.patientId === patientId),
-    () => state.plans.filter((plan) => plan.patientId === patientId),
+    () => getPlansForPatientId(patientId),
+    () => getPlansForPatientId(patientId),
   );
 }
 
