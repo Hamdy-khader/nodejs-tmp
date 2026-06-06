@@ -5,12 +5,24 @@ import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/clinic/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   component: ClinicLoginPage,
 });
+
+function cleanClinicRedirect(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
+  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") return "/";
+  if (value.startsWith("/admin")) return "/";
+  return value;
+}
 
 function ClinicLoginPage() {
   useAdminStyles();
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const redirectTo = cleanClinicRedirect(search.redirect);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,8 +31,8 @@ function ClinicLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (clinicTokenStore.exists()) navigate({ to: "/" });
-  }, []);
+    if (clinicTokenStore.exists()) navigate({ to: redirectTo });
+  }, [navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,8 +47,7 @@ function ClinicLoginPage() {
     setLoading(true);
     try {
       await clinicApi.login(email.trim(), password);
-      // Redirect to clinic dashboard
-      navigate({ to: "/" });
+      navigate({ to: redirectTo, replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "CLINIC_SUSPENDED") {

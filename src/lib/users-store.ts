@@ -75,6 +75,11 @@ interface State {
   permissions: Permission[];
 }
 
+interface UserPasswordPayload {
+  password: string;
+  password_confirmation: string;
+}
+
 let state: State = {
   users: [],
   roles: [],
@@ -196,7 +201,7 @@ export const usersStore = {
     await load(true);
   },
 
-  async upsertUser(user: ClinicUser) {
+  async upsertUser(user: ClinicUser, passwordPayload?: UserPasswordPayload) {
     if (user.id) {
       await clinicApi.users.update(user.id, {
         first_name: user.firstName,
@@ -225,6 +230,7 @@ export const usersStore = {
         last_name: user.lastName,
         email: user.email,
         phone: user.phone,
+        ...passwordPayload,
         avatar_url: user.avatarUrl ?? null,
         role: user.role,
         status: user.status,

@@ -4,12 +4,28 @@ import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { adminApi, adminTokenStore, ApiError } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/admin/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   component: AdminLoginPage,
 });
+
+function cleanAdminRedirect(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return "/admin/dashboard";
+  }
+  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") {
+    return "/admin/dashboard";
+  }
+  if (!value.startsWith("/admin")) return "/admin/dashboard";
+  return value;
+}
 
 function AdminLoginPage() {
   useAdminStyles();
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const redirectTo = cleanAdminRedirect(search.redirect);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -18,8 +34,8 @@ function AdminLoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (adminTokenStore.exists()) navigate({ to: "/admin/dashboard" });
-  }, []);
+    if (adminTokenStore.exists()) navigate({ to: redirectTo });
+  }, [navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +51,7 @@ function AdminLoginPage() {
     setLoading(true);
     try {
       await adminApi.login(email.trim(), password);
-      navigate({ to: "/admin/dashboard" });
+      navigate({ to: redirectTo, replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.errors) {

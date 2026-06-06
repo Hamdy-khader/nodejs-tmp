@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   component: LoginPage,
   head: () => ({
     meta: [
@@ -20,8 +23,17 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
+function cleanClinicRedirect(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
+  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") return "/";
+  if (value.startsWith("/admin")) return "/";
+  return value;
+}
+
 function LoginPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const redirectTo = cleanClinicRedirect(search.redirect);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,8 +41,8 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (clinicTokenStore.exists()) navigate({ to: "/" });
-  }, [navigate]);
+    if (clinicTokenStore.exists()) navigate({ to: redirectTo });
+  }, [navigate, redirectTo]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +54,7 @@ function LoginPage() {
     setLoading(true);
     try {
       await clinicApi.login(email.trim(), password);
-      navigate({ to: "/" });
+      navigate({ to: redirectTo, replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "CLINIC_SUSPENDED") {

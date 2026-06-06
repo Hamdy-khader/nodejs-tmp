@@ -266,6 +266,39 @@ function serializePlan(plan: TreatmentPlan) {
   };
 }
 
+function serializeTreatmentRows(treatments: TreatmentRow[]) {
+  return treatments.map((row, index) => ({
+    id: row.id,
+    kind: row.kind,
+    label: "label" in row ? (row.label ?? null) : null,
+    note: row.note ?? null,
+    days: row.kind === "healing" ? (row.days ?? null) : null,
+    mode: row.kind === "discount" ? row.mode : null,
+    value: row.kind === "discount" ? row.value : null,
+    sort_order: index + 1,
+    items:
+      row.kind === "visit"
+        ? row.items.map((item, itemIndex) => ({
+            id: item.id,
+            name: item.name,
+            tooth_number: item.toothNumber ?? null,
+            amount: item.amount,
+            unit_price: item.unitPrice,
+            sort_order: itemIndex + 1,
+          }))
+        : [],
+  }));
+}
+
+function serializeTeeth(teeth: Record<number, ToothState>) {
+  return Object.values(teeth).map((tooth) => ({
+    tooth_number: tooth.number,
+    status: tooth.status,
+    note: tooth.note ?? null,
+    diagnosis: tooth.diagnosis ?? [],
+  }));
+}
+
 async function loadPatients(force = false) {
   if (!force && patientsLoaded) return;
   if (patientsInflight) return patientsInflight;
@@ -461,17 +494,26 @@ export const patientsStore = {
       );
     }
     if (input.teeth) {
-      void clinicApi.plans.saveTeeth(
-        plan.id,
-        Object.values(input.teeth).map((tooth) => ({
-          tooth_number: tooth.number,
-          status: tooth.status,
-          note: tooth.note ?? null,
-          diagnosis: tooth.diagnosis ?? [],
-        })),
-      );
+      void clinicApi.plans.saveTeeth(plan.id, serializeTeeth(input.teeth));
     }
     void clinicApi.plans.update(plan.patientId, plan.id, serializePlan(next));
+  },
+
+  async savePlan(planId: string) {
+    const plan = getPlanById(planId);
+    if (!plan) throw new Error("Plan not found");
+
+    await Promise.all([
+      clinicApi.plans.update(plan.patientId, plan.id, serializePlan(plan)),
+      clinicApi.plans.saveTeeth(plan.id, serializeTeeth(plan.teeth)),
+      clinicApi.plans.setGeneralStatuses(
+        plan.id,
+        (plan.generalStatuses ?? []).map((label) => ({ label })),
+      ),
+      clinicApi.plans.setRows(plan.id, serializeTreatmentRows(plan.treatments ?? [])),
+    ]);
+
+    await loadPlan(plan.patientId, plan.id, true);
   },
 
   setTooth(planId: string, tooth: ToothState) {
@@ -490,30 +532,7 @@ export const patientsStore = {
 
   setTreatments(planId: string, treatments: TreatmentRow[]) {
     updateLocalPlan(planId, { treatments });
-    void clinicApi.plans.setRows(
-      planId,
-      treatments.map((row, index) => ({
-        id: row.id,
-        kind: row.kind,
-        label: "label" in row ? (row.label ?? null) : null,
-        note: row.note ?? null,
-        days: row.kind === "healing" ? (row.days ?? null) : null,
-        mode: row.kind === "discount" ? row.mode : null,
-        value: row.kind === "discount" ? row.value : null,
-        sort_order: index + 1,
-        items:
-          row.kind === "visit"
-            ? row.items.map((item, itemIndex) => ({
-                id: item.id,
-                name: item.name,
-                tooth_number: item.toothNumber ?? null,
-                amount: item.amount,
-                unit_price: item.unitPrice,
-                sort_order: itemIndex + 1,
-              }))
-            : [],
-      })),
-    );
+    void clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments));
   },
 
   addTreatmentRow(planId: string, row: TreatmentRow) {

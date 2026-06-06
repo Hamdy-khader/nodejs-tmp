@@ -434,13 +434,14 @@ function UserFormDialog({ open, user, roles, onClose }:
   { open: boolean; user: ClinicUser | null; roles: Role[]; onClose: () => void }) {
 
   const empty: ClinicUser = useMemo(() => ({
-    id: crypto.randomUUID(), firstName: "", lastName: "", email: "", phone: "",
+    id: "", firstName: "", lastName: "", email: "", phone: "",
     role: "assistant", status: "active", branch: BRANCHES[0],
     createdAt: new Date().toISOString(),
   }), []);
   const [form, setForm] = useState<ClinicUser>(user ?? empty);
   const [tab, setTab] = useState("basic");
   const [pwd, setPwd] = useState(""); const [pwd2, setPwd2] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Reset form when opening with different user
   useMemo(() => { setForm(user ?? empty); setTab("basic"); setPwd(""); setPwd2(""); }, [user, open, empty]);
@@ -448,12 +449,23 @@ function UserFormDialog({ open, user, roles, onClose }:
   const set = <K extends keyof ClinicUser>(k: K, v: ClinicUser[K]) => setForm((f) => ({ ...f, [k]: v }));
   const valid = form.firstName && form.lastName && /\S+@\S+\.\S+/.test(form.email);
 
-  const submit = () => {
+  const submit = async () => {
     if (!valid) { toast.error("Please fill required fields"); return; }
+    if (!user && !pwd) { toast.error("Password is required"); return; }
     if (!user && pwd !== pwd2) { toast.error("Passwords don't match"); return; }
-    usersStore.upsertUser(form);
-    toast.success(user ? "User updated" : "User created");
-    onClose();
+    setSaving(true);
+    try {
+      await usersStore.upsertUser(
+        form,
+        user ? undefined : { password: pwd, password_confirmation: pwd2 },
+      );
+      toast.success(user ? "User updated" : "User created");
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to save user");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -551,7 +563,7 @@ function UserFormDialog({ open, user, roles, onClose }:
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit}>{user ? "Save changes" : "Create user"}</Button>
+          <Button onClick={submit} disabled={saving}>{saving ? "Saving..." : user ? "Save changes" : "Create user"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

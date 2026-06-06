@@ -145,6 +145,7 @@ function PlanPage() {
   const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
   const [panelKey, setPanelKey] = useState(0);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
+  const [saving, setSaving] = useState(false);
 
   const closeAllPanels = () => {
     setFilledPanelOpen(false);
@@ -198,6 +199,18 @@ function PlanPage() {
   const setStatus = (s: ToothStatus) => {
     if (!selectedTooth) return;
     patientsStore.setTooth(plan.id, { ...selectedTooth, status: s });
+  };
+
+  const handleSavePlan = async () => {
+    setSaving(true);
+    try {
+      await patientsStore.savePlan(plan.id);
+      toast.success("Plan saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save plan");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const summary = (Object.keys(STATUS_META) as ToothStatus[])
@@ -623,6 +636,14 @@ function PlanPage() {
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
             <RailRow icon={<Globe className="h-4 w-4" />} label={accountSettings.language} sub="Account default" />
             <RailRow icon={<DollarSign className="h-4 w-4" />} label={accountSettings.pricePage.currency} sub="Account default" />
+            <div className="my-2 h-px bg-border" />
+            <RailButton
+              icon={<Save className="h-4 w-4" />}
+              label={saving ? "Saving..." : "Save"}
+              onClick={handleSavePlan}
+              disabled={saving}
+              active={saving}
+            />
             <div className="my-2 h-px bg-border" />
             <RailButton icon={<Undo2 className="h-4 w-4" />} label="Undo" disabled />
             <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
