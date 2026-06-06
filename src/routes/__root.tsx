@@ -3,11 +3,10 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
-  useRouter,
+  redirect,
   useRouterState,
-  useNavigate,
+  useRouter,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { adminTokenStore, clinicTokenStore } from "@/lib/admin/api";
 
 function NotFoundComponent() {
@@ -67,7 +66,68 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+function cleanRedirectTarget(value: unknown, fallback: string, scope: "admin" | "clinic") {
+  if (typeof value !== "string" || !value.startsWith("/")) return fallback;
+  if (value.startsWith("//")) return fallback;
+  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") return fallback;
+  if (scope === "admin") return value.startsWith("/admin") ? value : fallback;
+  return value.startsWith("/admin") ? fallback : value;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  beforeLoad: ({ location, search }) => {
+    const pathname = location.pathname;
+    const isAdminRoute = pathname.startsWith("/admin");
+    const isAdminLogin = pathname === "/admin/login";
+    const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
+    const isClinicLogin = pathname === "/clinic/login";
+    const isLogin = pathname === "/login";
+    const hasAdminToken = adminTokenStore.exists();
+    const hasClinicToken = clinicTokenStore.exists();
+    const redirectSearch = (search as { redirect?: unknown } | undefined)?.redirect;
+
+    if (isAdminLogin) {
+      if (hasAdminToken) {
+        throw redirect({
+          to: cleanRedirectTarget(redirectSearch, "/admin/dashboard", "admin"),
+          replace: true,
+        });
+      }
+      return;
+    }
+
+    if (isClinicLogin || isLogin) {
+      if (hasClinicToken) {
+        throw redirect({
+          to: cleanRedirectTarget(redirectSearch, "/", "clinic"),
+          replace: true,
+        });
+      }
+      return;
+    }
+
+    if (isAdminRoute) {
+      if (!hasAdminToken) {
+        throw redirect({
+          to: "/admin/login",
+          search: { redirect: location.href },
+          replace: true,
+        });
+      }
+      if (isAdminIndex) {
+        throw redirect({ to: "/admin/dashboard", replace: true });
+      }
+      return;
+    }
+
+    if (!hasClinicToken) {
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.href },
+        replace: true,
+      });
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -104,56 +164,11 @@ import { PatientTabs } from "@/components/PatientTabs";
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
 
-  const isAdminRoute = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
-  const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
   const isClinicLogin = pathname === "/clinic/login";
   const isLogin = pathname === "/login";
   const isAuthPage = isAdminLogin || isClinicLogin || isLogin;
-  const hasAdminToken = adminTokenStore.exists();
-  const hasClinicToken = clinicTokenStore.exists();
-
-  useEffect(() => {
-    if (isAdminLogin) {
-      if (hasAdminToken) {
-        navigate({ to: "/admin/dashboard", replace: true });
-      }
-      return;
-    }
-
-    if (isClinicLogin || isLogin) {
-      if (hasClinicToken) {
-        navigate({ to: "/", replace: true });
-      }
-      return;
-    }
-
-    if (isAdminRoute) {
-      if (!hasAdminToken) {
-        navigate({ to: "/admin/login", replace: true });
-        return;
-      }
-      if (isAdminIndex) {
-        navigate({ to: "/admin/dashboard", replace: true });
-      }
-      return;
-    }
-
-    if (!hasClinicToken) {
-      navigate({ to: "/login", replace: true });
-    }
-  }, [
-    hasAdminToken,
-    hasClinicToken,
-    isAdminIndex,
-    isAdminLogin,
-    isAdminRoute,
-    isClinicLogin,
-    isLogin,
-    navigate,
-  ]);
 
   if (isAuthPage) {
     return (
@@ -161,14 +176,6 @@ function RootComponent() {
         <Outlet />
       </QueryClientProvider>
     );
-  }
-
-  if (isAdminRoute && !hasAdminToken) {
-    return <QueryClientProvider client={queryClient} />;
-  }
-
-  if (!isAdminRoute && !hasClinicToken) {
-    return <QueryClientProvider client={queryClient} />;
   }
 
   return (
