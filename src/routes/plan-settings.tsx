@@ -8,6 +8,7 @@ import {
   QrCode,
   FileText,
   Check,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,15 +46,31 @@ export const Route = createFileRoute("/plan-settings")({
 
 type EditorKey = keyof PageDesign | "pageSize" | "priceList" | "pricePage" | "planSections" | null;
 
+const ACCOUNT_LANGUAGES = [
+  "English (EN)",
+  "العربية (AR)",
+  "Français (FR)",
+  "Deutsch (DE)",
+  "Español (ES)",
+];
+const ACCOUNT_CURRENCIES = ["USD", "EUR", "GBP", "SAR", "AED", "TRY", "EGP"];
+
 function PlanSettingsPage() {
   const settings = usePlanSettings();
   const [saved, setSaved] = useState(false);
   const [editor, setEditor] = useState<EditorKey>(null);
+  const [accountSaved, setAccountSaved] = useState(false);
 
   const save = () => {
     planSettingsStore.update({});
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  };
+
+  const saveAccount = () => {
+    planSettingsStore.update({});
+    setAccountSaved(true);
+    setTimeout(() => setAccountSaved(false), 1500);
   };
 
   return (
@@ -62,37 +79,10 @@ function PlanSettingsPage() {
         {/* Header card */}
         <section className="rounded-2xl border border-border/60 bg-card shadow-sm">
           <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
-            <div className="flex items-center gap-5">
-              <h1 className="text-xl font-semibold uppercase tracking-[0.18em] text-primary">
-                Plan Settings
-              </h1>
-              <Select
-                value={settings.language}
-                onValueChange={(v) => planSettingsStore.update({ language: v })}
-              >
-                <SelectTrigger className="h-10 w-[220px] rounded-none border-0 border-b text-sm shadow-none focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["English (EN)", "العربية (AR)", "Français (FR)", "Deutsch (DE)"].map((l) => (
-                    <SelectItem key={l} value={l}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <h1 className="text-xl font-semibold uppercase tracking-[0.18em] text-primary">
+              Plan Settings
+            </h1>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 rounded-full bg-primary-deep px-4 py-2 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary-deep/90">
-                <span className="grid size-7 place-items-center rounded-full bg-destructive">
-                  <Youtube className="size-4 text-white" />
-                </span>
-                <span className="leading-tight text-left">
-                  Tutorial
-                  <br />
-                  Plan Settings
-                </span>
-              </button>
               <button
                 onClick={save}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary hover:text-primary-deep"
@@ -100,10 +90,80 @@ function PlanSettingsPage() {
                 <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
                   <Save className="size-4" />
                 </span>
-                {saved ? "Saved" : "Save"}
+                {saved ? "Saved ✓" : "Save"}
               </button>
             </div>
           </header>
+        </section>
+
+        {/* Account Defaults */}
+        <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Globe className="size-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                Account Defaults
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Shared language and currency used across diagnosis and patient flows.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Language
+              </label>
+              <Select
+                value={settings.language}
+                onValueChange={(v) => planSettingsStore.update({ language: v })}
+              >
+                <SelectTrigger className="h-10 w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCOUNT_LANGUAGES.map((l) => (
+                    <SelectItem key={l} value={l}>
+                      {l}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Currency
+              </label>
+              <Select
+                value={settings.pricePage.currency}
+                onValueChange={(v) =>
+                  planSettingsStore.update({
+                    pricePage: { ...settings.pricePage, currency: v },
+                  })
+                }
+              >
+                <SelectTrigger className="h-10 w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCOUNT_CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <button
+              onClick={saveAccount}
+              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
+            >
+              <Save className="size-4" />
+              {accountSaved ? "Saved ✓" : "Save defaults"}
+            </button>
+          </div>
         </section>
 
         {/* Page Design */}

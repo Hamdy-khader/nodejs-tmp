@@ -273,6 +273,21 @@ function clinicReq<T>(
   return request<T>(method, path, clinicTokenStore.get(), body, params);
 }
 
+async function clinicDownloadReq(path: string): Promise<Blob> {
+  const url = new URL(`${API_BASE}${path}`);
+  const token = clinicTokenStore.get();
+  const res = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/pdf,application/octet-stream,*/*",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    throw new ApiError("DOWNLOAD_FAILED", `Download failed (${res.status})`, res.status);
+  }
+  return res.blob();
+}
+
 export const adminApi = {
   login: async (email: string, password: string): Promise<{ token: string; admin: AdminUser }> => {
     const res = await request<{ token: string; admin: AdminUser }>(
@@ -465,6 +480,8 @@ export const clinicApi = {
       clinicReq("PATCH", `/clinic/plans/${planId}/rows/${rowId}/items/${itemId}`, body),
     deleteItem: (planId: string, rowId: string, itemId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/plans/${planId}/rows/${rowId}/items/${itemId}`),
+    downloadDocument: (planId: string): Promise<Blob> =>
+      clinicDownloadReq(`/clinic/plans/${planId}/document`),
   },
 
   templates: {

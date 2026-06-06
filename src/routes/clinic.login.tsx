@@ -12,9 +12,9 @@ export const Route = createFileRoute("/clinic/login")({
 });
 
 function cleanClinicRedirect(value: unknown) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value === "/clinic/login" || value === "/admin/login") return "/";
-  if (value.startsWith("/admin")) return "/";
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/clinic";
+  if (value === "/clinic/login" || value === "/admin/login" || value === "/") return "/clinic";
+  if (value.startsWith("/admin")) return "/clinic";
   return value;
 }
 

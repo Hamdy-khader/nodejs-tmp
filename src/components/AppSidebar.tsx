@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Account", url: "/", icon: User },
+  { title: "Account", url: "/clinic", icon: User },
   { title: "Patients", url: "/patients", icon: UserPlus },
   { title: "Users", url: "/users", icon: Users },
   { title: "Price list", url: "/clinic-fees", icon: Tag },
@@ -51,7 +51,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border/40 px-4 py-5">
-        <Link to="/" className="flex items-center gap-2.5">
+        <Link to="/clinic" className="flex items-center gap-2.5">
           <div className="relative grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-accent)] shadow-[var(--shadow-glow)]">
             <Sparkle className="h-4 w-4 text-accent-foreground" />
           </div>

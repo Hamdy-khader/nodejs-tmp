@@ -9,7 +9,8 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('scripts',{}\\)\\)\")",
       "Bash(findstr /i \"access-control\")",
       "PowerShell(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\DENTAL\\\\treatlyonline.de\\\\src\" -Recurse -Force | Where-Object {$_.PSIsContainer} | Select-Object FullName | ForEach-Object {$_.FullName.Replace\\('C:\\\\laragon\\\\www\\\\DENTAL\\\\treatlyonline.de\\\\', ''\\)} | Sort-Object)",
-      "Bash(xargs ls -lh)"
+      "Bash(xargs ls -lh)",
+      "Bash(grep -n \"DocumentsPanel\\\\|OverviewPanel\\\\|RailRow\\\\|RailButton\\\\|usePlanSettings\\\\|Undo2\\\\|Redo2\\\\|Globe\\\\|DollarSign\" \"C:\\\\laragon\\\\www\\\\DENTAL\\\\treatlyonline.de\\\\src\\\\routes\\\\patients.\\\\$patientId.plans.\\\\$planId.tsx\")"
     ]
   }
 }

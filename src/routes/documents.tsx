@@ -148,7 +148,7 @@ function DocumentsPage() {
       <header className="bg-[oklch(0.23_0.06_240)] px-6 py-3">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-4 text-white">
-            <Link to="/" className="text-lg font-semibold tracking-tight">
+            <Link to="/clinic" className="text-lg font-semibold tracking-tight">
               BrightPlans
             </Link>
             <span className="text-sm text-white/80">Elene</span>

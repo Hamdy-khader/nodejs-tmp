@@ -123,6 +123,7 @@ function RootComponent() {
   const isAdminLogin = pathname === "/admin/login";
   const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
   const isClinicLogin = pathname === "/clinic/login";
+  const isPublicHome = pathname === "/";
   const isAuthPage = isAdminLogin || isClinicLogin;
 
   useEffect(() => {
@@ -135,7 +136,7 @@ function RootComponent() {
 
     if (isClinicLogin) {
       if (hasClinicToken) {
-        navigate({ to: "/", replace: true });
+        navigate({ to: "/clinic", replace: true });
       }
       return;
     }
@@ -151,6 +152,9 @@ function RootComponent() {
       return;
     }
 
+    // Public homepage — accessible without auth
+    if (isPublicHome) return;
+
     if (!hasClinicToken) {
       navigate({ to: "/clinic/login", replace: true });
     }
@@ -161,10 +165,21 @@ function RootComponent() {
     isAdminLogin,
     isAdminRoute,
     isClinicLogin,
+    isPublicHome,
     navigate,
   ]);
 
+  // Auth pages (login screens) — bare layout
   if (isAuthPage) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    );
+  }
+
+  // Public homepage — bare layout (no sidebar)
+  if (isPublicHome) {
     return (
       <QueryClientProvider client={queryClient}>
         <Outlet />
@@ -176,7 +191,7 @@ function RootComponent() {
     return <QueryClientProvider client={queryClient} />;
   }
 
-  if (!isAdminRoute && !isClinicLogin && !hasClinicToken) {
+  if (!isAdminRoute && !isClinicLogin && !isPublicHome && !hasClinicToken) {
     return <QueryClientProvider client={queryClient} />;
   }
 
