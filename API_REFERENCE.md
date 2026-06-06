@@ -1,57 +1,84 @@
-# API Reference — Treatly Online
+# API Reference — Treatly Online (BrightPlans)
 
 **Base URL:** `https://backend.treatlyonline.de/api`  
-**Source:** `src/lib/admin/api.ts`
+**Client source:** `src/lib/admin/api.ts`
 
 ---
 
-## Authentication & Auth Guard
+## Auth & Security
 
-### Token Storage
-| Store key | Where | Scope |
-|-----------|-------|-------|
+### Token storage
+| Key | Storage | Used for |
+|-----|---------|----------|
 | `bp_clinic_token` | `localStorage` | All `/clinic/*` requests |
 | `bp_admin_token` | `localStorage` | All `/admin/*` requests |
 
-### Auth Guard (Frontend — `src/routes/__root.tsx`)
-- Every route (except `/login`, `/clinic/login`, `/admin/login`) requires a valid token.
-- If no token → **automatic redirect** to `/login` (clinic) or `/admin/login` (admin).
-- Token state is **reactive**: clearing the token dispatches `auth:changed` event and triggers an immediate re-render + redirect.
-
-### 401 Auto-Redirect (`src/lib/admin/api.ts`)
-Any API response with **HTTP 401** will:
-1. Clear the appropriate token from localStorage.
-2. Redirect `window.location.href` → `/login` or `/admin/login`.
-3. Full page reload (clears all in-memory store state).
-
-### Logout
-- Clinic: `POST /clinic/logout` → clears `bp_clinic_token` → `window.location.href = '/login'`
-- Admin: `POST /admin/logout` → clears `bp_admin_token` → `window.location.href = '/admin/login'`
-- Full page reload on logout ensures no data leakage between sessions.
-
-### All protected requests require:
+### Protected request headers
 ```
 Authorization: Bearer {token}
 Accept: application/json
+Content-Type: application/json
 ```
-
 Login endpoints use `Content-Type: application/x-www-form-urlencoded`.
+
+### Auth guard (frontend)
+- Every route except `/login`, `/clinic/login`, `/admin/login` requires a valid token.
+- No token → automatic redirect to `/login` or `/admin/login`.
+- **401 response** from any endpoint → token cleared → `window.location.href` redirect → full page reload.
+- **Logout** → `window.location.href` redirect → full page reload (clears all in-memory store state).
 
 ---
 
-## 1. Admin Auth
+## Response format
+
+### Single resource
+```json
+{ "data": { ...object } }
+```
+
+### Paginated list
+```json
+{
+  "data": [ ...items ],
+  "meta": { "total": 55, "per_page": 20, "current_page": 1, "last_page": 3 }
+}
+```
+
+### Error
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Human readable message",
+    "errors": { "field": ["detail"] }
+  }
+}
+```
+
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 400 | `VALIDATION_ERROR` | Invalid input |
+| 401 | `UNAUTHENTICATED` | Missing or expired token |
+| 403 | `FORBIDDEN` | Insufficient permissions |
+| 404 | `NOT_FOUND` | Resource not found |
+| 409 | `CONFLICT` | Duplicate resource |
+| 422 | `UNPROCESSABLE` | Business rule violation |
+| 429 | `TOO_MANY_ATTEMPTS` | Rate limited |
+| 500 | `SERVER_ERROR` | Internal server error |
+
+---
+
+## 1. Admin — Authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/admin/login` | Admin login → returns `{ token, admin }` |
-| POST | `/admin/logout` | Invalidate admin session |
-| GET | `/admin/me` | Get current admin user |
+| POST | `/admin/login` | Login → `{ token, admin }` |
+| POST | `/admin/logout` | Invalidate session |
+| GET | `/admin/me` | Current admin user |
 
 ### POST `/admin/login`
-**Body (form-encoded):**
-```
-email=...&password=...
-```
+**Body (form-encoded):** `email=...&password=...`
+
 **Response:**
 ```json
 {
@@ -68,19 +95,17 @@ email=...&password=...
 
 ---
 
-## 2. Clinic Auth
+## 2. Clinic — Authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/clinic/login` | Clinic user login → returns `{ token, clinic_user, clinic }` |
-| POST | `/clinic/logout` | Invalidate clinic session |
-| GET | `/clinic/me` | Get current clinic user + clinic info |
+| POST | `/clinic/login` | Login → `{ token, clinic_user, clinic }` |
+| POST | `/clinic/logout` | Invalidate session |
+| GET | `/clinic/me` | Current clinic user + clinic info |
 
 ### POST `/clinic/login`
-**Body (form-encoded):**
-```
-email=...&password=...
-```
+**Body (form-encoded):** `email=...&password=...`
+
 **Response:**
 ```json
 {
@@ -89,6 +114,8 @@ email=...&password=...
   "clinic": { ...Clinic }
 }
 ```
+
+**Error codes:** `CLINIC_SUSPENDED` · `ACCOUNT_INACTIVE` · `TOO_MANY_ATTEMPTS`
 
 ---
 
@@ -100,24 +127,21 @@ email=...&password=...
 |--------|------|-------------|
 | GET | `/admin/clinics` | List clinics (paginated) |
 | POST | `/admin/clinics` | Create clinic |
-| GET | `/admin/clinics/{id}` | Get clinic by ID |
+| GET | `/admin/clinics/{id}` | Get clinic |
 | PUT | `/admin/clinics/{id}` | Update clinic |
 | DELETE | `/admin/clinics/{id}` | Delete clinic |
 | PATCH | `/admin/clinics/{id}/suspend` | Suspend clinic |
 | PATCH | `/admin/clinics/{id}/activate` | Activate clinic |
 
-### GET `/admin/clinics`
-**Query params:**
+### GET `/admin/clinics` — query params
 | Param | Type | Description |
 |-------|------|-------------|
 | `q` | string | Search by name / email |
-| `status` | `active` \| `suspended` | Filter by status |
-| `page` | number | Page number (default: 1) |
+| `status` | `active` \| `suspended` | Filter |
+| `page` | number | Default: 1 |
 | `limit` | number | Items per page |
 
-**Response:** `PaginatedResponse<Clinic>`
-
-### Clinic Object
+### Clinic object
 ```json
 {
   "id": 1,
@@ -141,29 +165,41 @@ email=...&password=...
 
 ---
 
-## 4. Clinic Users (Admin View)
+## 4. Clinic Users (Admin view)
 
 > Requires Admin token.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/clinics/{clinicId}/users` | List users of a clinic |
-| POST | `/admin/clinics/{clinicId}/users` | Create user in a clinic |
-| GET | `/admin/clinic-users/{id}` | Get user by ID |
+| POST | `/admin/clinics/{clinicId}/users` | Create user in clinic |
+| GET | `/admin/clinic-users/{id}` | Get user |
 | PUT | `/admin/clinic-users/{id}` | Update user |
 | DELETE | `/admin/clinic-users/{id}` | Delete user |
 | PATCH | `/admin/clinic-users/{id}/activate` | Activate user |
 | PATCH | `/admin/clinic-users/{id}/deactivate` | Deactivate user |
 
-### GET `/admin/clinics/{clinicId}/users`
-**Query params:**
+### GET `/admin/clinics/{clinicId}/users` — query params
 | Param | Type | Description |
 |-------|------|-------------|
 | `q` | string | Search |
-| `status` | `active` \| `inactive` | Filter by status |
+| `status` | `active` \| `inactive` | Filter |
 | `role` | string | Filter by role |
-| `page` | number | Page number |
+| `page` | number | Default: 1 |
 | `limit` | number | Items per page |
+
+### POST/PUT body
+```json
+{
+  "full_name": "string",
+  "email": "string",
+  "phone": "string",
+  "password": "string",
+  "confirm_password": "string",
+  "role": "clinic_staff|...",
+  "status": "active|inactive"
+}
+```
 
 ---
 
@@ -173,7 +209,7 @@ email=...&password=...
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/stats` | Get dashboard statistics |
+| GET | `/admin/stats` | Dashboard statistics |
 
 **Response:**
 ```json
@@ -185,7 +221,7 @@ email=...&password=...
   "newClinicsThisMonth": 0
 }
 ```
-> Backend may return snake_case (`total_clinics`) — client normalizes both.
+> Backend may return snake_case (`total_clinics`) — client normalises both variants.
 
 ---
 
@@ -197,21 +233,20 @@ email=...&password=...
 |--------|------|-------------|
 | GET | `/clinic/patients` | List patients (paginated) |
 | POST | `/clinic/patients` | Create patient |
-| GET | `/clinic/patients/{id}` | Get patient by ID |
+| GET | `/clinic/patients/{id}` | Get patient |
 | PUT | `/clinic/patients/{id}` | Update patient |
 | DELETE | `/clinic/patients/{id}` | Delete patient |
 
-### GET `/clinic/patients`
-**Query params:**
+### GET `/clinic/patients` — query params
 | Param | Type | Description |
 |-------|------|-------------|
-| `search` | string | Search by name / email / phone |
-| `page` | number | Page number |
-| `limit` | number | Items per page |
+| `search` | string | Name / email / phone |
+| `page` | number | Default: 1 |
+| `limit` | number | Items per page (store uses 200) |
 | `sort` | `created_at` \| `name` | Sort field |
 | `order` | `asc` \| `desc` | Sort direction |
 
-### Patient Object
+### Patient object
 ```json
 {
   "id": "string",
@@ -225,13 +260,13 @@ email=...&password=...
 }
 ```
 
-### POST/PUT Body
+### POST/PUT body
 ```json
 {
   "name": "string",
-  "email": "string",
-  "phone": "string",
-  "date_of_birth": "YYYY-MM-DD"
+  "email": "string|null",
+  "phone": "string|null",
+  "date_of_birth": "YYYY-MM-DD|null"
 }
 ```
 
@@ -239,9 +274,9 @@ email=...&password=...
 
 ## 7. Treatment Plans
 
-> Requires Clinic token. Plans are scoped to a patient.
+> Requires Clinic token. Plans are scoped under a patient.
 
-### Plan CRUD
+### 7.1 Plan CRUD
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -251,124 +286,151 @@ email=...&password=...
 | PUT | `/clinic/patients/{patientId}/plans/{planId}` | Update plan metadata |
 | DELETE | `/clinic/patients/{patientId}/plans/{planId}` | Delete plan |
 
-### Plan Object
+### POST body (create)
+```json
+{ "name": "string", "notes": "" }
+```
+
+### PUT body (update)
+```json
+{
+  "name": "string",
+  "notes": "string",
+  "billing_mode": "insurance|payment|null",
+  "insurance": { "unused_max": 0, "deductible": 0 },
+  "payment_plan": { "amount": 0, "term": 0, "interest": 0 },
+  "treatment_note": "string|null"
+}
+```
+
+### Plan object
 ```json
 {
   "id": "string",
   "patient_id": "string",
   "name": "string",
   "notes": "string",
-  "teeth": { "18": { "number": 18, "status": "intact", "note": "...", "diagnosis": [] } },
-  "xrays": ["base64 or url"],
-  "general_statuses": ["string"],
-  "billing_mode": "insurance|payment",
+  "billing_mode": "insurance|payment|null",
   "insurance": { "unused_max": 0, "deductible": 0 },
   "payment_plan": { "amount": 0, "term": 0, "interest": 0 },
+  "treatment_note": "string|null",
+  "teeth": [...],
+  "xrays": [...],
+  "general_statuses": [...],
+  "treatment_rows": [...],
   "created_at": "ISO8601",
   "updated_at": "ISO8601"
 }
 ```
 
-### Tooth Status Values
-`intact` | `missing` | `caries` | `filled` | `crown` | `root-treated` | `implant` | `bridge`
-
 ---
 
-### Teeth Management
+### 7.2 Teeth
 
 | Method | Path | Description |
 |--------|------|-------------|
-| PUT | `/clinic/plans/{planId}/teeth` | Save all teeth states (batch) |
+| PUT | `/clinic/plans/{planId}/teeth` | Batch save all teeth |
 | PATCH | `/clinic/plans/{planId}/teeth/{toothNumber}` | Update single tooth |
 
 **PUT body:**
 ```json
 {
   "teeth": [
-    { "number": 18, "status": "intact", "note": "string", "diagnosis": [] }
+    { "tooth_number": 18, "status": "intact", "note": "string|null", "diagnosis": [] }
   ]
 }
 ```
 
+**PATCH body:**
+```json
+{ "tooth_number": 18, "status": "caries", "note": "string|null", "diagnosis": [] }
+```
+
+**Tooth status values:** `intact` · `missing` · `caries` · `filled` · `crown` · `root-treated` · `implant` · `bridge`
+
+**FDI tooth numbers (upper):** 18–11, 21–28  
+**FDI tooth numbers (lower):** 48–41, 31–38
+
 ---
 
-### X-Ray Management
+### 7.3 X-Rays
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/clinic/plans/{planId}/xrays` | Add X-ray |
 | DELETE | `/clinic/plans/{planId}/xrays/{xrayId}` | Delete X-ray |
 
+**POST body:**
+```json
+{ "file_url": "string", "sort_order": 1 }
+```
+
 ---
 
-### General Statuses
+### 7.4 General Statuses
 
 | Method | Path | Description |
 |--------|------|-------------|
-| PUT | `/clinic/plans/{planId}/general-statuses` | Set general statuses (replaces all) |
+| PUT | `/clinic/plans/{planId}/general-statuses` | Replace all statuses |
 
 **Body:**
 ```json
-{
-  "items": [{ "label": "string" }]
-}
+{ "items": [{ "label": "Bruxism signs" }, { "label": "Gingivitis" }] }
 ```
 
 ---
 
-### Treatment Rows
+### 7.5 Treatment Rows
 
 | Method | Path | Description |
 |--------|------|-------------|
-| PUT | `/clinic/plans/{planId}/rows` | Save all rows (batch replace) |
-| POST | `/clinic/plans/{planId}/rows` | Create a row |
-| PATCH | `/clinic/plans/{planId}/rows/{rowId}` | Update a row |
-| DELETE | `/clinic/plans/{planId}/rows/{rowId}` | Delete a row |
+| PUT | `/clinic/plans/{planId}/rows` | Batch replace all rows |
+| POST | `/clinic/plans/{planId}/rows` | Create row |
+| PATCH | `/clinic/plans/{planId}/rows/{rowId}` | Update row |
+| DELETE | `/clinic/plans/{planId}/rows/{rowId}` | Delete row |
 
-**Row types:**
+**Row kinds and their fields:**
+
 ```json
-{ "kind": "visit",   "label": "string", "note": "string", "items": [] }
-{ "kind": "healing", "label": "string", "note": "string", "days": 7 }
-{ "kind": "discount","note": "string",  "mode": "amount|percent", "value": 100 }
+{ "kind": "visit",    "label": "string|null", "note": "string|null", "sort_order": 1, "items": [] }
+{ "kind": "healing",  "label": "string|null", "note": "string|null", "sort_order": 2, "days": 7 }
+{ "kind": "discount", "note": "string|null",  "sort_order": 3, "mode": "amount|percent", "value": 100 }
 ```
 
 ---
 
-### Treatment Items (inside Rows)
+### 7.6 Treatment Items (inside rows)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/clinic/plans/{planId}/rows/{rowId}/items` | Create item in row |
+| POST | `/clinic/plans/{planId}/rows/{rowId}/items` | Create item |
 | PATCH | `/clinic/plans/{planId}/rows/{rowId}/items/{itemId}` | Update item |
 | DELETE | `/clinic/plans/{planId}/rows/{rowId}/items/{itemId}` | Delete item |
 
-**Item Object:**
+**POST/PATCH body:**
 ```json
 {
-  "id": "string",
   "name": "string",
   "tooth_number": 18,
   "amount": 1,
-  "unit_price": 150.00
+  "unit_price": 150.00,
+  "sort_order": 1
 }
 ```
 
 ---
 
-## 8. Documents (Document Presets)
+## 8. Documents (Presets)
 
-> Requires Clinic token. One preset config per clinic.
+> Requires Clinic token. One config per clinic.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/document-presets` | Get clinic document presets |
-| PUT | `/clinic/document-presets` | Save document presets |
+| GET | `/clinic/document-presets` | Get document preset config |
+| PUT | `/clinic/document-presets` | Save preset config |
 | POST | `/clinic/document-presets/reset` | Reset to factory defaults |
 
-### Document Sections
-`clinic` | `opg` | `diagnosis` | `treatments` | `other`
-
-### GET/PUT Body Shape
+**GET response / PUT body:**
 ```json
 {
   "selected_ids": ["fixed:clinic:demo", "fixed:diagnosis:note"],
@@ -377,40 +439,81 @@ email=...&password=...
     "opg":        [],
     "diagnosis":  ["id3"],
     "treatments": [],
-    "other":      ["id4"]
+    "other":      ["id4", "id5"]
   }
 }
 ```
 
+**Section IDs:** `clinic` · `opg` · `diagnosis` · `treatments` · `other`
+
 ---
 
-## 9. Users (Clinic Internal)
+## 9. Users (Clinic internal)
 
 > Requires Clinic token.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/users` | List clinic users |
+| GET | `/clinic/users` | List users (paginated) |
 | POST | `/clinic/users` | Create user |
-| GET | `/clinic/users/{id}` | Get user by ID |
+| GET | `/clinic/users/{id}` | Get user |
 | PUT | `/clinic/users/{id}` | Update user |
 | DELETE | `/clinic/users/{id}` | Delete user |
 | POST | `/clinic/users/bulk-status` | Bulk update status |
 | POST | `/clinic/users/bulk-role` | Bulk update role |
-| POST | `/clinic/users/{id}/reset-password` | Send reset password email |
+| POST | `/clinic/users/{id}/reset-password` | Send password reset |
 
-### GET `/clinic/users`
-**Query params:**
+### GET `/clinic/users` — query params
 | Param | Type | Description |
 |-------|------|-------------|
-| `search` | string | Search by name / email |
-| `role` | string | Filter by role key |
-| `status` | `active` \| `inactive` \| `suspended` | Filter by status |
-| `branch` | string | Filter by branch name |
-| `page` | number | Page number |
-| `limit` | number | Items per page |
+| `search` | string | Name / email |
+| `role` | string | Role key filter |
+| `status` | `active` \| `inactive` \| `suspended` | Status filter |
+| `branch` | string | Branch filter |
+| `page` | number | Default: 1 |
+| `limit` | number | Store uses 200 |
 
-### User Object
+### POST body (create — password required)
+```json
+{
+  "first_name": "string",
+  "last_name": "string",
+  "email": "string",
+  "phone": "string",
+  "password": "string",
+  "password_confirmation": "string",
+  "role": "dentist",
+  "status": "active",
+  "branch": "string",
+  "avatar_url": "string|null",
+  "department": "string|null",
+  "specialty": "string|null",
+  "license_number": "string|null",
+  "experience_years": 5,
+  "gender": "male|female|other|null",
+  "dob": "YYYY-MM-DD|null",
+  "working_hours": "string|null",
+  "calendar_color": "#hex|null",
+  "notes": "string|null",
+  "tags": [],
+  "two_factor": false
+}
+```
+
+### PUT body (update — no password field)
+Same as above minus `password` / `password_confirmation`.
+
+### POST `/clinic/users/bulk-status`
+```json
+{ "user_ids": ["id1", "id2"], "status": "active|inactive|suspended" }
+```
+
+### POST `/clinic/users/bulk-role`
+```json
+{ "user_ids": ["id1", "id2"], "role": "dentist" }
+```
+
+### User object (response)
 ```json
 {
   "id": "string",
@@ -419,7 +522,7 @@ email=...&password=...
   "email": "string",
   "phone": "string",
   "avatar_url": "string|null",
-  "role": "dentist|admin|receptionist|...",
+  "role": "dentist",
   "status": "active|inactive|suspended",
   "branch": "string",
   "department": "string|null",
@@ -433,24 +536,14 @@ email=...&password=...
   "last_login": "ISO8601|null",
   "created_at": "ISO8601",
   "notes": "string|null",
-  "tags": ["string"],
+  "tags": [],
   "two_factor": false,
   "online": false
 }
 ```
 
-### Role Keys
-`super_admin` | `admin` | `dentist` | `assistant` | `receptionist` | `accountant` | `lab_technician` | `viewer`
-
-### POST `/clinic/users/bulk-status`
-```json
-{ "user_ids": ["id1", "id2"], "status": "active|inactive|suspended" }
-```
-
-### POST `/clinic/users/bulk-role`
-```json
-{ "user_ids": ["id1", "id2"], "role": "dentist" }
-```
+### Built-in role keys
+`super_admin` · `admin` · `dentist` · `assistant` · `receptionist` · `accountant` · `lab_technician` · `viewer`
 
 ---
 
@@ -465,15 +558,15 @@ email=...&password=...
 | PUT | `/clinic/roles/{roleKey}` | Update role |
 | DELETE | `/clinic/roles/{roleKey}` | Delete role |
 
-### Role Object
+### Role object
 ```json
 {
   "key": "string",
   "name": "string",
   "description": "string",
-  "color": "#hex",
+  "color": "from-slate-400 to-slate-500",
   "built_in": false,
-  "permissions": ["permission_key"]
+  "permissions": ["permission_key_1", "permission_key_2"]
 }
 ```
 
@@ -487,13 +580,9 @@ email=...&password=...
 |--------|------|-------------|
 | GET | `/clinic/permissions` | List all available permissions |
 
-### Permission Object
+### Permission object
 ```json
-{
-  "key": "string",
-  "group": "string",
-  "label": "string"
-}
+{ "key": "string", "group": "string", "label": "string" }
 ```
 
 ---
@@ -504,20 +593,19 @@ email=...&password=...
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/audit-logs` | List audit log entries |
+| GET | `/clinic/audit-logs` | List audit log entries (paginated) |
 
-### GET `/clinic/audit-logs`
-**Query params:**
+### GET query params
 | Param | Type | Description |
 |-------|------|-------------|
 | `actor` | string | Filter by actor name |
 | `action` | string | Filter by action type |
 | `from` | ISO8601 | Start date |
 | `to` | ISO8601 | End date |
-| `page` | number | Page number |
-| `limit` | number | Items per page |
+| `page` | number | Default: 1 |
+| `limit` | number | Store uses 200 |
 
-### AuditLog Object
+### AuditLog object
 ```json
 {
   "id": "string",
@@ -537,8 +625,43 @@ email=...&password=...
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/plan-settings` | Get plan print/display settings |
+| GET | `/clinic/plan-settings` | Get plan settings |
 | PUT | `/clinic/plan-settings` | Update plan settings |
+
+### PUT body
+```json
+{
+  "language": "English (EN)",
+  "page_size": "A4|Letter|Legal",
+  "price_list_design": "compact|detailed|minimal",
+  "price_page": {
+    "show_prices": true,
+    "show_subtotal": true,
+    "show_discount": true,
+    "show_tax": false,
+    "show_total": true,
+    "show_insurance": true,
+    "currency": "EUR"
+  },
+  "plan_sections": {
+    "show_diagnosis": true,
+    "show_treatments": true,
+    "show_animation": true,
+    "show_documents": true,
+    "show_overview": true
+  },
+  "page_design": {
+    "front_cover": {
+      "cover_image": "url|null",
+      "title": "TREATMENT PLAN",
+      "subtitle": "[PATIENT NAME]|null"
+    },
+    "inner_pages": { "header_text": "TITLE", "show_footer": true },
+    "animation_page": { "mode": "default|custom", "custom_note": "string|null" },
+    "back_cover": { "back_image": "url|null", "note": "string|null" }
+  }
+}
+```
 
 ---
 
@@ -548,13 +671,13 @@ email=...&password=...
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/pricelist` | Get full pricelist with sections |
-| PUT | `/clinic/pricelist` | Save entire pricelist (batch replace) |
-| POST | `/clinic/pricelist/items` | Add new price item |
-| PATCH | `/clinic/pricelist/items/{id}` | Update price item |
-| DELETE | `/clinic/pricelist/items/{id}` | Delete price item |
+| GET | `/clinic/pricelist` | Get full pricelist |
+| PUT | `/clinic/pricelist` | Batch save entire pricelist |
+| POST | `/clinic/pricelist/items` | Add item to a group |
+| PATCH | `/clinic/pricelist/items/{id}` | Update item |
+| DELETE | `/clinic/pricelist/items/{id}` | Delete item |
 
-### Pricelist Structure
+### Full pricelist structure
 ```json
 {
   "settings": {
@@ -575,7 +698,7 @@ email=...&password=...
           "title": "string",
           "price_label": "string|null",
           "items": [
-            { "id": "string", "name": "string", "price": 100.00, "note": "string" }
+            { "id": "string", "name": "string", "price": 150.00, "note": "string" }
           ]
         }
       ]
@@ -584,14 +707,14 @@ email=...&password=...
 }
 ```
 
-### POST `/clinic/pricelist/items`
+### POST `/clinic/pricelist/items` body
 ```json
-{
-  "group_id": "string",
-  "name": "string",
-  "price": 150.00,
-  "note": "string"
-}
+{ "group_id": "string", "name": "string", "price": 150.00, "note": "string" }
+```
+
+### PATCH `/clinic/pricelist/items/{id}` body
+```json
+{ "name": "string", "price": 150.00, "note": "string" }
 ```
 
 ---
@@ -604,23 +727,43 @@ email=...&password=...
 |--------|------|-------------|
 | GET | `/clinic/templates` | List templates |
 | POST | `/clinic/templates` | Create template |
-| GET | `/clinic/templates/{id}` | Get template by ID |
+| GET | `/clinic/templates/{id}` | Get template |
 | PUT | `/clinic/templates/{id}` | Update template |
 | DELETE | `/clinic/templates/{id}` | Delete template |
-| PUT | `/clinic/templates/reorder` | Reorder templates within category |
+| PUT | `/clinic/templates/reorder` | Reorder within a category |
 
-### GET `/clinic/templates`
-**Query params:**
+### GET `/clinic/templates` — query params
 | Param | Type | Description |
 |-------|------|-------------|
-| `category` | `diagnosis` \| `treatments` \| `dentists` \| `other` | Filter by category |
-| `language` | string | Filter by language code |
+| `category` | `diagnosis` \| `treatments` \| `dentists` \| `other` | Filter |
+| `language` | string | Filter by language |
 
-### PUT `/clinic/templates/reorder`
+### POST/PUT body
 ```json
 {
+  "title": "string",
+  "category": "diagnosis|treatments|dentists|other",
+  "language": "English",
+  "body": "<p>HTML content</p>",
+  "order": 1
+}
+```
+
+### PUT `/clinic/templates/reorder` body
+```json
+{ "category": "diagnosis", "ordered_ids": ["id1", "id2", "id3"] }
+```
+
+### Template object
+```json
+{
+  "id": "string",
+  "title": "string",
   "category": "diagnosis",
-  "ordered_ids": ["id1", "id2", "id3"]
+  "language": "English",
+  "body": "<p>...</p>",
+  "order": 1,
+  "updated_at": "ISO8601"
 }
 ```
 
@@ -632,11 +775,10 @@ email=...&password=...
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/clinic/overview/stats` | Clinic summary statistics |
+| GET | `/clinic/overview/stats` | Clinic summary stats |
 | GET | `/clinic/overview/revenue` | Revenue chart data |
 
-### GET `/clinic/overview/revenue`
-**Query params:**
+### GET `/clinic/overview/revenue` — query params
 | Param | Type | Description |
 |-------|------|-------------|
 | `from` | ISO8601 | Start date |
@@ -645,70 +787,53 @@ email=...&password=...
 
 ---
 
-## Response Envelopes
+## Endpoint index
 
-### Single item
-```json
-{ "data": { ...entity } }
-```
-
-### Paginated list
-```json
-{
-  "data": [ ...items ],
-  "meta": {
-    "total": 55,
-    "per_page": 20,
-    "current_page": 1,
-    "last_page": 3
-  }
-}
-```
-
-### Error
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Human-readable message",
-    "errors": {
-      "field_name": ["error detail"]
-    }
-  }
-}
-```
-
-### Common Error Codes
-| HTTP | Code | Meaning |
-|------|------|---------|
-| 400 | `VALIDATION_ERROR` | Invalid input fields |
-| 401 | `UNAUTHENTICATED` | Missing or invalid token |
-| 403 | `FORBIDDEN` | Insufficient permissions |
-| 404 | `NOT_FOUND` | Resource not found |
-| 409 | `CONFLICT` | Duplicate resource |
-| 422 | `UNPROCESSABLE` | Business rule violation |
-| 500 | `SERVER_ERROR` | Internal server error |
+| # | Scope | Entity | Count | Auth |
+|---|-------|--------|-------|------|
+| 1 | Admin | Auth | 3 | — |
+| 2 | Clinic | Auth | 3 | — |
+| 3 | Admin | Clinics | 7 | Admin |
+| 4 | Admin | Clinic Users | 7 | Admin |
+| 5 | Admin | Dashboard Stats | 1 | Admin |
+| 6 | Clinic | Patients | 5 | Clinic |
+| 7 | Clinic | Treatment Plans | 5 | Clinic |
+| 8 | Clinic | Teeth | 2 | Clinic |
+| 9 | Clinic | X-Rays | 2 | Clinic |
+| 10 | Clinic | General Statuses | 1 | Clinic |
+| 11 | Clinic | Treatment Rows | 4 | Clinic |
+| 12 | Clinic | Treatment Items | 3 | Clinic |
+| 13 | Clinic | Documents | 3 | Clinic |
+| 14 | Clinic | Users | 8 | Clinic |
+| 15 | Clinic | Roles | 4 | Clinic |
+| 16 | Clinic | Permissions | 1 | Clinic |
+| 17 | Clinic | Audit Logs | 1 | Clinic |
+| 18 | Clinic | Plan Settings | 2 | Clinic |
+| 19 | Clinic | Pricelist | 5 | Clinic |
+| 20 | Clinic | Templates | 6 | Clinic |
+| 21 | Clinic | Overview / Analytics | 2 | Clinic |
+| **Total** | | | **76** | |
 
 ---
 
-## Endpoint Summary
+## Page → API mapping
 
-| # | Entity | Endpoints | Auth |
-|---|--------|-----------|------|
-| 1 | Admin Auth | 3 | — |
-| 2 | Clinic Auth | 3 | — |
-| 3 | Clinics | 7 | Admin |
-| 4 | Clinic Users (Admin) | 7 | Admin |
-| 5 | Admin Dashboard | 1 | Admin |
-| 6 | Patients | 5 | Clinic |
-| 7 | Treatment Plans | 5 + 2 + 2 + 1 + 4 + 3 = **17** | Clinic |
-| 8 | Documents | 3 | Clinic |
-| 9 | Users (Clinic) | 8 | Clinic |
-| 10 | Roles | 4 | Clinic |
-| 11 | Permissions | 1 | Clinic |
-| 12 | Audit Logs | 1 | Clinic |
-| 13 | Plan Settings | 2 | Clinic |
-| 14 | Pricelist | 5 | Clinic |
-| 15 | Templates | 6 | Clinic |
-| 16 | Overview / Analytics | 2 | Clinic |
-| **Total** | | **76 endpoints** | |
+| Route | Endpoints used |
+|-------|---------------|
+| `/login` | POST `/clinic/login` |
+| `/admin/login` | POST `/admin/login` |
+| `/` (Dashboard) | GET `/clinic/me` · GET/PUT `/clinic/plan-settings` |
+| `/patients/` | GET `/clinic/patients` · POST · PUT · DELETE |
+| `/patients/{id}/` | GET `/clinic/patients/{id}` · GET `/clinic/patients/{id}/plans` |
+| `/patients/{id}/plans/{planId}` | Full plan CRUD + teeth + xrays + statuses + rows + items |
+| `/documents` | GET/PUT/POST `/clinic/document-presets` |
+| `/templates` | Full `/clinic/templates` CRUD |
+| `/clinic-fees` | Full `/clinic/pricelist` CRUD |
+| `/plan-settings` | GET/PUT `/clinic/plan-settings` |
+| `/overview` | `/clinic/document-presets` · `/clinic/templates` · `/clinic/plan-settings` (read-only preview) |
+| `/users` | `/clinic/users` · `/clinic/roles` · `/clinic/permissions` · `/clinic/audit-logs` |
+| `/admin/dashboard` | GET `/admin/stats` |
+| `/admin/clinics/` | GET/PATCH(suspend/activate)/DELETE `/admin/clinics` |
+| `/admin/clinics/create` | POST `/admin/clinics` |
+| `/admin/clinics/{id}` | GET/PUT `/admin/clinics/{id}` |
+| `/admin/clinics/{id}/users` | Full `/admin/clinics/{id}/users` · `/admin/clinic-users/{id}` CRUD |
