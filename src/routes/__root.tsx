@@ -123,8 +123,7 @@ function RootComponent() {
   const isAdminLogin = pathname === "/admin/login";
   const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
   const isClinicLogin = pathname === "/clinic/login";
-  const isLogin = pathname === "/login";
-  const isAuthPage = isAdminLogin || isClinicLogin || isLogin;
+  const isAuthPage = isAdminLogin || isClinicLogin;
 
   useEffect(() => {
     if (isAdminLogin) {
@@ -134,7 +133,7 @@ function RootComponent() {
       return;
     }
 
-    if (isClinicLogin || isLogin) {
+    if (isClinicLogin) {
       if (hasClinicToken) {
         navigate({ to: "/", replace: true });
       }
@@ -153,7 +152,7 @@ function RootComponent() {
     }
 
     if (!hasClinicToken) {
-      navigate({ to: "/login", replace: true });
+      navigate({ to: "/clinic/login", replace: true });
     }
   }, [
     hasAdminToken,
@@ -162,7 +161,6 @@ function RootComponent() {
     isAdminLogin,
     isAdminRoute,
     isClinicLogin,
-    isLogin,
     navigate,
   ]);
 
@@ -178,7 +176,7 @@ function RootComponent() {
     return <QueryClientProvider client={queryClient} />;
   }
 
-  if (!isAdminRoute && !hasClinicToken) {
+  if (!isAdminRoute && !isClinicLogin && !hasClinicToken) {
     return <QueryClientProvider client={queryClient} />;
   }
 

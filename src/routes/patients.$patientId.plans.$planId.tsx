@@ -125,7 +125,7 @@ function PlanPage() {
   const { patientId, planId } = useParams({ from: "/patients/$patientId/plans/$planId" });
   const patient = usePatient(patientId);
   usePlansFor(patientId);
-  const plan = usePlan(planId);
+  const plan = usePlan(planId, patientId);
   const accountSettings = usePlanSettings();
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");

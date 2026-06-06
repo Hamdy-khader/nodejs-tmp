@@ -237,7 +237,7 @@ async function request<T>(
         window.location.href = "/admin/login";
       } else {
         clinicTokenStore.clear();
-        window.location.href = "/login";
+        window.location.href = "/clinic/login";
       }
     }
     throw new ApiError(

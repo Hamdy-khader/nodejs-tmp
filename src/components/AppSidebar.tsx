@@ -45,7 +45,7 @@ export function AppSidebar() {
 
   const handleLogout = async () => {
     await clinicApi.logout();
-    window.location.href = "/login";
+    window.location.href = "/clinic/login";
   };
 
   return (

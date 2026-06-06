@@ -13,7 +13,7 @@ export const Route = createFileRoute("/clinic/login")({
 
 function cleanClinicRedirect(value: unknown) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") return "/";
+  if (value === "/clinic/login" || value === "/admin/login") return "/";
   if (value.startsWith("/admin")) return "/";
   return value;
 }

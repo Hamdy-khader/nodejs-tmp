@@ -193,13 +193,19 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
     if (tooth.number) teeth[tooth.number] = tooth;
   });
 
-  const xraysRaw = Array.isArray(raw.xrays) ? raw.xrays : [];
-  const generalStatusesRaw = Array.isArray(raw.general_statuses) ? raw.general_statuses : [];
+  const xraysRaw = Array.isArray(raw.xrays) ? raw.xrays : Array.isArray(raw.xray) ? raw.xray : [];
+  const generalStatusesRaw = Array.isArray(raw.general_statuses)
+    ? raw.general_statuses
+    : Array.isArray(raw.general_status)
+      ? raw.general_status
+      : [];
   const treatmentRowsRaw = Array.isArray(raw.treatment_rows)
     ? raw.treatment_rows
     : Array.isArray(raw.treatments)
       ? raw.treatments
-      : [];
+      : Array.isArray(raw.rows)
+        ? raw.rows
+        : [];
 
   return {
     id: String(raw.id ?? uid()),
@@ -325,9 +331,10 @@ async function loadPlansFor(patientId: string, force = false) {
       const rows = Array.isArray(res) ? res : (res.data ?? []);
       const plans = rows.map((item) => toPlan(item, patientId));
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
-      state = { ...state, plans: [...plans, ...rest] };
+      // preserve any plans already fetched via the detail endpoint (they have full data)
+      const merged = plans.map((p) => (planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p));
+      state = { ...state, plans: [...merged, ...rest] };
       plansLoadedFor.add(patientId);
-      plans.forEach((plan) => planLoaded.add(plan.id));
       emit();
     } finally {
       plansInflight.delete(patientId);
@@ -417,11 +424,12 @@ export function usePlansFor(patientId: string | undefined) {
   );
 }
 
-export function usePlan(id: string | undefined) {
+export function usePlan(id: string | undefined, patientId?: string) {
   const plan = getPlanById(id);
+  const resolvedPatientId = patientId ?? plan?.patientId;
   useEffect(() => {
-    if (plan?.patientId && id) void loadPlan(plan.patientId, id);
-  }, [plan?.patientId, id]);
+    if (resolvedPatientId && id) void loadPlan(resolvedPatientId, id);
+  }, [resolvedPatientId, id]);
   return useSyncExternalStore(
     subscribe,
     () => getPlanById(id),
