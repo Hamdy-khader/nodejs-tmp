@@ -7,7 +7,7 @@ import {
   useRouterState,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { adminTokenStore, clinicTokenStore } from "@/lib/admin/api";
 
 function NotFoundComponent() {
@@ -106,14 +106,25 @@ function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
+  const [hasAdminToken, setHasAdminToken] = useState(() => adminTokenStore.exists());
+  const [hasClinicToken, setHasClinicToken] = useState(() => clinicTokenStore.exists());
+
+  const syncTokens = useCallback(() => {
+    setHasAdminToken(adminTokenStore.exists());
+    setHasClinicToken(clinicTokenStore.exists());
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("auth:changed", syncTokens);
+    return () => window.removeEventListener("auth:changed", syncTokens);
+  }, [syncTokens]);
+
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
   const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
   const isClinicLogin = pathname === "/clinic/login";
   const isLogin = pathname === "/login";
   const isAuthPage = isAdminLogin || isClinicLogin || isLogin;
-  const hasAdminToken = adminTokenStore.exists();
-  const hasClinicToken = clinicTokenStore.exists();
 
   useEffect(() => {
     if (isAdminLogin) {

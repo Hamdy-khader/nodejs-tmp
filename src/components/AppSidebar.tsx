@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   User,
   Users,
@@ -42,11 +42,10 @@ const items = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await clinicApi.logout();
-    navigate({ to: "/login" });
+    window.location.href = "/login";
   };
 
   return (

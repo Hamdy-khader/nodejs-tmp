@@ -40,7 +40,7 @@ export function AdminLayout({ children, title = "Admin Panel" }: AdminLayoutProp
 
   const handleLogout = async () => {
     await adminApi.logout();
-    navigate({ to: "/admin/login" });
+    window.location.href = "/admin/login";
   };
 
   if (checking) {

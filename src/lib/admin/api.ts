@@ -20,7 +20,10 @@ export const adminTokenStore = {
     if (storageAvailable()) window.localStorage.setItem("bp_admin_token", t);
   },
   clear: (): void => {
-    if (storageAvailable()) window.localStorage.removeItem("bp_admin_token");
+    if (storageAvailable()) {
+      window.localStorage.removeItem("bp_admin_token");
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   exists: (): boolean => Boolean(adminTokenStore.get()),
 };
@@ -33,7 +36,10 @@ export const clinicTokenStore = {
     if (storageAvailable()) window.localStorage.setItem("bp_clinic_token", t);
   },
   clear: (): void => {
-    if (storageAvailable()) window.localStorage.removeItem("bp_clinic_token");
+    if (storageAvailable()) {
+      window.localStorage.removeItem("bp_clinic_token");
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   exists: (): boolean => Boolean(clinicTokenStore.get()),
 };
@@ -224,6 +230,16 @@ async function request<T>(
 
   if (!res.ok) {
     const err = json?.error ?? json ?? {};
+    if (res.status === 401 && typeof window !== "undefined") {
+      const isAdmin = path.startsWith("/admin");
+      if (isAdmin) {
+        adminTokenStore.clear();
+        window.location.href = "/admin/login";
+      } else {
+        clinicTokenStore.clear();
+        window.location.href = "/login";
+      }
+    }
     throw new ApiError(
       err.code ?? "UNKNOWN_ERROR",
       err.message ?? `Request failed (${res.status})`,
