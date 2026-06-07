@@ -31,13 +31,19 @@ export type TreatmentRow =
   | { id: string; kind: "healing"; label?: string; note?: string; days?: number }
   | { id: string; kind: "discount"; note?: string; mode: "amount" | "percent"; value: number };
 
+export interface XrayImage {
+  id: string;
+  url: string;
+  sortOrder: number;
+}
+
 export interface TreatmentPlan {
   id: string;
   patientId: string;
   name: string;
   notes: string;
   teeth: Record<number, ToothState>;
-  xrays?: string[];
+  xrays?: XrayImage[];
   generalStatuses?: string[];
   treatments?: TreatmentRow[];
   treatmentNote?: string;
@@ -214,10 +220,21 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
     notes: String(raw.notes ?? ""),
     teeth,
     xrays: xraysRaw
-      .map((item) =>
-        typeof item === "string" ? item : String((item as Record<string, unknown>).file_url ?? ""),
-      )
-      .filter(Boolean),
+      .map((item, index): XrayImage | null => {
+        if (typeof item === "string") {
+          return item ? { id: item, url: item, sortOrder: index + 1 } : null;
+        }
+        const rec = item as Record<string, unknown>;
+        const url = String(rec.file_url ?? rec.url ?? "");
+        if (!url) return null;
+        return {
+          id: String(rec.id ?? url),
+          url,
+          sortOrder: Number(rec.sort_order ?? index + 1),
+        };
+      })
+      .filter((item): item is XrayImage => item !== null)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     generalStatuses: generalStatusesRaw
       .map((item) =>
         typeof item === "string" ? item : String((item as Record<string, unknown>).label ?? ""),
@@ -682,25 +699,35 @@ export const patientsStore = {
     void clinicApi.plans.delete(plan.patientId, id);
   },
 
-  addXrays(planId: string, dataUrls: string[]) {
+  async addXrays(planId: string, files: File[]) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    updateLocalPlan(planId, { xrays: [...(plan.xrays ?? []), ...dataUrls] });
-    dataUrls.forEach((fileUrl, index) => {
-      void clinicApi.plans.addXray(planId, {
-        file_url: fileUrl,
-        sort_order: (plan.xrays?.length ?? 0) + index + 1,
+    const startOrder = plan.xrays?.length ?? 0;
+    for (let index = 0; index < files.length; index += 1) {
+      const record = await clinicApi.plans.addXray(planId, files[index], startOrder + index + 1);
+      const current = getPlanById(planId);
+      if (!current) continue;
+      updateLocalPlan(planId, {
+        xrays: [
+          ...(current.xrays ?? []),
+          {
+            id: String(record.id),
+            url: String(record.file_url ?? record.url ?? ""),
+            sortOrder: Number(record.sort_order ?? startOrder + index + 1),
+          },
+        ],
       });
-    });
+    }
   },
 
-  removeXray(planId: string, index: number) {
+  async removeXray(planId: string, xrayId: string) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    const xrays = [...(plan.xrays ?? [])];
-    const removed = xrays[index];
-    updateLocalPlan(planId, { xrays: xrays.filter((_, itemIndex) => itemIndex !== index) });
-    if (removed) {
+    const xrays = plan.xrays ?? [];
+    updateLocalPlan(planId, { xrays: xrays.filter((item) => item.id !== xrayId) });
+    try {
+      await clinicApi.plans.deleteXray(planId, xrayId);
+    } catch {
       void loadPlan(plan.patientId, planId, true).catch(() => null);
     }
   },
