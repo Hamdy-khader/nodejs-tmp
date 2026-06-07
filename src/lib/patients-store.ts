@@ -712,7 +712,7 @@ export const patientsStore = {
           ...(current.xrays ?? []),
           {
             id: String(record.id),
-            url: String(record.file_url ?? record.url ?? ""),
+            url: String(record.file_url ?? ""),
             sortOrder: Number(record.sort_order ?? startOrder + index + 1),
           },
         ],

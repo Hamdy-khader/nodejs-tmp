@@ -357,12 +357,15 @@ Login endpoints use `Content-Type: application/x-www-form-urlencoded`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/clinic/plans/{planId}/xrays` | Add X-ray |
+| GET | `/clinic/plans/{planId}/xrays` | List X-rays (sorted by `sort_order`) |
+| POST | `/clinic/plans/{planId}/xrays` | Upload X-ray (`multipart/form-data`) |
 | DELETE | `/clinic/plans/{planId}/xrays/{xrayId}` | Delete X-ray |
 
-**POST body:**
+**POST request:** `multipart/form-data` — fields: `file` (binary, required, `image/*`), `sort_order` (int, optional)
+
+**Response item shape:**
 ```json
-{ "file_url": "string", "sort_order": 1 }
+{ "id": "string", "file_url": "string", "sort_order": 1, "created_at": "ISO8601", "updated_at": "ISO8601" }
 ```
 
 ---

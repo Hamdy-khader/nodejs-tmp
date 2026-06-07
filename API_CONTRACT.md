@@ -707,16 +707,82 @@ deleted_at
 
 تحديث سن واحد فقط.
 
-### 8.8 POST `/clinic/plans/{planId}/xrays`
+### 8.8 صور الأشعة X-ray Images — `/clinic/plans/{planId}/xrays`
+
+#### GET `/clinic/plans/{planId}/xrays`
+
+يرجع قائمة صور الأشعة الخاصة بالخطة العلاجية، مرتبة تصاعدياً حسب `sort_order`.
+
+##### Response
 
 ```json
 {
-  "file_url": "https://cdn.example.com/xrays/1.png",
-  "sort_order": 1
+  "success": true,
+  "data": [
+    {
+      "id": "xray_001",
+      "file_url": "https://cdn.example.com/xrays/plan_123/1.png",
+      "sort_order": 1,
+      "created_at": "2026-06-01T10:00:00Z",
+      "updated_at": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "xray_002",
+      "file_url": "https://cdn.example.com/xrays/plan_123/2.png",
+      "sort_order": 2,
+      "created_at": "2026-06-02T09:30:00Z",
+      "updated_at": "2026-06-02T09:30:00Z"
+    }
+  ]
 }
 ```
 
-### 8.9 DELETE `/clinic/plans/{planId}/xrays/{xrayId}`
+#### POST `/clinic/plans/{planId}/xrays`
+
+رفع صورة أشعة جديدة وحفظها. الطلب من نوع **`multipart/form-data`** (وليس JSON) لأن الواجهة الأمامية ترسل ملف الصورة الفعلي مباشرة، وليس رابطاً جاهزاً.
+
+##### Request — `multipart/form-data` fields
+
+| Field        | Type   | Required | ملاحظات                                                  |
+|--------------|--------|----------|-----------------------------------------------------------|
+| `file`       | binary | نعم      | ملف الصورة (`image/png`, `image/jpeg`, `image/webp`)      |
+| `sort_order` | int    | لا       | ترتيب العرض؛ افتراضياً = آخر ترتيب موجود + 1               |
+
+##### Response — `201 Created`
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "xray_003",
+    "file_url": "https://cdn.example.com/xrays/plan_123/3.png",
+    "sort_order": 3,
+    "created_at": "2026-06-08T08:00:00Z",
+    "updated_at": "2026-06-08T08:00:00Z"
+  }
+}
+```
+
+##### ملاحظات تنفيذية للباكند
+
+- **لا تُخزَّن الصورة كـ `base64` داخل قاعدة البيانات.** يُرفع الملف إلى object storage (S3 / Supabase Storage / Cloudflare R2 ...) ويُحفظ الرابط النهائي فقط في عمود `treatment_plan_xrays.file_url`، اتساقاً مع توصية قسم [Files](#files) أعلاه.
+- يجب التحقق من:
+  - أن `Content-Type` الخاص بالملف من نوع `image/*` فعلياً.
+  - حجم الملف لا يتجاوز الحد الأقصى المسموح (يُقترح ~10MB — حدد الرقم النهائي وأبلغ الفرونت به).
+- عند الرفض، استخدم نفس Response Envelope الموحّد للأخطاء (`error.code`, `error.message`)، أمثلة على أكواد مقترحة:
+  - `INVALID_FILE_TYPE` — الملف ليس صورة مدعومة
+  - `FILE_TOO_LARGE` — تجاوز الحجم الأقصى المسموح
+  - `PLAN_NOT_FOUND` — الخطة العلاجية غير موجودة أو لا تتبع للعيادة الحالية
+
+#### DELETE `/clinic/plans/{planId}/xrays/{xrayId}`
+
+يحذف سجل صورة الأشعة من قاعدة البيانات **ومن الـ object storage أيضاً** (لتفادي تراكم ملفات يتيمة لا يشير إليها أي سجل).
+
+##### Response
+
+`204 No Content` — أو `200 OK` مع `{ "success": true, "data": null }` بحسب الاتفاقية المتبعة في بقية الـ API.
+
+إذا لم يُعثر على السجل: `404 Not Found` بكود خطأ `XRAY_NOT_FOUND`.
 
 ### 8.10 PUT `/clinic/plans/{planId}/general-statuses`
 
