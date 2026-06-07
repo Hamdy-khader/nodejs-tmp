@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/clinic/login")({
+export const Route = createFileRoute("/clinic_/login")({
   validateSearch: (search: Record<string, unknown>) => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),

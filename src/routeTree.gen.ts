@@ -21,7 +21,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
-import { Route as ClinicLoginRouteImport } from './routes/clinic.login'
+import { Route as ClinicLoginRouteImport } from './routes/clinic_.login'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as PatientsPatientIdIndexRouteImport } from './routes/patients.$patientId.index'
@@ -93,7 +93,7 @@ const PatientsPatientIdRoute = PatientsPatientIdRouteImport.update({
   getParentRoute: () => PatientsRoute,
 } as any)
 const ClinicLoginRoute = ClinicLoginRouteImport.update({
-  id: '/clinic/login',
+  id: '/clinic_/login',
   path: '/clinic/login',
   getParentRoute: () => rootRouteImport,
 } as any)
@@ -203,7 +203,7 @@ export interface FileRoutesById {
   '/users': typeof UsersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/login': typeof AdminLoginRoute
-  '/clinic/login': typeof ClinicLoginRoute
+  '/clinic_/login': typeof ClinicLoginRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/patients/': typeof PatientsIndexRoute
@@ -275,7 +275,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/admin/dashboard'
     | '/admin/login'
-    | '/clinic/login'
+    | '/clinic_/login'
     | '/patients/$patientId'
     | '/admin/'
     | '/patients/'
@@ -395,8 +395,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PatientsPatientIdRouteImport
       parentRoute: typeof PatientsRoute
     }
-    '/clinic/login': {
-      id: '/clinic/login'
+    '/clinic_/login': {
+      id: '/clinic_/login'
       path: '/clinic/login'
       fullPath: '/clinic/login'
       preLoaderRoute: typeof ClinicLoginRouteImport
