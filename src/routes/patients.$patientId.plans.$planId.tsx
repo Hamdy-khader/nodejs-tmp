@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft, Save, Trash2, RotateCcw, Pencil,
-  ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus, FileDown,
+  ArrowLeft, Save, Trash2, RotateCcw, Pencil, Undo2, Redo2,
+  Globe, DollarSign, ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import {
   patientsStore, usePatient, usePlan, usePlansFor, defaultTeeth,
   STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
-import { clinicApi } from "@/lib/admin/api";
 import { tabsStore } from "@/lib/tabs-store";
 import { useHydrated } from "@/lib/use-hydrated";
 import { TeethChart } from "@/components/TeethChart";
@@ -33,7 +32,10 @@ import { MalocclusionDiagnosisPanel } from "@/components/MalocclusionDiagnosisPa
 import { FacialDisproportionsPanel } from "@/components/FacialDisproportionsPanel";
 import { GeneralStatusDialog } from "@/components/GeneralStatusDialog";
 import { TreatmentsView } from "@/components/TreatmentsView";
+import { DocumentsPanel } from "@/components/DocumentsPanel";
+import { OverviewPanel } from "@/components/OverviewPanel";
 import { X } from "lucide-react";
+import { usePlanSettings } from "@/lib/plan-settings-store";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -60,6 +62,9 @@ export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
 const STEPS = [
   { id: "diagnosis", label: "Diagnosis" },
   { id: "treatments", label: "Treatments" },
+  { id: "animation", label: "Animation" },
+  { id: "documents", label: "Documents" },
+  { id: "overview", label: "Overview" },
 ] as const;
 
 type StatusGroupId = ToothStatus | "general" | "other";
@@ -121,6 +126,7 @@ function PlanPage() {
   const patient = usePatient(patientId);
   usePlansFor(patientId);
   const plan = usePlan(planId, patientId);
+  const accountSettings = usePlanSettings();
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");
   const [selected, setSelected] = useState<number | null>(null);
@@ -140,7 +146,6 @@ function PlanPage() {
   const [panelKey, setPanelKey] = useState(0);
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const [saving, setSaving] = useState(false);
-  const [downloading, setDownloading] = useState(false);
 
   const closeAllPanels = () => {
     setFilledPanelOpen(false);
@@ -208,23 +213,6 @@ function PlanPage() {
     }
   };
 
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const blob = await clinicApi.plans.downloadDocument(plan.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${plan.name || "treatment-plan"}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Could not download document");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   const summary = (Object.keys(STATUS_META) as ToothStatus[])
     .filter((s) => s !== "intact")
     .map((s) => ({ s, count: Object.values(plan.teeth).filter((t) => t.status === s).length }))
@@ -258,9 +246,10 @@ function PlanPage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1600px] min-w-0 p-3 sm:p-5">
+      <div className="mx-auto grid w-full max-w-[1600px] min-w-0 grid-cols-1 gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+        {/* Main column */}
         <div className="space-y-5">
-          {/* Plan header (back + name + actions) */}
+          {/* Plan header (back + name) */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link
               to="/patients"
@@ -268,7 +257,7 @@ function PlanPage() {
             >
               <ArrowLeft className="h-4 w-4" /> All patients
             </Link>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               {editName ? (
                 <>
                   <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 max-w-xs text-sm" />
@@ -279,7 +268,7 @@ function PlanPage() {
                     }
                     setEditName(false);
                   }}>
-                    <Save className="h-4 w-4" /> Save name
+                    <Save className="h-4 w-4" /> Save
                   </Button>
                 </>
               ) : (
@@ -291,58 +280,10 @@ function PlanPage() {
                   </Button>
                 </>
               )}
-              {/* Action buttons */}
-              <div className="flex items-center gap-1 border-l border-border/50 pl-2">
-                <Button
-                  size="sm"
-                  variant={xrayOpen ? "default" : "outline"}
-                  onClick={() => setXrayOpen((o) => !o)}
-                  className="h-8 gap-1.5 text-xs"
-                >
-                  <ScanLine className="h-3.5 w-3.5" /> X-ray
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSavePlan}
-                  disabled={saving}
-                  className="h-8 gap-1.5 text-xs"
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {saving ? "Saving…" : "Save"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  className="h-8 gap-1.5 text-xs"
-                >
-                  <FileDown className="h-3.5 w-3.5" />
-                  {downloading ? "Downloading…" : "Download"}
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  title="Reset teeth"
-                  onClick={() => setResetOpen(true)}
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                  title="Delete plan"
-                  onClick={() => setDelOpen(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
             </div>
           </div>
 
-          {xrayOpen && (
+          {xrayOpen && step === "treatments" && (
             <XrayPanel
               planId={plan.id}
               xrays={plan.xrays ?? []}
@@ -351,36 +292,17 @@ function PlanPage() {
           )}
 
           {step === "treatments" ? (
-            <>
-              {/* Add row buttons */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => patientsStore.addTreatmentRow(plan.id, { id: uid(), kind: "visit", items: [] })}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Visit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => patientsStore.addTreatmentRow(plan.id, { id: uid(), kind: "healing" })}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Healing period
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => patientsStore.addTreatmentRow(plan.id, { id: uid(), kind: "discount", mode: "amount", value: 0 })}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Discount
-                </Button>
-              </div>
-              <TreatmentsView plan={plan} />
-            </>
+            <TreatmentsView plan={plan} />
+          ) : step === "documents" ? (
+            <DocumentsPanel />
+          ) : step === "overview" ? (
+            <OverviewPanel />
+          ) : step !== "diagnosis" ? (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-card p-12 text-center shadow-[var(--shadow-soft)]">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{STEPS.find((s) => s.id === step)?.label}</span> step coming soon.
+              </p>
+            </div>
           ) : (
             <>
               {/* Teeth chart + status grid (no heavy card chrome) */}
@@ -557,6 +479,14 @@ function PlanPage() {
                 </div>
               </div>
 
+              {xrayOpen && (
+                <XrayPanel
+                  planId={plan.id}
+                  xrays={plan.xrays ?? []}
+                  onClose={() => setXrayOpen(false)}
+                />
+              )}
+
               {/* General section */}
               <Section
                 title="General"
@@ -615,105 +545,177 @@ function PlanPage() {
               >
                 <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
-
-              {/* Diagnosis panels — shown inline when a tooth is selected */}
-              {filledPanelOpen &&
-                selectedTooth &&
-                selectedTooth.status === "filled" &&
-                selectedTooth.note &&
-                FILLED_VARIANTS.includes(selectedTooth.note) && (
-                  <FilledDiagnosisPanel
-                    key={`filled-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setFilledPanelOpen(false)}
-                  />
-                )}
-              {severityPanelOpen &&
-                selectedTooth &&
-                selectedTooth.note &&
-                ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
-                  GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
-                  <SeverityDiagnosisPanel
-                    key={`severity-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setSeverityPanelOpen(false)}
-                  />
-                )}
-              {implantPanelOpen &&
-                selectedTooth &&
-                selectedTooth.status === "implant" &&
-                selectedTooth.note &&
-                IMPLANT_VARIANTS.includes(selectedTooth.note) && (
-                  <ImplantDiagnosisPanel
-                    key={`implant-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setImplantPanelOpen(false)}
-                  />
-                )}
-              {bridgePanelOpen &&
-                selectedTooth &&
-                selectedTooth.status === "bridge" &&
-                selectedTooth.note &&
-                BRIDGE_VARIANTS.includes(selectedTooth.note) && (
-                  <BridgeDiagnosisPanel
-                    key={`bridge-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setBridgePanelOpen(false)}
-                  />
-                )}
-              {malocclusionPanelOpen &&
-                selectedTooth &&
-                selectedTooth.note &&
-                MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
-                  <MalocclusionDiagnosisPanel
-                    key={`malocclusion-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setMalocclusionPanelOpen(false)}
-                  />
-                )}
-              {facialPanelOpen &&
-                selectedTooth &&
-                selectedTooth.note &&
-                FACIAL_VARIANTS.includes(selectedTooth.note) && (
-                  <FacialDisproportionsPanel
-                    key={`facial-${panelKey}`}
-                    planId={plan.id}
-                    tooth={selectedTooth}
-                    variant={selectedTooth.note}
-                    onClose={() => setFacialPanelOpen(false)}
-                  />
-                )}
-
-              {/* Diagnosis summary */}
-              {summary.length > 0 && (
-                <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Diagnosis summary</h3>
-                  <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-3 lg:grid-cols-4">
-                    {summary.map(({ s, count }) => (
-                      <li key={s} className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: STATUS_META[s].color }} />
-                          {STATUS_META[s].label}
-                        </span>
-                        <span className="font-semibold tabular-nums">{count}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </>
           )}
         </div>
+
+        {/* Right rail */}
+        <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+          {filledPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "filled" &&
+            selectedTooth.note &&
+            FILLED_VARIANTS.includes(selectedTooth.note) && (
+              <FilledDiagnosisPanel
+                key={`filled-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setFilledPanelOpen(false)}
+              />
+            )}
+
+          {severityPanelOpen &&
+            selectedTooth &&
+            selectedTooth.note &&
+            ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
+              GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
+              <SeverityDiagnosisPanel
+                key={`severity-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setSeverityPanelOpen(false)}
+              />
+            )}
+
+          {implantPanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "implant" &&
+            selectedTooth.note &&
+            IMPLANT_VARIANTS.includes(selectedTooth.note) && (
+              <ImplantDiagnosisPanel
+                key={`implant-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setImplantPanelOpen(false)}
+              />
+            )}
+
+          {bridgePanelOpen &&
+            selectedTooth &&
+            selectedTooth.status === "bridge" &&
+            selectedTooth.note &&
+            BRIDGE_VARIANTS.includes(selectedTooth.note) && (
+              <BridgeDiagnosisPanel
+                key={`bridge-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setBridgePanelOpen(false)}
+              />
+            )}
+
+          {malocclusionPanelOpen &&
+            selectedTooth &&
+            selectedTooth.note &&
+            MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
+              <MalocclusionDiagnosisPanel
+                key={`malocclusion-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setMalocclusionPanelOpen(false)}
+              />
+            )}
+
+          {facialPanelOpen &&
+            selectedTooth &&
+            selectedTooth.note &&
+            FACIAL_VARIANTS.includes(selectedTooth.note) && (
+              <FacialDisproportionsPanel
+                key={`facial-${panelKey}`}
+                planId={plan.id}
+                tooth={selectedTooth}
+                variant={selectedTooth.note}
+                onClose={() => setFacialPanelOpen(false)}
+              />
+            )}
+
+          <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
+            <RailRow icon={<Globe className="h-4 w-4" />} label={accountSettings.language} sub="Account default" />
+            <RailRow icon={<DollarSign className="h-4 w-4" />} label={accountSettings.pricePage.currency} sub="Account default" />
+            <div className="my-2 h-px bg-border" />
+            <RailButton
+              icon={<Save className="h-4 w-4" />}
+              label={saving ? "Saving..." : "Save"}
+              onClick={handleSavePlan}
+              disabled={saving}
+              active={saving}
+            />
+            <div className="my-2 h-px bg-border" />
+            <RailButton icon={<Undo2 className="h-4 w-4" />} label="Undo" disabled />
+            <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
+            <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
+            <div className="my-2 h-px bg-border" />
+            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={() => setXrayOpen((o) => !o)} active={xrayOpen} />
+            {step === "treatments" && (
+              <>
+                <div className="my-2 h-px bg-border" />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Visit"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "visit",
+                      items: [],
+                    })
+                  }
+                />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Healing period"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "healing",
+                    })
+                  }
+                />
+                <RailButton
+                  icon={<Plus className="h-4 w-4" />}
+                  label="Discount"
+                  onClick={() =>
+                    patientsStore.addTreatmentRow(plan.id, {
+                      id: uid(),
+                      kind: "discount",
+                      mode: "amount",
+                      value: 0,
+                    })
+                  }
+                />
+              </>
+            )}
+            <div className="my-2 h-px bg-border" />
+            <RailButton
+              icon={<Trash2 className="h-4 w-4" />}
+              label="Delete plan"
+              onClick={() => setDelOpen(true)}
+              danger
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Diagnosis:</h3>
+            {summary.length === 0 ? (
+              <p className="mt-2 text-xs italic text-muted-foreground">First select a status.</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {summary.map(({ s, count }) => (
+                  <li key={s} className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_META[s].color }} />
+                      {STATUS_META[s].label}
+                    </span>
+                    <span className="font-semibold tabular-nums">{count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
       </div>
 
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
@@ -808,53 +810,138 @@ function JawGrid({
 }) {
   const left = numbers.slice(0, 8);
   const right = numbers.slice(8);
+
+  // Count how many treatment items belong to each tooth
+  const treatmentCounts: Record<number, number> = {};
+  for (const row of plan.treatments ?? []) {
+    if (row.kind === "visit") {
+      for (const item of row.items) {
+        if (item.toothNumber != null) {
+          treatmentCounts[item.toothNumber] = (treatmentCounts[item.toothNumber] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-x-5 gap-y-1.5 sm:grid-cols-2">
       {[left, right].map((col, i) => (
-        <div key={i} className="space-y-2">
+        <div key={i} className="space-y-1.5">
           {col.map((n) => {
             const t = plan.teeth[n];
             const isSel = selected === n;
             const status = t?.status ?? "intact";
-            const set = status !== "intact";
-            const baseLabel = t?.note || (set ? STATUS_META[status].label : "");
+            const hasStatus = status !== "intact";
+            const meta = STATUS_META[status];
+            const baseLabel = t?.note || (hasStatus ? meta.label : "");
             const dx = (t?.diagnosis ?? []).filter(Boolean);
-            const chipLabel = baseLabel
-              ? dx.length
-                ? `${baseLabel} - ${dx.join(", ")}`
-                : baseLabel
-              : "";
+            const txCount = treatmentCounts[n] ?? 0;
+
             return (
               <div
                 key={n}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-left text-sm transition-all",
-                  isSel ? "ring-1 ring-primary bg-primary/5" : "hover:bg-muted",
+                  "group relative flex w-full items-stretch overflow-hidden rounded-xl border text-left text-sm transition-all duration-150",
+                  isSel
+                    ? "border-primary/50 bg-primary/[0.04] shadow-sm ring-1 ring-primary/30"
+                    : hasStatus
+                      ? "border-border/60 bg-card hover:border-primary/30 hover:bg-primary/[0.02] hover:shadow-sm"
+                      : "border-border/40 bg-muted/30 hover:bg-muted/60 hover:border-border/60",
                 )}
               >
-                <button
-                  type="button"
-                  onClick={() => onSelect(n)}
-                  className={cn(
-                    "min-w-[26px] text-sm font-semibold tabular-nums text-left",
-                    isSel ? "text-primary" : "text-foreground/70",
-                  )}
-                >
-                  {n}
-                </button>
-                <div className="flex flex-1 flex-wrap items-center gap-1.5">
-                  {chipLabel && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-medium text-foreground/80 shadow-sm">
+                {/* Status accent bar */}
+                <div
+                  className="w-1 shrink-0 rounded-l-xl"
+                  style={{ background: hasStatus ? meta.color : "transparent" }}
+                />
+
+                <div className="flex flex-1 items-center gap-2.5 px-2.5 py-2">
+                  {/* Tooth number badge */}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(n)}
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold tabular-nums transition-colors",
+                      isSel
+                        ? "bg-primary text-primary-foreground"
+                        : hasStatus
+                          ? "text-foreground"
+                          : "bg-muted text-muted-foreground",
+                    )}
+                    style={
+                      hasStatus && !isSel
+                        ? { background: meta.bg, color: meta.ring }
+                        : undefined
+                    }
+                  >
+                    {n}
+                  </button>
+
+                  {/* Content area */}
+                  <div className="flex flex-1 min-w-0 flex-col gap-0.5">
+                    {/* Diagnosis chip */}
+                    {baseLabel ? (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onEditDiagnosis?.(n);
                         }}
-                        className="cursor-pointer hover:underline"
+                        className="flex items-center gap-1.5 text-left"
                       >
-                        {chipLabel}
+                        {/* Status dot */}
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: meta.color }}
+                        />
+                        <span className="truncate text-[12px] font-semibold text-foreground/90 hover:underline">
+                          {baseLabel}
+                        </span>
                       </button>
+                    ) : (
+                      <span className="text-[11px] italic text-muted-foreground/60">
+                        Intact — no diagnosis
+                      </span>
+                    )}
+
+                    {/* Diagnosis detail tags */}
+                    {dx.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {dx.map((d) => (
+                          <span
+                            key={d}
+                            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                            style={{ background: meta.bg, color: meta.ring }}
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Treatment badge */}
+                  {txCount > 0 && (
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                      style={{ background: "#EBF1FB", color: "#1E4890" }}
+                      title={`${txCount} treatment item${txCount > 1 ? "s" : ""}`}
+                    >
+                      Tx×{txCount}
+                    </span>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(n)}
+                      className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label={`Select tooth ${n}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    {hasStatus && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -866,22 +953,14 @@ function JawGrid({
                             diagnosis: undefined,
                           });
                         }}
-                        className="rounded-full p-0.5 text-muted-foreground hover:bg-muted"
+                        className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         aria-label={`Clear tooth ${n}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
-                    </span>
-                  )}
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onSelect(n)}
-                  className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted"
-                  aria-label={`Select tooth ${n}`}
-                >
-                  <Plus className={cn("h-4 w-4", isSel ? "text-primary" : "text-muted-foreground")} />
-                </button>
               </div>
             );
           })}
@@ -891,6 +970,48 @@ function JawGrid({
   );
 }
 
+function RailRow({ icon, label, sub }: { icon: React.ReactNode; label: string; sub?: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm">
+      <span className="grid h-7 w-7 place-items-center rounded-md bg-muted text-muted-foreground">{icon}</span>
+      <div className="min-w-0">
+        <div className="truncate font-medium">{label}</div>
+        {sub && <div className="truncate text-[10px] text-muted-foreground">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function RailButton({
+  icon, label, onClick, disabled, danger, active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        disabled
+          ? "cursor-not-allowed text-muted-foreground/50"
+          : active
+          ? "bg-primary/10 text-primary"
+          : danger
+          ? "text-destructive hover:bg-destructive/10"
+          : "text-foreground/80 hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <span className={cn(disabled ? "opacity-50" : "")}>{icon}</span>
+      {label}
+    </button>
+  );
+}
 
 function NoteRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [editing, setEditing] = useState(false);

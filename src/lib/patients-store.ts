@@ -706,17 +706,13 @@ export const patientsStore = {
   },
 };
 
-export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string }> = {
-  intact: { label: "Intact", color: "oklch(0.96 0.012 160)", ring: "oklch(0.7 0.04 165)" },
-  missing: { label: "Missing", color: "oklch(0.92 0.005 0)", ring: "oklch(0.55 0.02 0)" },
-  caries: { label: "Caries", color: "oklch(0.78 0.16 50)", ring: "oklch(0.55 0.18 40)" },
-  filled: { label: "Filled", color: "oklch(0.55 0.05 250)", ring: "oklch(0.35 0.04 250)" },
-  crown: { label: "Crown", color: "oklch(0.85 0.14 90)", ring: "oklch(0.6 0.13 80)" },
-  "root-treated": {
-    label: "Root treated",
-    color: "oklch(0.65 0.18 25)",
-    ring: "oklch(0.45 0.16 25)",
-  },
-  implant: { label: "Implant", color: "oklch(0.45 0.04 250)", ring: "oklch(0.25 0.03 250)" },
-  bridge: { label: "Bridge", color: "oklch(0.7 0.13 280)", ring: "oklch(0.45 0.13 280)" },
+export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string; bg: string }> = {
+  intact:        { label: "Intact",       color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
+  missing:       { label: "Missing",      color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
+  caries:        { label: "Caries",       color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
+  filled:        { label: "Filled",       color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
+  crown:         { label: "Crown",        color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
+  "root-treated":{ label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
+  implant:       { label: "Implant",      color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
+  bridge:        { label: "Bridge",       color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
 };
