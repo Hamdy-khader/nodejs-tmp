@@ -17,7 +17,10 @@ export const adminTokenStore = {
   get: (): string | null =>
     storageAvailable() ? window.localStorage.getItem("bp_admin_token") : null,
   set: (t: string): void => {
-    if (storageAvailable()) window.localStorage.setItem("bp_admin_token", t);
+    if (storageAvailable()) {
+      window.localStorage.setItem("bp_admin_token", t);
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   clear: (): void => {
     if (storageAvailable()) {
@@ -33,7 +36,10 @@ export const clinicTokenStore = {
   get: (): string | null =>
     storageAvailable() ? window.localStorage.getItem("bp_clinic_token") : null,
   set: (t: string): void => {
-    if (storageAvailable()) window.localStorage.setItem("bp_clinic_token", t);
+    if (storageAvailable()) {
+      window.localStorage.setItem("bp_clinic_token", t);
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   clear: (): void => {
     if (storageAvailable()) {
