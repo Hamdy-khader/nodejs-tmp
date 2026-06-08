@@ -327,7 +327,6 @@ async function loadPlansFor(patientId: string, force = false) {
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
       state = { ...state, plans: [...plans, ...rest] };
       plansLoadedFor.add(patientId);
-      plans.forEach((plan) => planLoaded.add(plan.id));
       emit();
     } finally {
       plansInflight.delete(patientId);

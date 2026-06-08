@@ -8,7 +8,7 @@ import {
   UPPER_TEETH,
   LOWER_TEETH,
 } from "@/lib/patients-store";
-import { pricelistStore } from "@/lib/pricelist-store";
+import { pricelistStore, usePricelist } from "@/lib/pricelist-store";
 import { TeethChart } from "@/components/TeethChart";
 import {
   DropdownMenu,
@@ -55,7 +55,7 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
   {
     id: "dentures",
     label: "Dentures",
-    items: ["Temporary bridge", "Temporary crown", "Overdenture", "Overdentures", "Preci-vertix"],
+    items: ["Temporary bridge", "Temporary crown", "Overdenture", "Overdentures", "Pred-vertix"],
   },
   {
     id: "rct",
@@ -66,7 +66,7 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
       "Root canal treatment - 2 root",
       "Root canal treatment - 3 root",
       "Root canal re-treatment",
-      "Post",
+      "Post (Composite)",
       "Post preparation",
       "Parapulpal pin",
     ],
@@ -113,8 +113,8 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
       "Removable appliance",
       "Lingual braces",
       "Orthodontic retainer",
-      "Teeth whitening - external bleach",
-      "Teeth whitening - internal bleach",
+      "Teeth Whitening (External Bleach)",
+      "Teeth Whitening (Internal Bleach)",
       "Dental Hygiene Treatment",
       "Prevention & hygiene",
       "Topical fluoride",
@@ -127,7 +127,7 @@ const TREATMENT_GROUPS: TreatmentGroup[] = [
       "Custom...",
       "Local X-ray",
       "Accommodation",
-      "Transportation(Airport-Hotel-Clinic)",
+      "Transportation (Airport-Hotel-Clinic)",
       "Apicoectomy",
       "Core build-up",
       "Crown lengthening",
@@ -156,6 +156,8 @@ function teethBetween(a: number, b: number): number[] {
 }
 
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
+  // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
+  usePricelist();
   const [selected, setSelected] = useState<number | null>(null);
   const [customOpen, setCustomOpen] = useState<{ groupId: string } | null>(null);
   const [customText, setCustomText] = useState("");
