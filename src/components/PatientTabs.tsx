@@ -15,7 +15,7 @@ export function PatientTabs() {
   return (
     <div className="flex items-end gap-1 overflow-x-auto bg-[image:var(--gradient-hero)] px-3 pt-2">
       <Link
-        to="/"
+        to="/clinic"
         className="flex items-center gap-2 rounded-t-lg px-3 py-2 text-sm font-bold text-white/90 hover:text-white"
       >
         <Sparkle className="h-4 w-4 fill-current" />

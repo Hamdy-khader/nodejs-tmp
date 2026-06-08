@@ -308,71 +308,76 @@ function TemplateEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1100px] gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-border/60 bg-muted/40 px-6 py-4">
+      <DialogContent className="flex max-h-[80vh] max-w-[1100px] flex-col gap-0 overflow-hidden p-0">
+        {/* Fixed header */}
+        <DialogHeader className="shrink-0 border-b border-border/60 bg-muted/40 px-6 py-4">
           <DialogTitle className="text-base font-medium">
             {isNew ? "New template" : `Edit template: ${template?.title ?? ""}`}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 pt-5">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Template title"
-            className={cn(
-              "h-11 rounded-none border-0 border-b px-0 text-lg shadow-none focus-visible:ring-0",
-              touched && !title.trim() && "border-destructive",
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-6 pt-5">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Template title"
+              className={cn(
+                "h-11 rounded-none border-0 border-b px-0 text-lg shadow-none focus-visible:ring-0",
+                touched && !title.trim() && "border-destructive",
+              )}
+            />
+            {touched && !title.trim() && (
+              <p className="mt-1 text-xs text-destructive">Required field</p>
             )}
-          />
-          {touched && !title.trim() && (
-            <p className="mt-1 text-xs text-destructive">Required field</p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-[260px_1fr] gap-5 p-6">
-          {/* Tools */}
-          <div className="space-y-5">
-            <ToolGroup label="Format">
-              <ToolBtn icon={Bold} label="Bold" onClick={() => exec("bold")} />
-              <ToolBtn icon={Italic} label="Italic" onClick={() => exec("italic")} />
-              <ToolBtn icon={Underline} label="Underline" onClick={() => exec("underline")} />
-            </ToolGroup>
-
-            <ToolGroup label="Alignments">
-              <ToolBtn icon={AlignLeft} label="Left" onClick={() => exec("justifyLeft")} />
-              <ToolBtn icon={AlignCenter} label="Center" onClick={() => exec("justifyCenter")} />
-              <ToolBtn icon={AlignRight} label="Right" onClick={() => exec("justifyRight")} />
-              <ToolBtn icon={AlignJustify} label="Justify" onClick={() => exec("justifyFull")} />
-            </ToolGroup>
-
-            <ToolGroup label="Layouts">
-              <ToolBtn icon={Columns2} label="2 Columns" onClick={() => insertColumns(2)} />
-              <ToolBtn icon={Columns3} label="3 Columns" onClick={() => insertColumns(3)} />
-              <ToolBtn icon={Columns4} label="4 Columns" onClick={() => insertColumns(4)} />
-            </ToolGroup>
-
-            <ToolGroup label="Media">
-              <ToolBtn icon={ImageIcon} label="Image" onClick={insertImage} />
-            </ToolGroup>
-
-            <ToolGroup label="Advanced">
-              <ToolBtn icon={UserCog} label="Patient data" onClick={insertPatientData} />
-              <ToolBtn icon={Code2} label="Source" onClick={editSource} />
-            </ToolGroup>
           </div>
 
-          {/* Canvas */}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => setBody((e.target as HTMLDivElement).innerHTML)}
-            className="min-h-[460px] rounded-md border border-border bg-white p-5 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary/40 [&_table]:w-full [&_td]:p-2"
-          />
+          <div className="grid grid-cols-[260px_1fr] gap-5 p-6">
+            {/* Tools */}
+            <div className="space-y-5">
+              <ToolGroup label="Format">
+                <ToolBtn icon={Bold} label="Bold" onClick={() => exec("bold")} />
+                <ToolBtn icon={Italic} label="Italic" onClick={() => exec("italic")} />
+                <ToolBtn icon={Underline} label="Underline" onClick={() => exec("underline")} />
+              </ToolGroup>
+
+              <ToolGroup label="Alignments">
+                <ToolBtn icon={AlignLeft} label="Left" onClick={() => exec("justifyLeft")} />
+                <ToolBtn icon={AlignCenter} label="Center" onClick={() => exec("justifyCenter")} />
+                <ToolBtn icon={AlignRight} label="Right" onClick={() => exec("justifyRight")} />
+                <ToolBtn icon={AlignJustify} label="Justify" onClick={() => exec("justifyFull")} />
+              </ToolGroup>
+
+              <ToolGroup label="Layouts">
+                <ToolBtn icon={Columns2} label="2 Columns" onClick={() => insertColumns(2)} />
+                <ToolBtn icon={Columns3} label="3 Columns" onClick={() => insertColumns(3)} />
+                <ToolBtn icon={Columns4} label="4 Columns" onClick={() => insertColumns(4)} />
+              </ToolGroup>
+
+              <ToolGroup label="Media">
+                <ToolBtn icon={ImageIcon} label="Image" onClick={insertImage} />
+              </ToolGroup>
+
+              <ToolGroup label="Advanced">
+                <ToolBtn icon={UserCog} label="Patient data" onClick={insertPatientData} />
+                <ToolBtn icon={Code2} label="Source" onClick={editSource} />
+              </ToolGroup>
+            </div>
+
+            {/* Canvas */}
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={(e) => setBody((e.target as HTMLDivElement).innerHTML)}
+              className="min-h-[460px] rounded-md border border-border bg-white p-5 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary/40 [&_table]:w-full [&_td]:p-2"
+            />
+          </div>
         </div>
 
-        <DialogFooter className="border-t border-border/60 bg-muted/30 px-6 py-3">
+        {/* Fixed footer */}
+        <DialogFooter className="shrink-0 border-t border-border/60 bg-muted/30 px-6 py-3">
           <Button onClick={save} className="gap-2">
             <Save className="size-4" />
             Save

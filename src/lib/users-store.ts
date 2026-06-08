@@ -194,7 +194,7 @@ export const usersStore = {
   get: () => state,
   subscribe(listener: () => void) {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => { listeners.delete(listener); };
   },
 
   async reload() {

@@ -17,10 +17,16 @@ export const adminTokenStore = {
   get: (): string | null =>
     storageAvailable() ? window.localStorage.getItem("bp_admin_token") : null,
   set: (t: string): void => {
-    if (storageAvailable()) window.localStorage.setItem("bp_admin_token", t);
+    if (storageAvailable()) {
+      window.localStorage.setItem("bp_admin_token", t);
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   clear: (): void => {
-    if (storageAvailable()) window.localStorage.removeItem("bp_admin_token");
+    if (storageAvailable()) {
+      window.localStorage.removeItem("bp_admin_token");
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   exists: (): boolean => Boolean(adminTokenStore.get()),
 };
@@ -30,10 +36,16 @@ export const clinicTokenStore = {
   get: (): string | null =>
     storageAvailable() ? window.localStorage.getItem("bp_clinic_token") : null,
   set: (t: string): void => {
-    if (storageAvailable()) window.localStorage.setItem("bp_clinic_token", t);
+    if (storageAvailable()) {
+      window.localStorage.setItem("bp_clinic_token", t);
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   clear: (): void => {
-    if (storageAvailable()) window.localStorage.removeItem("bp_clinic_token");
+    if (storageAvailable()) {
+      window.localStorage.removeItem("bp_clinic_token");
+      window.dispatchEvent(new CustomEvent("auth:changed"));
+    }
   },
   exists: (): boolean => Boolean(clinicTokenStore.get()),
 };
@@ -159,6 +171,12 @@ export interface PricelistData {
   sections: PricelistSection[];
 }
 
+export interface XrayRecord {
+  id: string;
+  file_url: string;
+  sort_order: number;
+}
+
 export interface ClinicAuthData {
   token: string;
   clinic_user: ClinicUser;
@@ -224,6 +242,16 @@ async function request<T>(
 
   if (!res.ok) {
     const err = json?.error ?? json ?? {};
+    if (res.status === 401 && typeof window !== "undefined") {
+      const isAdmin = path.startsWith("/admin");
+      if (isAdmin) {
+        adminTokenStore.clear();
+        window.location.href = "/admin/login";
+      } else {
+        clinicTokenStore.clear();
+        window.location.href = "/clinic/login";
+      }
+    }
     throw new ApiError(
       err.code ?? "UNKNOWN_ERROR",
       err.message ?? `Request failed (${res.status})`,
@@ -255,6 +283,54 @@ function clinicReq<T>(
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
   return request<T>(method, path, clinicTokenStore.get(), body, params);
+}
+
+async function clinicDownloadReq(path: string): Promise<Blob> {
+  const url = new URL(`${API_BASE}${path}`);
+  const token = clinicTokenStore.get();
+  const res = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/pdf,application/octet-stream,*/*",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    throw new ApiError("DOWNLOAD_FAILED", `Download failed (${res.status})`, res.status);
+  }
+  return res.blob();
+}
+
+async function clinicUploadReq<T>(path: string, formData: FormData): Promise<T> {
+  const url = new URL(`${API_BASE}${path}`);
+  const token = clinicTokenStore.get();
+
+  // No Content-Type header — the browser sets multipart/form-data with the boundary itself.
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const json = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const err = json?.error ?? json ?? {};
+    if (res.status === 401 && typeof window !== "undefined") {
+      clinicTokenStore.clear();
+      window.location.href = "/clinic/login";
+    }
+    throw new ApiError(
+      err.code ?? "UNKNOWN_ERROR",
+      err.message ?? `Upload failed (${res.status})`,
+      res.status,
+      err.errors,
+    );
+  }
+
+  return (json?.data ?? json) as T;
 }
 
 export const adminApi = {
@@ -416,8 +492,14 @@ export const clinicApi = {
       toothNumber: number,
       body: Record<string, unknown>,
     ): Promise<unknown> => clinicReq("PATCH", `/clinic/plans/${planId}/teeth/${toothNumber}`, body),
-    addXray: (planId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
-      clinicReq("POST", `/clinic/plans/${planId}/xrays`, body),
+    listXrays: (planId: string): Promise<XrayRecord[]> =>
+      clinicReq("GET", `/clinic/plans/${planId}/xrays`),
+    addXray: (planId: string, file: File, sortOrder?: number): Promise<XrayRecord> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (sortOrder != null) formData.append("sort_order", String(sortOrder));
+      return clinicUploadReq<XrayRecord>(`/clinic/plans/${planId}/xrays`, formData);
+    },
     deleteXray: (planId: string, xrayId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/plans/${planId}/xrays/${xrayId}`),
     setGeneralStatuses: (planId: string, items: { label: string }[]): Promise<unknown> =>
@@ -449,6 +531,8 @@ export const clinicApi = {
       clinicReq("PATCH", `/clinic/plans/${planId}/rows/${rowId}/items/${itemId}`, body),
     deleteItem: (planId: string, rowId: string, itemId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/plans/${planId}/rows/${rowId}/items/${itemId}`),
+    downloadDocument: (planId: string): Promise<Blob> =>
+      clinicDownloadReq(`/clinic/plans/${planId}/document`),
   },
 
   templates: {

@@ -1,35 +1,22 @@
 import {
-  Check,
-  AlertCircle,
   UserPlus,
   Users as UsersIcon,
   Wallet,
-  HelpCircle,
-  MessageCircle,
   FileText,
-  FolderOpen,
-  Lightbulb,
-  UserCog,
-  Workflow,
-  CreditCard,
-  Play,
+  LayoutTemplate,
+  Settings,
   Bell,
   Search,
-  Save,
+  ArrowRight,
+  TrendingUp,
+  CalendarDays,
+  ClipboardList,
+  Stethoscope,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { clinicApi, type ClinicUser } from "@/lib/admin/api";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
-import { toast } from "sonner";
+import { usePatients } from "@/lib/patients-store";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -39,59 +26,31 @@ function getInitials(name: string): string {
     .join("");
 }
 
-const steps = [
-  { n: 1, title: "Synopsis", state: "done" as const },
-  { n: 2, title: "Your First Plan", state: "done" as const },
-  { n: 3, title: "Watch the Tutorials", state: "todo" as const },
-];
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
-const tiles: { title: string; icon: typeof UserPlus; primary?: boolean; to: string }[] = [
-  { title: "New Patient", icon: UserPlus, primary: true, to: "/patients" },
-  { title: "All Patients", icon: UsersIcon, to: "/patients" },
-  { title: "Your Clinic Fees", icon: Wallet, to: "/clinic-fees" },
-  { title: "Help Center", icon: HelpCircle, to: "/" },
-  { title: "Live Support", icon: MessageCircle, to: "/" },
+const quickActions: {
+  title: string;
+  desc: string;
+  icon: typeof UserPlus;
+  to: string;
+  accent?: boolean;
+}[] = [
+  { title: "New Patient", desc: "Register a new patient", icon: UserPlus, to: "/patients", accent: true },
+  { title: "All Patients", desc: "Browse patient records", icon: UsersIcon, to: "/patients" },
+  { title: "Clinic Fees", desc: "Manage your price list", icon: Wallet, to: "/clinic-fees" },
+  { title: "Templates", desc: "Edit document templates", icon: LayoutTemplate, to: "/templates" },
+  { title: "Documents", desc: "Patient documents & PDFs", icon: FileText, to: "/documents" },
+  { title: "Plan Settings", desc: "Customize PDF output", icon: Settings, to: "/plan-settings" },
 ];
-
-const utilities = [
-  { title: "PDF Settings", desc: "Edit the appearance of the cover and the pages", icon: FileText },
-  {
-    title: "Documents, Videos",
-    desc: "About your clinic, dentists, treatments, etc.",
-    icon: FolderOpen,
-  },
-  { title: "Smart Plans", desc: "Create complex plans with just a few clicks", icon: Lightbulb },
-  { title: "User Manager", desc: "Add users and manage permissions", icon: UserCog },
-  { title: "Integrations", desc: "Connect BrightPlans to your other systems", icon: Workflow },
-  { title: "Subscription", desc: "Manage your BrightPlans subscription", icon: CreditCard },
-];
-
-const tutorials = [
-  { title: "Create Plans", duration: "3:55", state: "new" as const },
-  { title: "Setup", duration: "3:33", state: "watched" as const },
-  { title: "Smart Plans", duration: "2:06", state: "watched" as const },
-];
-
-const ACCOUNT_LANGUAGES = [
-  { value: "English (EN)", label: "English (EN)" },
-  { value: "Arabic (AR)", label: "Arabic (AR)" },
-  { value: "Deutsch (DE)", label: "Deutsch (DE)" },
-  { value: "Francais (FR)", label: "Francais (FR)" },
-  { value: "Espanol (ES)", label: "Espanol (ES)" },
-];
-
-const ACCOUNT_CURRENCIES = ["USD", "EUR", "GBP", "SAR", "AED", "TRY", "EGP"];
 
 export function Dashboard() {
   const [clinicUser, setClinicUser] = useState<ClinicUser | null>(null);
-  const settings = usePlanSettings();
-  const [language, setLanguage] = useState(settings.language);
-  const [currency, setCurrency] = useState(settings.pricePage.currency);
-  const [savingPrefs, setSavingPrefs] = useState(false);
-  const progress = 89;
-  const radius = 56;
-  const circ = 2 * Math.PI * radius;
-  const offset = circ - (progress / 100) * circ;
+  const patients = usePatients();
 
   useEffect(() => {
     clinicApi
@@ -100,48 +59,62 @@ export function Dashboard() {
       .catch(() => null);
   }, []);
 
-  useEffect(() => {
-    setLanguage(settings.language);
-    setCurrency(settings.pricePage.currency);
-  }, [settings.language, settings.pricePage.currency]);
-
   const displayName = clinicUser?.full_name ?? "";
   const initials = displayName ? getInitials(displayName) : "??";
+  const clinicName = clinicUser?.clinic?.name ?? "Your Clinic";
 
-  const savePreferences = async () => {
-    setSavingPrefs(true);
-    try {
-      planSettingsStore.update({
-        language,
-        pricePage: {
-          ...settings.pricePage,
-          currency,
-        },
-      });
-      toast.success("Account defaults saved");
-    } finally {
-      setSavingPrefs(false);
-    }
-  };
+  const stats = [
+    {
+      label: "Total patients",
+      value: patients.length,
+      icon: UsersIcon,
+      color: "bg-blue-50 text-blue-600",
+      trend: null,
+    },
+    {
+      label: "Active plans",
+      value: "—",
+      icon: ClipboardList,
+      color: "bg-emerald-50 text-emerald-600",
+      trend: null,
+    },
+    {
+      label: "This month",
+      value: new Date().toLocaleString("default", { month: "long" }),
+      icon: CalendarDays,
+      color: "bg-violet-50 text-violet-600",
+      trend: null,
+    },
+    {
+      label: "Diagnosis types",
+      value: "8",
+      icon: Stethoscope,
+      color: "bg-amber-50 text-amber-600",
+      trend: null,
+    },
+  ];
+
+  // Recent patients (last 5)
+  const recent = [...patients].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
 
   return (
-    <div className="space-y-8 p-6 lg:p-8">
+    <div className="space-y-6 p-6 lg:p-8">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Welcome back{displayName ? `, ${displayName}` : ""}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Let's keep your clinic shining today.
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {clinicName}
           </p>
+          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-foreground">
+            {greeting()}{displayName ? `, ${displayName.split(" ")[0]}` : ""}
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative hidden md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder="Search patients, plans..."
-              className="h-10 w-72 rounded-xl border border-border bg-card pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              placeholder="Search patients, plans…"
+              className="h-10 w-64 rounded-xl border border-border bg-card pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <button className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:text-foreground">
@@ -156,239 +129,168 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Hero / Onboarding */}
-      <section className="rounded-3xl border border-border/60 bg-card p-6 shadow-[var(--shadow-soft)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight text-foreground">
-              Account defaults
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Diagnosis and patient flows now use one shared language and currency from your
-              account.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <div className="min-w-[190px]">
-              <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Language" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_LANGUAGES.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-[140px]">
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_CURRENCIES.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {item}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={savePreferences} className="gap-2" disabled={savingPrefs}>
-              <Save className="h-4 w-4" />
-              {savingPrefs ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section
-        className="relative overflow-hidden rounded-3xl p-8 shadow-[var(--shadow-soft)]"
-        style={{ background: "var(--gradient-hero)" }}
-      >
-        {/* Pattern */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-            backgroundSize: "22px 22px",
-          }}
-        />
-        <div className="relative grid items-center gap-8 lg:grid-cols-[auto_1fr]">
-          {/* Progress ring */}
-          <div className="flex items-center justify-center">
-            <div className="relative h-40 w-40">
-              <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
-                <circle
-                  cx="70"
-                  cy="70"
-                  r={radius}
-                  className="fill-none stroke-white/15"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="70"
-                  cy="70"
-                  r={radius}
-                  className="fill-none stroke-accent"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={circ}
-                  strokeDashoffset={offset}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-3xl font-bold text-white">{progress}%</span>
-                <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/70">
-                  Onboarding
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map((s) => {
+          const Icon = s.icon;
+          return (
+            <div
+              key={s.label}
+              className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  {s.label}
                 </span>
-                <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/70">
-                  Incomplete
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Steps */}
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-2">
-            {steps.map((s, i) => (
-              <div key={s.n} className="flex flex-1 items-start gap-3">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`grid h-10 w-10 place-items-center rounded-full ring-4 ring-white/10 ${
-                      s.state === "done"
-                        ? "bg-success text-success-foreground"
-                        : "bg-accent text-accent-foreground"
-                    }`}
-                  >
-                    {s.state === "done" ? (
-                      <Check className="h-5 w-5" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5" />
-                    )}
-                  </div>
-                  {i < steps.length - 1 && (
-                    <div className="mt-2 hidden h-px w-full bg-white/15 sm:block" />
-                  )}
-                </div>
-                <div className="pt-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
-                    Step {s.n}
-                  </div>
-                  <div className="mt-0.5 text-base font-semibold text-white">{s.title}</div>
-                  {s.state === "done" ? (
-                    <span className="mt-2 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
-                      Completed
-                    </span>
-                  ) : (
-                    <button className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background transition hover:opacity-90">
-                      Let's begin!
-                    </button>
-                  )}
+                <div className={`grid h-8 w-8 place-items-center rounded-lg text-sm ${s.color}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="mt-3 text-2xl font-bold tracking-tight text-foreground">
+                {s.value}
+              </div>
+              {s.trend && (
+                <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                  <TrendingUp className="h-3 w-3" /> {s.trend}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Quick actions */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Quick actions
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {quickActions.map((a) => {
+            const Icon = a.icon;
+            return (
+              <Link
+                to={a.to}
+                key={a.title}
+                className={`group flex flex-col items-center justify-center gap-2 rounded-2xl border p-5 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${
+                  a.accent
+                    ? "border-primary/20 bg-primary text-primary-foreground shadow-[var(--shadow-glow)]"
+                    : "border-border/60 bg-card text-foreground hover:border-primary/30 hover:bg-primary/[0.03]"
+                }`}
+              >
+                <Icon
+                  className={`h-6 w-6 ${a.accent ? "text-accent" : "text-primary/70 group-hover:text-primary"}`}
+                />
+                <span className="text-xs font-semibold leading-tight">{a.title}</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
       {/* Main grid */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-6">
-          {/* Tiles */}
-          <div className="rounded-2xl bg-card p-5 shadow-[var(--shadow-soft)]">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-              {tiles.map((t) => {
-                const Icon = t.icon;
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        {/* Recent patients */}
+        <section className="rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-soft)]">
+          <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
+            <h2 className="font-semibold text-foreground">Recent Patients</h2>
+            <Link
+              to="/patients"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          {recent.length === 0 ? (
+            <div className="px-6 py-10 text-center">
+              <UsersIcon className="mx-auto h-8 w-8 text-muted-foreground/40" />
+              <p className="mt-2 text-sm text-muted-foreground">No patients yet.</p>
+              <Link
+                to="/patients"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Add first patient
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border/50">
+              {recent.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    to="/patients/$patientId"
+                    params={{ patientId: p.id }}
+                    className="flex items-center gap-3 px-6 py-3.5 transition hover:bg-muted/40"
+                  >
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                      {getInitials(p.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-foreground">{p.name}</div>
+                      {p.phone && (
+                        <div className="truncate text-xs text-muted-foreground">{p.phone}</div>
+                      )}
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Right panel: Clinic summary */}
+        <aside className="space-y-4">
+          {/* Clinic info card */}
+          <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Clinic
+            </h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Name</span>
+                <span className="font-medium text-foreground truncate ml-2 text-right">{clinicName}</span>
+              </div>
+              {clinicUser?.email && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Email</span>
+                  <span className="font-medium text-foreground truncate ml-2 text-right">{clinicUser.email}</span>
+                </div>
+              )}
+              {clinicUser?.role && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Role</span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+                    {clinicUser.role}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Shortcuts */}
+          <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-soft)]">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Settings
+            </h3>
+            <div className="space-y-1">
+              {[
+                { label: "Plan Settings", to: "/plan-settings", icon: Settings },
+                { label: "Users", to: "/users", icon: UsersIcon },
+                { label: "Templates", to: "/templates", icon: LayoutTemplate },
+              ].map((item) => {
+                const Icon = item.icon;
                 return (
                   <Link
-                    to={t.to}
-                    key={t.title}
-                    className={`group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-2xl p-4 text-center transition-all duration-300 hover:-translate-y-0.5 ${
-                      t.primary
-                        ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
-                        : "bg-secondary text-secondary-foreground hover:bg-primary/5"
-                    }`}
+                    key={item.label}
+                    to={item.to}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-foreground/80 transition hover:bg-muted/60 hover:text-foreground"
                   >
-                    <Icon
-                      className={`mb-3 h-7 w-7 ${t.primary ? "text-accent" : "text-primary/70"}`}
-                    />
-                    <span className="text-sm font-semibold leading-tight">{t.title}</span>
-                    {t.primary && (
-                      <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-                        +
-                      </span>
-                    )}
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    {item.label}
+                    <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/50" />
                   </Link>
                 );
               })}
             </div>
-          </div>
-
-          {/* Utility cards */}
-          <div className="rounded-2xl bg-card p-5 shadow-[var(--shadow-soft)]">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {utilities.map((u) => {
-                const Icon = u.icon;
-                return (
-                  <button
-                    key={u.title}
-                    className="group flex items-start gap-3 rounded-xl border border-border/60 bg-background p-4 text-left transition hover:border-primary/30 hover:bg-primary/[0.03]"
-                  >
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">{u.title}</div>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        {u.desc}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Tutorials */}
-        <aside className="rounded-2xl bg-card p-5 shadow-[var(--shadow-soft)]">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">Tutorials</h2>
-            <button className="text-xs font-medium text-primary hover:underline">View all</button>
-          </div>
-          <div className="space-y-3">
-            {tutorials.map((t) => (
-              <div
-                key={t.title}
-                className="flex items-center gap-3 rounded-xl border border-border/60 p-3 transition hover:border-primary/30 hover:bg-primary/[0.03]"
-              >
-                <div
-                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-                    t.state === "new"
-                      ? "bg-[image:var(--gradient-accent)] text-accent-foreground shadow-[var(--shadow-glow)]"
-                      : "bg-secondary text-muted-foreground"
-                  }`}
-                >
-                  <Play className="h-4 w-4 fill-current" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-foreground">{t.title}</div>
-                  <div
-                    className={`text-[11px] font-semibold uppercase tracking-wider ${
-                      t.state === "new" ? "text-accent" : "text-muted-foreground"
-                    }`}
-                  >
-                    {t.state === "new" ? "Watch now" : "Watch again"}
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground">{t.duration}</span>
-              </div>
-            ))}
           </div>
         </aside>
       </div>

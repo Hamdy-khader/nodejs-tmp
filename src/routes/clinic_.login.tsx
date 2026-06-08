@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 
-export const Route = createFileRoute("/clinic/login")({
+export const Route = createFileRoute("/clinic_/login")({
   validateSearch: (search: Record<string, unknown>) => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
@@ -12,9 +12,9 @@ export const Route = createFileRoute("/clinic/login")({
 });
 
 function cleanClinicRedirect(value: unknown) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value === "/login" || value === "/clinic/login" || value === "/admin/login") return "/";
-  if (value.startsWith("/admin")) return "/";
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/clinic";
+  if (value === "/clinic/login" || value === "/admin/login" || value === "/") return "/clinic";
+  if (value.startsWith("/admin")) return "/clinic";
   return value;
 }
 

@@ -5,12 +5,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { patientsStore } from "@/lib/patients-store";
+import { patientsStore, type XrayImage } from "@/lib/patients-store";
 import { cn } from "@/lib/utils";
 
 interface XrayPanelProps {
   planId: string;
-  xrays: string[];
+  xrays: XrayImage[];
   onClose: () => void;
 }
 
@@ -26,7 +26,12 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
   const [index, setIndex] = useState(0);
   const [adjust, setAdjust] = useState<ImageAdjust>(DEFAULT_ADJUST);
   const [fullscreen, setFullscreen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void patientsStore.loadXrays(planId);
+  }, [planId]);
 
   useEffect(() => {
     if (index >= xrays.length) setIndex(Math.max(0, xrays.length - 1));
@@ -38,27 +43,21 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const reads = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map(
-        (f) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(f);
-          }),
-      );
-    const dataUrls = await Promise.all(reads);
-    if (dataUrls.length) {
-      patientsStore.addXrays(planId, dataUrls);
+    const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return;
+    setUploading(true);
+    try {
+      await patientsStore.addXrays(planId, images);
       setIndex(xrays.length);
+    } finally {
+      setUploading(false);
     }
   };
 
   const remove = () => {
-    if (xrays.length === 0) return;
-    patientsStore.removeXray(planId, index);
+    const target = xrays[index];
+    if (!target) return;
+    void patientsStore.removeXray(planId, target.id);
   };
 
   const current = xrays[index];
@@ -75,8 +74,8 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-wider text-primary">X-ray</h3>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => fileInput.current?.click()}>
-              <UploadCloud className="h-4 w-4" /> Upload
+            <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileInput.current?.click()}>
+              <UploadCloud className="h-4 w-4" /> {uploading ? "Uploading…" : "Upload"}
             </Button>
             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -113,7 +112,7 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
             {current ? (
               <>
                 <img
-                  src={current}
+                  src={current.url}
                   alt={`X-ray ${index + 1}`}
                   className="max-h-full max-w-full select-none object-contain"
                   style={filterStyle}
@@ -217,9 +216,9 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
 
             {xrays.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {xrays.map((src, i) => (
+                {xrays.map((xray, i) => (
                   <button
-                    key={i}
+                    key={xray.id}
                     type="button"
                     onClick={() => setIndex(i)}
                     className={cn(
@@ -227,7 +226,7 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
                       i === index ? "border-primary" : "border-border/60 opacity-70 hover:opacity-100",
                     )}
                   >
-                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <img src={xray.url} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -241,7 +240,7 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
           <div className="relative flex h-[90vh] w-full items-center justify-center overflow-hidden">
             {current && (
               <img
-                src={current}
+                src={current.url}
                 alt={`X-ray ${index + 1}`}
                 className="max-h-full max-w-full object-contain"
                 style={filterStyle}

@@ -31,13 +31,19 @@ export type TreatmentRow =
   | { id: string; kind: "healing"; label?: string; note?: string; days?: number }
   | { id: string; kind: "discount"; note?: string; mode: "amount" | "percent"; value: number };
 
+export interface XrayImage {
+  id: string;
+  url: string;
+  sortOrder: number;
+}
+
 export interface TreatmentPlan {
   id: string;
   patientId: string;
   name: string;
   notes: string;
   teeth: Record<number, ToothState>;
-  xrays?: string[];
+  xrays?: XrayImage[];
   generalStatuses?: string[];
   treatments?: TreatmentRow[];
   treatmentNote?: string;
@@ -193,13 +199,19 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
     if (tooth.number) teeth[tooth.number] = tooth;
   });
 
-  const xraysRaw = Array.isArray(raw.xrays) ? raw.xrays : [];
-  const generalStatusesRaw = Array.isArray(raw.general_statuses) ? raw.general_statuses : [];
+  const xraysRaw = Array.isArray(raw.xrays) ? raw.xrays : Array.isArray(raw.xray) ? raw.xray : [];
+  const generalStatusesRaw = Array.isArray(raw.general_statuses)
+    ? raw.general_statuses
+    : Array.isArray(raw.general_status)
+      ? raw.general_status
+      : [];
   const treatmentRowsRaw = Array.isArray(raw.treatment_rows)
     ? raw.treatment_rows
     : Array.isArray(raw.treatments)
       ? raw.treatments
-      : [];
+      : Array.isArray(raw.rows)
+        ? raw.rows
+        : [];
 
   return {
     id: String(raw.id ?? uid()),
@@ -208,10 +220,21 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
     notes: String(raw.notes ?? ""),
     teeth,
     xrays: xraysRaw
-      .map((item) =>
-        typeof item === "string" ? item : String((item as Record<string, unknown>).file_url ?? ""),
-      )
-      .filter(Boolean),
+      .map((item, index): XrayImage | null => {
+        if (typeof item === "string") {
+          return item ? { id: item, url: item, sortOrder: index + 1 } : null;
+        }
+        const rec = item as Record<string, unknown>;
+        const url = String(rec.file_url ?? rec.url ?? "");
+        if (!url) return null;
+        return {
+          id: String(rec.id ?? url),
+          url,
+          sortOrder: Number(rec.sort_order ?? index + 1),
+        };
+      })
+      .filter((item): item is XrayImage => item !== null)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
     generalStatuses: generalStatusesRaw
       .map((item) =>
         typeof item === "string" ? item : String((item as Record<string, unknown>).label ?? ""),
@@ -325,7 +348,9 @@ async function loadPlansFor(patientId: string, force = false) {
       const rows = Array.isArray(res) ? res : (res.data ?? []);
       const plans = rows.map((item) => toPlan(item, patientId));
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
-      state = { ...state, plans: [...plans, ...rest] };
+      // preserve any plans already fetched via the detail endpoint (they have full data)
+      const merged = plans.map((p) => (planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p));
+      state = { ...state, plans: [...merged, ...rest] };
       plansLoadedFor.add(patientId);
       emit();
     } finally {
@@ -416,11 +441,12 @@ export function usePlansFor(patientId: string | undefined) {
   );
 }
 
-export function usePlan(id: string | undefined) {
+export function usePlan(id: string | undefined, patientId?: string) {
   const plan = getPlanById(id);
+  const resolvedPatientId = patientId ?? plan?.patientId;
   useEffect(() => {
-    if (plan?.patientId && id) void loadPlan(plan.patientId, id);
-  }, [plan?.patientId, id]);
+    if (resolvedPatientId && id) void loadPlan(resolvedPatientId, id);
+  }, [resolvedPatientId, id]);
   return useSyncExternalStore(
     subscribe,
     () => getPlanById(id),
@@ -673,41 +699,65 @@ export const patientsStore = {
     void clinicApi.plans.delete(plan.patientId, id);
   },
 
-  addXrays(planId: string, dataUrls: string[]) {
-    const plan = getPlanById(planId);
-    if (!plan) return;
-    updateLocalPlan(planId, { xrays: [...(plan.xrays ?? []), ...dataUrls] });
-    dataUrls.forEach((fileUrl, index) => {
-      void clinicApi.plans.addXray(planId, {
-        file_url: fileUrl,
-        sort_order: (plan.xrays?.length ?? 0) + index + 1,
-      });
-    });
+  async loadXrays(planId: string) {
+    if (!getPlanById(planId)) return;
+    try {
+      const records = await clinicApi.plans.listXrays(planId);
+      const xrays: XrayImage[] = (records ?? [])
+        .map((record) => ({
+          id: String(record.id),
+          url: String(record.file_url ?? ""),
+          sortOrder: Number(record.sort_order ?? 0),
+        }))
+        .filter((item) => item.url)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      if (getPlanById(planId)) updateLocalPlan(planId, { xrays });
+    } catch {
+      // keep whatever was embedded in the plan response on failure
+    }
   },
 
-  removeXray(planId: string, index: number) {
+  async addXrays(planId: string, files: File[]) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    const xrays = [...(plan.xrays ?? [])];
-    const removed = xrays[index];
-    updateLocalPlan(planId, { xrays: xrays.filter((_, itemIndex) => itemIndex !== index) });
-    if (removed) {
+    const startOrder = plan.xrays?.length ?? 0;
+    for (let index = 0; index < files.length; index += 1) {
+      const record = await clinicApi.plans.addXray(planId, files[index], startOrder + index + 1);
+      const current = getPlanById(planId);
+      if (!current) continue;
+      updateLocalPlan(planId, {
+        xrays: [
+          ...(current.xrays ?? []),
+          {
+            id: String(record.id),
+            url: String(record.file_url ?? ""),
+            sortOrder: Number(record.sort_order ?? startOrder + index + 1),
+          },
+        ],
+      });
+    }
+  },
+
+  async removeXray(planId: string, xrayId: string) {
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    const xrays = plan.xrays ?? [];
+    updateLocalPlan(planId, { xrays: xrays.filter((item) => item.id !== xrayId) });
+    try {
+      await clinicApi.plans.deleteXray(planId, xrayId);
+    } catch {
       void loadPlan(plan.patientId, planId, true).catch(() => null);
     }
   },
 };
 
-export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string }> = {
-  intact: { label: "Intact", color: "oklch(0.96 0.012 160)", ring: "oklch(0.7 0.04 165)" },
-  missing: { label: "Missing", color: "oklch(0.92 0.005 0)", ring: "oklch(0.55 0.02 0)" },
-  caries: { label: "Caries", color: "oklch(0.78 0.16 50)", ring: "oklch(0.55 0.18 40)" },
-  filled: { label: "Filled", color: "oklch(0.55 0.05 250)", ring: "oklch(0.35 0.04 250)" },
-  crown: { label: "Crown", color: "oklch(0.85 0.14 90)", ring: "oklch(0.6 0.13 80)" },
-  "root-treated": {
-    label: "Root treated",
-    color: "oklch(0.65 0.18 25)",
-    ring: "oklch(0.45 0.16 25)",
-  },
-  implant: { label: "Implant", color: "oklch(0.45 0.04 250)", ring: "oklch(0.25 0.03 250)" },
-  bridge: { label: "Bridge", color: "oklch(0.7 0.13 280)", ring: "oklch(0.45 0.13 280)" },
+export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string; bg: string }> = {
+  intact:        { label: "Intact",       color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
+  missing:       { label: "Missing",      color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
+  caries:        { label: "Caries",       color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
+  filled:        { label: "Filled",       color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
+  crown:         { label: "Crown",        color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
+  "root-treated":{ label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
+  implant:       { label: "Implant",      color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
+  bridge:        { label: "Bridge",       color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
 };
