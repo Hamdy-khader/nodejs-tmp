@@ -30,6 +30,10 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    void patientsStore.loadXrays(planId);
+  }, [planId]);
+
+  useEffect(() => {
     if (index >= xrays.length) setIndex(Math.max(0, xrays.length - 1));
   }, [xrays.length, index]);
 

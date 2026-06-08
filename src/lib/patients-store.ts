@@ -699,6 +699,24 @@ export const patientsStore = {
     void clinicApi.plans.delete(plan.patientId, id);
   },
 
+  async loadXrays(planId: string) {
+    if (!getPlanById(planId)) return;
+    try {
+      const records = await clinicApi.plans.listXrays(planId);
+      const xrays: XrayImage[] = (records ?? [])
+        .map((record) => ({
+          id: String(record.id),
+          url: String(record.file_url ?? ""),
+          sortOrder: Number(record.sort_order ?? 0),
+        }))
+        .filter((item) => item.url)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      if (getPlanById(planId)) updateLocalPlan(planId, { xrays });
+    } catch {
+      // keep whatever was embedded in the plan response on failure
+    }
+  },
+
   async addXrays(planId: string, files: File[]) {
     const plan = getPlanById(planId);
     if (!plan) return;
