@@ -223,7 +223,14 @@ function RootComponent() {
     navigate,
   ]);
 
+  const waitingForAdminSession = hasAdminToken && adminSessionValid === null;
+  const waitingForClinicSession = hasClinicToken && clinicSessionValid === null;
+
   // Auth pages (login screens) — bare layout
+  if ((isAdminLogin && waitingForAdminSession) || (isClinicLogin && waitingForClinicSession)) {
+    return <QueryClientProvider client={queryClient} />;
+  }
+
   if (isAuthPage) {
     return (
       <QueryClientProvider client={queryClient}>
@@ -241,11 +248,16 @@ function RootComponent() {
     );
   }
 
-  if (isAdminRoute && !hasAdminToken) {
+  if (isAdminRoute && (!hasAdminToken || adminSessionValid !== true)) {
     return <QueryClientProvider client={queryClient} />;
   }
 
-  if (!isAdminRoute && !isClinicLogin && !isPublicHome && !hasClinicToken) {
+  if (
+    !isAdminRoute &&
+    !isClinicLogin &&
+    !isPublicHome &&
+    (!hasClinicToken || clinicSessionValid !== true)
+  ) {
     return <QueryClientProvider client={queryClient} />;
   }
 
