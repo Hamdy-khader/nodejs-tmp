@@ -15,28 +15,81 @@ import { clinicApi } from "@/lib/admin/api";
 import { useTabs } from "@/lib/tabs-store";
 import { toast } from "sonner";
 
-interface DocRow { id: string; title: string; }
+interface DocRow { id: string; title: string; body?: string; }
+
+const FIXED_DOCUMENT_BODIES: Record<string, string> = {
+  "fixed:clinic:demo":
+    "Demo dentist profile. This page can include the clinic introduction, responsible dentist details, and a short message that presents the treatment plan in a patient-friendly format.",
+  "fixed:clinic:note":
+    "Custom clinic note. Update this text source later from settings or backend data when clinic-specific notes are available.",
+  "fixed:diagnosis:note":
+    "Custom diagnosis note. Update this text source later with the diagnosis-specific note configured for the patient or clinic.",
+  "fixed:treatments:note":
+    "Custom treatment note. Update this text source later with the treatment note configured for the patient or clinic.",
+  "fixed:other:guarantee":
+    "Guarantee and brief information. This page can explain guarantee terms, expected follow-up, aftercare responsibilities, and important patient guidance.",
+  "fixed:other:ourclinic":
+    "Our clinic. This page can present the clinic story, team experience, technologies, and contact information.",
+  "fixed:other:note":
+    "Custom note. Update this text source later from the final note content configured in your workflow.",
+};
+
+function stripHtml(input: string) {
+  return input
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function getDocumentBody(id: string, templates: ClinicTemplate[]) {
+  const template = templates.find((item) => item.id === id);
+  if (template) return stripHtml(template.body);
+  return FIXED_DOCUMENT_BODIES[id] ?? "No content available for this document yet.";
+}
 
 function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], order: string[]): DocRow[] {
   let rows: DocRow[] = [];
   if (sectionId === "clinic") {
-    rows = [{ id: "fixed:clinic:demo", title: "Demo Dentist" }, { id: "fixed:clinic:note", title: "Custom note" }];
+    rows = [
+      { id: "fixed:clinic:demo", title: "Demo Dentist", body: getDocumentBody("fixed:clinic:demo", templates) },
+      { id: "fixed:clinic:note", title: "Custom note", body: getDocumentBody("fixed:clinic:note", templates) },
+    ];
   } else if (sectionId === "diagnosis") {
     rows = [
-      { id: "fixed:diagnosis:note", title: "Custom note" },
-      ...templates.filter((t) => t.category === "diagnosis").sort((a, b) => a.order - b.order).map((t) => ({ id: t.id, title: t.title })),
+      { id: "fixed:diagnosis:note", title: "Custom note", body: getDocumentBody("fixed:diagnosis:note", templates) },
+      ...templates
+        .filter((t) => t.category === "diagnosis")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({ id: t.id, title: t.title, body: getDocumentBody(t.id, templates) })),
     ];
   } else if (sectionId === "treatments") {
     rows = [
-      { id: "fixed:treatments:note", title: "Custom note" },
-      ...templates.filter((t) => t.category === "treatments").sort((a, b) => a.order - b.order).map((t) => ({ id: t.id, title: t.title })),
+      { id: "fixed:treatments:note", title: "Custom note", body: getDocumentBody("fixed:treatments:note", templates) },
+      ...templates
+        .filter((t) => t.category === "treatments")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({ id: t.id, title: t.title, body: getDocumentBody(t.id, templates) })),
     ];
   } else if (sectionId === "other") {
     rows = [
-      { id: "fixed:other:guarantee", title: "Guarantee and Brief Info" },
-      { id: "fixed:other:ourclinic", title: "Our Clinic" },
-      ...templates.filter((t) => t.category === "other" || t.category === "dentists").sort((a, b) => a.order - b.order).map((t) => ({ id: t.id, title: t.title })),
-      { id: "fixed:other:note", title: "Custom note" },
+      { id: "fixed:other:guarantee", title: "Guarantee and Brief Info", body: getDocumentBody("fixed:other:guarantee", templates) },
+      { id: "fixed:other:ourclinic", title: "Our Clinic", body: getDocumentBody("fixed:other:ourclinic", templates) },
+      ...templates
+        .filter((t) => t.category === "other" || t.category === "dentists")
+        .sort((a, b) => a.order - b.order)
+        .map((t) => ({ id: t.id, title: t.title, body: getDocumentBody(t.id, templates) })),
+      { id: "fixed:other:note", title: "Custom note", body: getDocumentBody("fixed:other:note", templates) },
     ];
   }
   if (order.length === 0) return rows;
@@ -72,7 +125,7 @@ export function OverviewPanel() {
     { id: "suggested", kind: "suggested", title: "Your suggested treatment" },
     { id: "animation", kind: "animation", title: "Your 3D treatment animation" },
   ];
-  const docPages = selectedDocs.map((d) => ({ id: d.id, kind: "document" as const, title: d.title }));
+  const docPages = selectedDocs.map((d) => ({ id: d.id, kind: "document" as const, title: d.title, body: d.body }));
   const allPages = [...systemPages, ...docPages];
 
   return (
@@ -102,7 +155,7 @@ export function OverviewPanel() {
 }
 
 function PageCard({ page, index, total, settings }: {
-  page: { id: string; kind: PageKind; title: string };
+  page: { id: string; kind: PageKind; title: string; body?: string };
   index: number; total: number; settings: ReturnType<typeof usePlanSettings>;
 }) {
   return (
@@ -118,7 +171,7 @@ function PageCard({ page, index, total, settings }: {
         {page.kind === "status" && <StatusContent />}
         {page.kind === "suggested" && <SuggestedContent settings={settings} />}
         {page.kind === "animation" && <AnimationContent />}
-        {page.kind === "document" && <DocumentContent title={page.title} />}
+        {page.kind === "document" && <DocumentContent title={page.title} body={page.body} />}
       </div>
       <footer className="flex items-center justify-center border-t border-border/50 py-1.5 text-[9px] text-muted-foreground">
         {index} / {total} · Made with Treatly
@@ -245,14 +298,23 @@ function AnimationContent() {
   );
 }
 
-function DocumentContent({ title }: { title: string }) {
-  const widths = [92, 84, 88, 70, 95, 78, 90, 82, 65, 86, 74, 80];
+function DocumentContent({ title, body }: { title: string; body?: string }) {
+  const previewLines = (body || "No content available for preview.")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-semibold text-foreground">{title}</p>
-      {widths.map((w, i) => (
-        <div key={i} className="h-[3px] rounded bg-muted" style={{ width: `${w}%` }} />
-      ))}
+      <div className="space-y-1 text-[7px] leading-relaxed text-foreground/75">
+        {previewLines.map((line, i) => (
+          <p key={`${title}-${i}`} className="line-clamp-2">
+            {line}
+          </p>
+        ))}
+      </div>
     </div>
   );
 }
