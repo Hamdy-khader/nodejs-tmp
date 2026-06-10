@@ -203,7 +203,7 @@ function RootComponent() {
           <div className="flex flex-1 flex-col">
             <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur lg:hidden">
               <SidebarTrigger />
-              <span className="text-sm font-semibold">BrightPlans</span>
+              <span className="text-sm font-semibold">Treatly</span>
             </header>
             <PatientTabs />
             <main className="flex-1">

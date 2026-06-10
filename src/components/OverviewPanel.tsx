@@ -118,7 +118,7 @@ function PageCard({ page, index, total, settings }: {
         {page.kind === "document" && <DocumentContent title={page.title} />}
       </div>
       <footer className="flex items-center justify-center border-t border-border/50 py-1.5 text-[9px] text-muted-foreground">
-        {index} / {total} · Made with BrightPlans
+        {index} / {total} · Made with Treatly
       </footer>
     </article>
   );

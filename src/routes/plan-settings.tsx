@@ -37,7 +37,7 @@ import {
 export const Route = createFileRoute("/plan-settings")({
   head: () => ({
     meta: [
-      { title: "Plan Settings — BrightPlans" },
+      { title: "Plan Settings — Treatly" },
       { name: "description", content: "Configure your treatment plan PDF design." },
     ],
   }),
@@ -276,7 +276,7 @@ function SettingTile({
 function FrontCoverPreview({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="flex h-full w-full flex-col justify-between bg-[oklch(0.18_0.03_60)] p-3 text-center text-white">
-      <div className="font-serif text-sm italic tracking-wide text-amber-200">BrightPlans</div>
+      <div className="font-serif text-sm italic tracking-wide text-amber-200">Treatly</div>
       <div className="space-y-1 pb-2">
         <div className="text-[10px] tracking-[0.3em] text-amber-200/80">{title}</div>
         {subtitle && <div className="text-[9px] tracking-[0.25em] text-amber-100/70">{subtitle}</div>}

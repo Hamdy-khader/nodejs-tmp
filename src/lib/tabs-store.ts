@@ -7,7 +7,7 @@ export interface PatientTab {
   planName?: string;
 }
 
-const KEY = "brightplans:tabs:v1";
+const KEY = "treatly:tabs:v1";
 
 function load(): PatientTab[] {
   if (typeof window === "undefined") return [];

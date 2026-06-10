@@ -38,7 +38,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/clinic-fees")({
   head: () => ({
     meta: [
-      { title: "Your Clinic Fees - BrightPlans" },
+      { title: "Your Clinic Fees - Treatly" },
       { name: "description", content: "Manage pricelists, languages and currencies for your clinic." },
     ],
   }),

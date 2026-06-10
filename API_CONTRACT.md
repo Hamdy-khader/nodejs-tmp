@@ -137,7 +137,7 @@ updated_by
 
 ```json
 {
-  "email": "admin@treatly.com",
+  "email": "admin@treatlyonline.de",
   "password": "secret"
 }
 ```
@@ -150,7 +150,7 @@ updated_by
     "admin": {
       "id": 1,
       "name": "System Admin",
-      "email": "admin@treatly.com",
+      "email": "admin@treatlyonline.de",
       "status": "active",
       "created_at": "2026-06-03T10:00:00Z"
     }

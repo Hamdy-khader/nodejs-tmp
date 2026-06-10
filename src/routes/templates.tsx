@@ -47,7 +47,7 @@ import {
 export const Route = createFileRoute("/templates")({
   head: () => ({
     meta: [
-      { title: "Templates — BrightPlans" },
+      { title: "Templates — Treatly" },
       { name: "description", content: "Manage your clinic document templates." },
     ],
   }),

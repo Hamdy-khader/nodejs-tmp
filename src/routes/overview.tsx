@@ -41,7 +41,7 @@ import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
 export const Route = createFileRoute("/overview")({
   head: () => ({
     meta: [
-      { title: "Overview — BrightPlans" },
+      { title: "Overview — Treatly" },
       { name: "description", content: "Preview the final treatment plan PDF before download." },
     ],
   }),
@@ -139,7 +139,7 @@ function OverviewPage() {
       <header className="bg-[oklch(0.23_0.06_240)] px-6 py-3">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-4 text-white">
-            <Link to="/clinic" className="text-lg font-semibold tracking-tight">BrightPlans</Link>
+            <Link to="/clinic" className="text-lg font-semibold tracking-tight">Treatly</Link>
             <span className="text-sm text-white/80">Elene</span>
             <div className="ml-4 flex items-center gap-1">
               <span className="flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs">
@@ -281,7 +281,7 @@ function PageCard({
       </div>
 
       <footer className="flex items-center justify-center border-t border-border/50 py-1.5 text-[9px] text-muted-foreground">
-        {index} / {total} · Made with BrightPlans
+        {index} / {total} · Made with Treatly
       </footer>
     </article>
   );
