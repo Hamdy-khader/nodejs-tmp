@@ -190,6 +190,7 @@ function PlanPage() {
 
   const selectedTooth = selected != null ? plan.teeth[selected] : null;
   const canSelectStatus = selectedTooth != null;
+  const showRightRail = step === "diagnosis" || step === "treatments";
 
   const setStatus = (s: ToothStatus) => {
     if (!selectedTooth) return;
@@ -541,6 +542,7 @@ function PlanPage() {
         </div>
 
         {/* Right rail */}
+        {showRightRail && (
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
           {filledPanelOpen &&
             selectedTooth &&
@@ -707,6 +709,7 @@ function PlanPage() {
             )}
           </div>
         </aside>
+        )}
       </div>
 
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
