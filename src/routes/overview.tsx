@@ -37,6 +37,9 @@ import {
 } from "@/lib/documents-store";
 import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
+import { clinicApi } from "@/lib/admin/api";
+import { useTabs } from "@/lib/tabs-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/overview")({
   head: () => ({
@@ -467,9 +470,36 @@ function DocumentContent({ title }: { title: string }) {
 function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean }) {
   const settings = usePlanSettings();
   const price = settings.pricePage;
+  const tabs = useTabs();
+  const activePlanTab = [...tabs].reverse().find((tab) => tab.planId);
+  const [downloading, setDownloading] = useState(false);
 
   const setPrice = (patch: Partial<typeof price>) =>
     planSettingsStore.update({ pricePage: { ...price, ...patch } });
+
+  const handleDownload = async () => {
+    if (!activePlanTab?.planId) {
+      toast.error("Open a treatment plan first, then try downloading from Overview.");
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      const blob = await clinicApi.plans.downloadDocument(activePlanTab.planId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const safePlanName = (activePlanTab.planName || "treatment-plan").replace(/[\\/:*?\"<>|]+/g, "-");
+      link.href = url;
+      link.download = `${safePlanName}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Treatment plan downloaded.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not download treatment plan.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <aside className="self-start space-y-3">
@@ -514,9 +544,13 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
       </div>
 
       {/* Download */}
-      <button className="flex w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.23_0.06_240)] py-3 text-sm font-medium text-white shadow-md hover:opacity-90">
+      <button
+        onClick={() => void handleDownload()}
+        disabled={downloading}
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.23_0.06_240)] py-3 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
         <Download className="size-4" />
-        Download
+        {downloading ? "Downloading..." : "Download"}
       </button>
 
       {/* Price table popover */}
