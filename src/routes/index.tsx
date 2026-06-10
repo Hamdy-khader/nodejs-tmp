@@ -227,11 +227,8 @@ function LandingPage() {
           </div>
 
           <div className="tl-nav-actions">
-            <Link className="tl-btn tl-btn-ghost" to="/admin/login">
-              Admin Login
-            </Link>
             <Link className="tl-btn tl-btn-primary" to="/clinic/login">
-              Clinic Login
+              Start Free Trial
             </Link>
           </div>
         </nav>
