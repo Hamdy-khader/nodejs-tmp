@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
-import { adminTokenStore, clinicTokenStore } from "@/lib/admin/api";
+import { adminApi, adminTokenStore, clinicApi, clinicTokenStore } from "@/lib/admin/api";
 
 function NotFoundComponent() {
   return (
@@ -108,6 +108,12 @@ function RootComponent() {
 
   const [hasAdminToken, setHasAdminToken] = useState(() => adminTokenStore.exists());
   const [hasClinicToken, setHasClinicToken] = useState(() => clinicTokenStore.exists());
+  const [adminSessionValid, setAdminSessionValid] = useState<boolean | null>(
+    () => (adminTokenStore.exists() ? null : false),
+  );
+  const [clinicSessionValid, setClinicSessionValid] = useState<boolean | null>(
+    () => (clinicTokenStore.exists() ? null : false),
+  );
 
   const syncTokens = useCallback(() => {
     setHasAdminToken(adminTokenStore.exists());
@@ -119,6 +125,52 @@ function RootComponent() {
     return () => window.removeEventListener("auth:changed", syncTokens);
   }, [syncTokens]);
 
+  useEffect(() => {
+    if (!hasAdminToken) {
+      setAdminSessionValid(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAdminSessionValid(null);
+
+    adminApi
+      .me()
+      .then(() => {
+        if (!cancelled) setAdminSessionValid(true);
+      })
+      .catch(() => {
+        if (!cancelled) setAdminSessionValid(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAdminToken]);
+
+  useEffect(() => {
+    if (!hasClinicToken) {
+      setClinicSessionValid(false);
+      return;
+    }
+
+    let cancelled = false;
+    setClinicSessionValid(null);
+
+    clinicApi
+      .me()
+      .then(() => {
+        if (!cancelled) setClinicSessionValid(true);
+      })
+      .catch(() => {
+        if (!cancelled) setClinicSessionValid(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasClinicToken]);
+
   const isAdminRoute = pathname.startsWith("/admin");
   const isAdminLogin = pathname === "/admin/login";
   const isAdminIndex = pathname === "/admin" || pathname === "/admin/";
@@ -128,25 +180,25 @@ function RootComponent() {
 
   useEffect(() => {
     if (isAdminLogin) {
-      if (hasAdminToken) {
+      if (hasAdminToken && adminSessionValid === true) {
         navigate({ to: "/admin/dashboard", replace: true });
       }
       return;
     }
 
     if (isClinicLogin) {
-      if (hasClinicToken) {
+      if (hasClinicToken && clinicSessionValid === true) {
         navigate({ to: "/clinic", replace: true });
       }
       return;
     }
 
     if (isAdminRoute) {
-      if (!hasAdminToken) {
+      if (!hasAdminToken || adminSessionValid === false) {
         navigate({ to: "/admin/login", replace: true });
         return;
       }
-      if (isAdminIndex) {
+      if (adminSessionValid === true && isAdminIndex) {
         navigate({ to: "/admin/dashboard", replace: true });
       }
       return;
@@ -155,10 +207,12 @@ function RootComponent() {
     // Public homepage — accessible without auth
     if (isPublicHome) return;
 
-    if (!hasClinicToken) {
+    if (!hasClinicToken || clinicSessionValid === false) {
       navigate({ to: "/clinic/login", replace: true });
     }
   }, [
+    adminSessionValid,
+    clinicSessionValid,
     hasAdminToken,
     hasClinicToken,
     isAdminIndex,
