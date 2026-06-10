@@ -1,5 +1,5 @@
 /**
- * BrightPlans Admin — Shared UI Components
+ * Treatly Admin — Shared UI Components
  *
  * Self-contained components that don't depend on shadcn/ui.
  * Uses Tailwind v4 utility classes + CSS custom properties injected once.

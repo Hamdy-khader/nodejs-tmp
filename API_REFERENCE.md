@@ -1,4 +1,4 @@
-# API Reference — Treatly Online (BrightPlans)
+# API Reference — Treatly Online (Treatly)
 
 **Base URL:** `https://backend.treatlyonline.de/api`  
 **Client source:** `src/lib/admin/api.ts`

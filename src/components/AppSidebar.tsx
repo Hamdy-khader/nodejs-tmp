@@ -57,7 +57,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="text-base font-semibold tracking-tight text-sidebar-foreground">
-              BrightPlans
+              Treatly
             </span>
             <span className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">
               Dental Suite

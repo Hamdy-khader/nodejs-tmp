@@ -1,5 +1,5 @@
 /**
- * BrightPlans - Admin & Clinic API Client
+ * Treatly - Admin & Clinic API Client
  *
  * Two separate auth systems:
  *  - Admin  -> /admin/*
