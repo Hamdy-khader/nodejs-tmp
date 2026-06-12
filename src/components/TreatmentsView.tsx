@@ -9,7 +9,7 @@ import {
   LOWER_TEETH,
 } from "@/lib/patients-store";
 import { pricelistStore, usePricelist } from "@/lib/pricelist-store";
-import { TeethChart } from "@/components/TeethChart";
+import { TeethChart, type ToothAnnotation } from "@/components/TeethChart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,12 @@ import { cn } from "@/lib/utils";
 interface TreatmentMenuItem {
   label: string;
   value: string;
+  itemId?: string;
+  itemKey?: string;
+  sectionKey?: string;
+  groupKey?: string;
+  unitPrice?: number;
+  priceDisplay?: string;
 }
 
 interface TreatmentGroup {
@@ -32,8 +38,78 @@ interface TreatmentGroup {
   items: TreatmentMenuItem[];
 }
 
+const TREATMENT_VISUALS: Record<
+  string,
+  { shortLabel: string; color: string; background: string; border: string }
+> = {
+  extraction: {
+    shortLabel: "EXT",
+    color: "#9f2f28",
+    background: "rgba(201, 73, 59, 0.14)",
+    border: "rgba(201, 73, 59, 0.34)",
+  },
+  filling: {
+    shortLabel: "FIL",
+    color: "#1f5fa8",
+    background: "rgba(66, 133, 244, 0.14)",
+    border: "rgba(66, 133, 244, 0.34)",
+  },
+  "root-canal-treatment": {
+    shortLabel: "RCT",
+    color: "#b54d19",
+    background: "rgba(229, 115, 35, 0.14)",
+    border: "rgba(229, 115, 35, 0.34)",
+  },
+  implant: {
+    shortLabel: "IMP",
+    color: "#38567d",
+    background: "rgba(90, 122, 167, 0.14)",
+    border: "rgba(90, 122, 167, 0.34)",
+  },
+  crown: {
+    shortLabel: "CRN",
+    color: "#8c6512",
+    background: "rgba(224, 184, 64, 0.16)",
+    border: "rgba(200, 152, 12, 0.34)",
+  },
+  veneer: {
+    shortLabel: "VNR",
+    color: "#7b4bb3",
+    background: "rgba(177, 122, 255, 0.14)",
+    border: "rgba(177, 122, 255, 0.34)",
+  },
+  bridge: {
+    shortLabel: "BRG",
+    color: "#6a2ec0",
+    background: "rgba(128, 64, 200, 0.14)",
+    border: "rgba(128, 64, 200, 0.34)",
+  },
+  dentures: {
+    shortLabel: "DNS",
+    color: "#0d766e",
+    background: "rgba(20, 184, 166, 0.14)",
+    border: "rgba(20, 184, 166, 0.34)",
+  },
+  general: {
+    shortLabel: "GEN",
+    color: "#475467",
+    background: "rgba(71, 84, 103, 0.10)",
+    border: "rgba(71, 84, 103, 0.26)",
+  },
+  other: {
+    shortLabel: "AUX",
+    color: "#475467",
+    background: "rgba(71, 84, 103, 0.10)",
+    border: "rgba(71, 84, 103, 0.26)",
+  },
+};
+
 /** Ordered FDI map across both jaws for finding "between" teeth. */
 const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
+
+function norm(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function teethBetween(a: number, b: number): number[] {
   for (const row of JAW_ORDER) {
@@ -45,6 +121,67 @@ function teethBetween(a: number, b: number): number[] {
     }
   }
   return [];
+}
+
+function buildTreatmentLookup(groups: TreatmentGroup[]) {
+  const lookup = new Map<string, string>();
+  groups.forEach((group) => {
+    group.items.forEach((item) => {
+      if (!item.value.startsWith("__")) {
+        lookup.set(norm(item.value), group.id);
+      }
+    });
+  });
+  return lookup;
+}
+
+function buildToothAnnotations(
+  rows: TreatmentRow[],
+  treatmentLookup: Map<string, string>,
+): Record<number, ToothAnnotation[]> {
+  const perTooth = new Map<number, Map<string, ToothAnnotation & { count: number }>>();
+
+  rows.forEach((row) => {
+    if (row.kind !== "visit") return;
+
+    row.items.forEach((item) => {
+      if (item.toothNumber == null) return;
+
+      const sectionId = treatmentLookup.get(norm(item.name)) ?? "general";
+      const visual = TREATMENT_VISUALS[sectionId] ?? TREATMENT_VISUALS.general;
+      const toothBucket = perTooth.get(item.toothNumber) ?? new Map();
+      const key = `${sectionId}:${item.name}`;
+      const current = toothBucket.get(key);
+
+      if (current) {
+        current.count += Math.max(1, item.amount);
+      } else {
+        toothBucket.set(key, {
+          id: key,
+          label: item.name,
+          shortLabel: visual.shortLabel,
+          color: visual.color,
+          background: visual.background,
+          border: visual.border,
+          count: Math.max(1, item.amount),
+        });
+      }
+
+      perTooth.set(item.toothNumber, toothBucket);
+    });
+  });
+
+  return Object.fromEntries(
+    [...perTooth.entries()].map(([toothNumber, bucket]) => [
+      toothNumber,
+      [...bucket.values()]
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+        .map(({ count, ...annotation }) => ({
+          ...annotation,
+          shortLabel: count > 1 ? `${annotation.shortLabel}${count}` : annotation.shortLabel,
+        })),
+    ]),
+  );
 }
 
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
@@ -71,20 +208,29 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         items.push({
           label: `${group.title}: ${item.name}`,
           value: item.name,
+          itemId: item.id,
+          itemKey: item.key,
+          sectionKey: section.key,
+          groupKey: group.key,
+          unitPrice: item.price,
+          priceDisplay: item.price > 0 ? `$ ${item.price.toFixed(0)}` : "$ 0",
         });
       });
     });
     return {
-      id: section.id,
+      id: section.key,
       label: section.label,
       items,
     };
   });
+  const treatmentLookup = buildTreatmentLookup(treatmentGroups);
+  const toothAnnotations = buildToothAnnotations(rows, treatmentLookup);
+  const defaultBridgeItem = treatmentGroups
+    .find((group) => group.id === "bridge")
+    ?.items.find((item) => item.itemId);
 
   const toggleBridgeTooth = (n: number) => {
-    setBridgeSel((prev) =>
-      prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n],
-    );
+    setBridgeSel((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
   };
 
   const handlePick = (group: TreatmentGroup, item: TreatmentMenuItem) => {
@@ -96,10 +242,16 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       name: item.value,
       toothNumber: selected ?? undefined,
       amount: 1,
-      unitPrice: pricelistStore.getPriceFor(item.value),
+      unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
+      catalogSectionKey: item.sectionKey,
+      catalogGroupKey: item.groupKey,
+      catalogItemId: item.itemId,
+      catalogItemKey: item.itemKey,
+      priceSource: item.itemId ? "catalog" : undefined,
+      manualPriceOverride: false,
     });
     if (selected != null) {
-      const nextStatus = getToothStatusForTreatment(group.id, item.value);
+      const nextStatus = getToothStatusForTreatment(item.sectionKey ?? group.id, item.value);
       if (nextStatus) {
         const tooth = plan.teeth[selected];
         patientsStore.setTooth(plan.id, {
@@ -150,7 +302,13 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
       name: bridgeName,
       amount: 1,
-      unitPrice: pricelistStore.getPriceFor("Bridge"),
+      unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
+      catalogSectionKey: defaultBridgeItem?.sectionKey ?? "bridge",
+      catalogGroupKey: defaultBridgeItem?.groupKey ?? "bridge",
+      catalogItemId: defaultBridgeItem?.itemId,
+      catalogItemKey: defaultBridgeItem?.itemKey,
+      priceSource: "catalog",
+      manualPriceOverride: false,
     });
     cancelBridge();
   };
@@ -181,13 +339,14 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             selected={bridgeMode ? null : selected}
             onSelect={bridgeMode ? toggleBridgeTooth : setSelected}
             highlighted={bridgeMode ? bridgeSel : undefined}
+            annotations={toothAnnotations}
           />
           {bridgeMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[oklch(0.55_0.18_290)]/40 bg-[oklch(0.55_0.18_290)]/10 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2">
               <p className="text-xs font-medium text-foreground">
                 Bridge mode — pick 2+ teeth across a missing tooth
                 {bridgeSel.length > 0 && (
-                  <span className="ml-2 font-semibold text-[oklch(0.45_0.18_290)]">
+                  <span className="ml-2 font-semibold text-violet-700">
                     Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
                   </span>
                 )}
@@ -202,7 +361,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 <button
                   onClick={applyBridge}
                   disabled={bridgeSel.length < 2}
-                  className="rounded-md bg-[oklch(0.55_0.18_290)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  className="rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   Apply Bridge
                 </button>
@@ -214,23 +373,19 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Treatments
+              Clinic treatments
             </h3>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                 bridgeMode
-                  ? "bg-[oklch(0.55_0.18_290)]/15 text-[oklch(0.45_0.18_290)]"
+                  ? "bg-violet-500/15 text-violet-700"
                   : selected
                     ? "bg-primary/15 text-primary"
                     : "bg-muted text-muted-foreground",
               )}
             >
-              {bridgeMode
-                ? "Bridge mode"
-                : selected
-                  ? `Tooth ${selected}`
-                  : "Any tooth"}
+              {bridgeMode ? "Bridge mode" : selected ? `Tooth ${selected}` : "Any tooth"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
@@ -243,22 +398,34 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                       className={cn(
                         "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
                         isActive
-                          ? "bg-[oklch(0.55_0.18_290)] text-white"
-                          : "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
+                          ? "bg-violet-600 text-white"
+                          : "bg-emerald-500 text-white hover:bg-emerald-600",
                       )}
                     >
                       <span className="truncate">{group.label}</span>
-                      {isActive ? <Check className="h-3.5 w-3.5 shrink-0 opacity-90" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />}
+                      {isActive ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
+                  <DropdownMenuContent
+                    align="start"
+                    className="max-h-[320px] min-w-[240px] overflow-y-auto"
+                  >
                     {group.items?.map((item) => (
                       <DropdownMenuItem
-                        key={`${group.id}-${item.groupTitle}-${item.value}-${item.label}`}
+                        key={`${group.id}-${item.value}-${item.label}`}
                         onSelect={() => handlePick(group, item)}
-                        className="text-xs font-medium"
+                        className="flex items-center justify-between gap-3 text-xs font-medium"
                       >
                         <span className="truncate">{item.label}</span>
+                        {item.priceDisplay && (
+                          <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                            {item.priceDisplay}
+                          </span>
+                        )}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -321,12 +488,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             </p>
           ) : (
             rows.map((row, idx) => (
-              <RowRenderer
-                key={row.id}
-                row={row}
-                index={idx}
-                planId={plan.id}
-              />
+              <RowRenderer key={row.id} row={row} index={idx} planId={plan.id} />
             ))
           )}
         </div>
@@ -351,58 +513,61 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               <span>Total</span>
               <span className="text-foreground tabular-nums">$ {totals.total.toFixed(0)}</span>
             </div>
-            {billingMode === "insurance" && plan.insurance && (() => {
-              const coverage = Math.max(
-                0,
-                Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
-              );
-              const oop = Math.max(0, totals.total - coverage);
-              return (
-                <>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Insurance coverage (estimated)</span>
-                    <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Out of pocket costs (estimated)</span>
-                    <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
-                  </div>
-                </>
-              );
-            })()}
-            {billingMode === "payment" && plan.paymentPlan && (() => {
-              const { amount, term, interest } = plan.paymentPlan;
-              const safeTerm = Math.max(1, term);
-              const monthly =
-                interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
-              const totalPaid = monthly * safeTerm;
-              const totalInterest = Math.max(0, totalPaid - amount);
-              return (
-                <>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Monthly payments</span>
-                    <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Total interest</span>
-                    <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Total ({safeTerm} months)</span>
-                    <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
-                  </div>
-                </>
-              );
-            })()}
+            {billingMode === "insurance" &&
+              plan.insurance &&
+              (() => {
+                const coverage = Math.max(
+                  0,
+                  Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
+                );
+                const oop = Math.max(0, totals.total - coverage);
+                return (
+                  <>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Insurance coverage (estimated)</span>
+                      <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Out of pocket costs (estimated)</span>
+                      <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            {billingMode === "payment" &&
+              plan.paymentPlan &&
+              (() => {
+                const { amount, term, interest } = plan.paymentPlan;
+                const safeTerm = Math.max(1, term);
+                const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+                const totalPaid = monthly * safeTerm;
+                const totalInterest = Math.max(0, totalPaid - amount);
+                return (
+                  <>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Monthly payments</span>
+                      <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Total interest</span>
+                      <span className="font-semibold tabular-nums">
+                        $ {totalInterest.toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Total ({safeTerm} months)</span>
+                      <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
           <div>
             <Textarea
               placeholder="Note:"
               rows={3}
               value={plan.treatmentNote ?? ""}
-              onChange={(e) =>
-                patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })
-              }
+              onChange={(e) => patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })}
               className="bg-muted/30"
             />
           </div>
@@ -440,15 +605,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   );
 }
 
-function RowRenderer({
-  row,
-  index,
-  planId,
-}: {
-  row: TreatmentRow;
-  index: number;
-  planId: string;
-}) {
+function RowRenderer({ row, index, planId }: { row: TreatmentRow; index: number; planId: string }) {
   if (row.kind === "visit") {
     return <VisitRow row={row} index={index} planId={planId} />;
   }
@@ -516,13 +673,7 @@ function RowShell({
   );
 }
 
-function NoteInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function NoteInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="ml-7 mt-1 flex items-center gap-2 rounded-md border border-dashed border-border/60 bg-background px-2 py-1.5">
       <StickyNote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -588,15 +739,7 @@ function VisitRow({
   );
 }
 
-function ItemRow({
-  planId,
-  rowId,
-  item,
-}: {
-  planId: string;
-  rowId: string;
-  item: TreatmentItem;
-}) {
+function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item: TreatmentItem }) {
   const price = item.amount * item.unitPrice;
   return (
     <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md bg-background px-2 py-1.5">
@@ -609,7 +752,14 @@ function ItemRow({
             {item.toothNumber}
           </span>
         )}
-        <span className="truncate">{item.name}</span>
+        <div className="min-w-0">
+          <div className="truncate">{item.name}</div>
+          {item.manualPriceOverride && (
+            <div className="text-[10px] font-medium uppercase tracking-wide text-amber-700">
+              Plan price override
+            </div>
+          )}
+        </div>
       </div>
       <Input
         type="number"
@@ -798,10 +948,7 @@ function ModalShell({
   width?: string;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
       <div
         className={cn("w-full rounded-2xl bg-background shadow-xl", width)}
         onClick={(e) => e.stopPropagation()}

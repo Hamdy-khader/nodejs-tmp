@@ -187,13 +187,21 @@ export interface PricelistSettings {
 
 export interface PricelistItem {
   id: string;
+  key?: string;
   name: string;
   price: number;
   note: string;
+  usage_count?: number;
+  is_used?: boolean;
+  can_edit_name?: boolean;
+  can_edit_note?: boolean;
+  can_delete?: boolean;
+  can_edit_price?: boolean;
 }
 
 export interface PricelistGroup {
   id: string;
+  key?: string;
   title: string;
   price_label: string | null;
   items: PricelistItem[];
@@ -201,6 +209,7 @@ export interface PricelistGroup {
 
 export interface PricelistSection {
   id: string;
+  key?: string;
   n: number | null;
   label: string;
   icon: string;

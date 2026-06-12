@@ -72,7 +72,7 @@ function PlanSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.96_0.005_160)] px-6 py-8">
+    <div className="min-h-screen bg-[#eff3f1] px-6 py-8">
       <div className="mx-auto max-w-[1400px] space-y-6">
         {/* Header card */}
         <section className="rounded-2xl border border-border/60 bg-card shadow-sm">
@@ -291,7 +291,7 @@ function FrontCoverPreview({
   subtitle?: string;
 }) {
   return (
-    <div className="flex h-full w-full flex-col justify-between bg-[oklch(0.18_0.03_60)] p-3 text-center text-white">
+    <div className="flex h-full w-full flex-col justify-between bg-[#1b0e04] p-3 text-center text-white">
       <div className="font-serif text-sm italic tracking-wide text-amber-200">{clinicName}</div>
       <div className="space-y-1 pb-2">
         <div className="text-[10px] tracking-[0.3em] text-amber-200/80">{title}</div>

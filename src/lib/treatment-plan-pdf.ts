@@ -1,3 +1,4 @@
+import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import type { PlanSettings } from "@/lib/plan-settings-store";
 
@@ -7,143 +8,214 @@ export interface TreatmentPlanPdfPage {
   body?: string;
 }
 
-function drawInnerChrome(
-  pdf: jsPDF,
-  settings: PlanSettings,
-  pageNumber: number,
-  totalPages: number,
-) {
-  const { innerPages } = settings.pageDesign;
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
+const STYLE_PROPS = [
+  "color",
+  "background",
+  "backgroundColor",
+  "backgroundImage",
+  "border",
+  "borderColor",
+  "borderTopColor",
+  "borderRightColor",
+  "borderBottomColor",
+  "borderLeftColor",
+  "borderRadius",
+  "boxShadow",
+  "textShadow",
+  "outline",
+  "outlineColor",
+  "fill",
+  "stroke",
+  "opacity",
+  "font",
+  "fontFamily",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "lineHeight",
+  "letterSpacing",
+  "textTransform",
+  "textAlign",
+  "whiteSpace",
+  "wordBreak",
+  "overflowWrap",
+  "display",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "width",
+  "height",
+  "minWidth",
+  "minHeight",
+  "maxWidth",
+  "maxHeight",
+  "margin",
+  "padding",
+  "gap",
+  "gridTemplateColumns",
+  "gridTemplateRows",
+  "gridColumn",
+  "gridRow",
+  "flex",
+  "flexDirection",
+  "justifyContent",
+  "alignItems",
+  "alignSelf",
+  "placeItems",
+  "aspectRatio",
+  "transform",
+  "transformOrigin",
+  "overflow",
+  "overflowX",
+  "overflowY",
+  "visibility",
+  "zIndex",
+] as const;
 
-  pdf.setDrawColor(220, 220, 220);
-  pdf.line(56, 42, pageWidth - 56, 42);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(10);
-  pdf.text(innerPages.headerText || "Inner pages", 56, 34);
+// html2canvas cannot parse some newer CSS color functions.
+// Chrome can return them verbatim from getComputedStyle, so we convert each
+// occurrence to rgb() using the browser's own Canvas color parser.
+const MODERN_COLOR_FN_NAMES = [
+  ["ok", "lab"],
+  ["ok", "lch"],
+  ["lab"],
+  ["lch"],
+  ["color"],
+]
+  .map((parts) => parts.join(""))
+  .join("|");
 
-  if (!innerPages.showFooter) return;
+const MODERN_COLOR_RE = new RegExp(
+  String.raw`\b(?:${MODERN_COLOR_FN_NAMES})\((?:[^()]+|\([^()]*\))*\)`,
+  "gi",
+);
 
-  pdf.line(56, pageHeight - 38, pageWidth - 56, pageHeight - 38);
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
-  pdf.text(innerPages.footerLeft || "", 56, pageHeight - 24);
-  pdf.text(`${pageNumber} / ${totalPages}`, pageWidth / 2, pageHeight - 24, { align: "center" });
-  pdf.text(innerPages.footerRight || "", pageWidth - 56, pageHeight - 24, { align: "right" });
+let colorParseCtx: CanvasRenderingContext2D | null = null;
+
+function colorToRgb(color: string): string | null {
+  if (!colorParseCtx) {
+    colorParseCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!colorParseCtx) return null;
+  // Use a sentinel so we can detect when the canvas fails to parse the color.
+  colorParseCtx.fillStyle = "#000000";
+  colorParseCtx.fillStyle = color;
+  const parsed = colorParseCtx.fillStyle;
+  colorParseCtx.fillStyle = "#ffffff";
+  colorParseCtx.fillStyle = color;
+  // If parsing fails, fillStyle keeps the previous value, so the two probes differ.
+  return parsed === colorParseCtx.fillStyle ? parsed : null;
 }
 
-function drawCover(pdf: jsPDF, settings: PlanSettings) {
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const { frontCover } = settings.pageDesign;
+function sanitizeColorValue(value: string): string {
+  // MODERN_COLOR_RE is global, so reset lastIndex to keep test()/replace() stateless.
+  MODERN_COLOR_RE.lastIndex = 0;
+  if (!MODERN_COLOR_RE.test(value)) return value;
+  MODERN_COLOR_RE.lastIndex = 0;
+  return value.replace(MODERN_COLOR_RE, (match) => colorToRgb(match) ?? "rgb(0, 0, 0)");
+}
 
-  pdf.setFillColor(48, 37, 22);
-  pdf.rect(0, 0, pageWidth, pageHeight, "F");
+function inlineComputedStyles(source: Element, target: Element) {
+  const computed = window.getComputedStyle(source);
+  const targetStyle = (target as HTMLElement | SVGElement).style;
 
-  pdf.setFillColor(228, 223, 210);
-  pdf.rect(0, 130, pageWidth, pageHeight - 260, "F");
+  if (target instanceof HTMLElement) {
+    target.className = "";
+  } else {
+    target.removeAttribute("class");
+  }
+  target.removeAttribute("data-slot");
+  target.removeAttribute("style");
 
-  pdf.setTextColor(233, 198, 112);
-  pdf.setFont("times", "italic");
-  pdf.setFontSize(24);
-  pdf.text(frontCover.clinicName || "Treatly", pageWidth / 2, 80, { align: "center" });
+  // Inline the curated structural/visual props so the declassed clone keeps its layout.
+  for (const prop of STYLE_PROPS) {
+    const value = computed.getPropertyValue(prop);
+    if (!value) continue;
+    targetStyle.setProperty(prop, sanitizeColorValue(value));
+  }
 
-  pdf.setTextColor(90, 72, 45);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(20);
-  pdf.text(frontCover.title || "TREATMENT PLAN", pageWidth / 2, pageHeight / 2 - 10, {
-    align: "center",
-  });
-
-  if (frontCover.subtitle) {
-    pdf.setFont("times", "italic");
-    pdf.setFontSize(18);
-    pdf.text(frontCover.subtitle, pageWidth / 2, pageHeight / 2 + 22, { align: "center" });
+  // Scan EVERY computed property (including --tw-* custom properties, accent-color,
+  // caret-color, text-decoration-color, etc.). Any value still carrying a modern
+  // color function would crash html2canvas, so override it with the rgb equivalent.
+  for (let i = 0; i < computed.length; i += 1) {
+    const prop = computed.item(i);
+    if (!prop) continue;
+    const value = computed.getPropertyValue(prop);
+    if (!value) continue;
+    const sanitized = sanitizeColorValue(value);
+    if (sanitized !== value) targetStyle.setProperty(prop, sanitized);
   }
 }
 
-function drawBackCover(pdf: jsPDF, settings: PlanSettings) {
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const { backCover } = settings.pageDesign;
+function inlineTreeStyles(source: Node, target: Node) {
+  if (source.nodeType === Node.ELEMENT_NODE && target.nodeType === Node.ELEMENT_NODE) {
+    inlineComputedStyles(source as Element, target as Element);
+  }
 
-  pdf.setFillColor(248, 245, 239);
-  pdf.rect(0, 0, pageWidth, pageHeight, "F");
+  const sourceChildren = Array.from(source.childNodes);
+  const targetChildren = Array.from(target.childNodes);
+  const count = Math.min(sourceChildren.length, targetChildren.length);
 
-  pdf.setTextColor(82, 66, 41);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(22);
-  pdf.text(backCover.title || "Back cover", pageWidth / 2, pageHeight / 2 - 20, { align: "center" });
-
-  if (backCover.note) {
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-    const lines = pdf.splitTextToSize(backCover.note, pageWidth - 120);
-    pdf.text(lines, pageWidth / 2, pageHeight / 2 + 20, { align: "center" });
+  for (let index = 0; index < count; index += 1) {
+    inlineTreeStyles(sourceChildren[index], targetChildren[index]);
   }
 }
 
-function drawBodyPage(pdf: jsPDF, page: TreatmentPlanPdfPage) {
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 56;
-  const contentWidth = pageWidth - margin * 2;
+function createExportClone(page: HTMLElement) {
+  const clone = page.cloneNode(true) as HTMLElement;
+  inlineTreeStyles(page, clone);
 
-  pdf.setTextColor(28, 28, 28);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(18);
-  pdf.text(page.title, margin, 84);
+  clone.style.position = "fixed";
+  clone.style.left = "-20000px";
+  clone.style.top = "0";
+  clone.style.margin = "0";
+  clone.style.zIndex = "-1";
+  clone.style.pointerEvents = "none";
+  clone.style.backgroundColor = "#ffffff";
+  clone.style.isolation = "isolate";
 
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(11);
-  const paragraphs = (page.body || "")
-    .split(/\n{2,}/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  let y = 112;
-  paragraphs.forEach((paragraph) => {
-    const lines = pdf.splitTextToSize(paragraph, contentWidth);
-    const blockHeight = lines.length * 15;
-
-    if (y + blockHeight > pageHeight - 70) {
-      return;
-    }
-
-    pdf.text(lines, margin, y);
-    y += blockHeight + 10;
-  });
+  document.body.appendChild(clone);
+  return clone;
 }
 
-export function saveTreatmentPlanPdf(args: {
+export async function saveTreatmentPlanPdf(args: {
   fileName: string;
-  pages: TreatmentPlanPdfPage[];
+  pageElements: Array<HTMLElement | null>;
   settings: PlanSettings;
 }) {
-  const { fileName, pages, settings } = args;
+  const { fileName, pageElements, settings } = args;
+  const pages = pageElements.filter((element): element is HTMLElement => Boolean(element));
+  if (pages.length === 0) {
+    throw new Error("No overview pages available to export.");
+  }
+
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "pt",
     format: settings.pageSize.toLowerCase(),
   });
 
-  pages.forEach((page, index) => {
-    if (index > 0) pdf.addPage();
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
 
-    if (page.kind === "cover") {
-      drawCover(pdf, settings);
-      return;
+  for (let index = 0; index < pages.length; index += 1) {
+    const exportPage = createExportClone(pages[index]);
+    try {
+      const canvas = await html2canvas(exportPage, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+      });
+      const imageData = canvas.toDataURL("image/png");
+
+      if (index > 0) pdf.addPage();
+      pdf.addImage(imageData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
+    } finally {
+      exportPage.remove();
     }
-
-    if (page.kind === "back") {
-      drawBackCover(pdf, settings);
-      return;
-    }
-
-    drawInnerChrome(pdf, settings, index + 1, pages.length);
-    drawBodyPage(pdf, page);
-  });
+  }
 
   pdf.save(fileName);
 }

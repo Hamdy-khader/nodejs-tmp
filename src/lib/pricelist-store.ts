@@ -2,10 +2,29 @@ import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
 import { normalizePricelistData } from "@/lib/treatment-catalog";
 
-export type PriceItem = { id: string; name: string; price: number; note?: string };
-export type PriceSubGroup = { id: string; title: string; priceLabel?: string; items: PriceItem[] };
+export type PriceItem = {
+  id: string;
+  key: string;
+  name: string;
+  price: number;
+  note?: string;
+  usageCount?: number;
+  isUsed?: boolean;
+  canEditName?: boolean;
+  canEditNote?: boolean;
+  canDelete?: boolean;
+  canEditPrice?: boolean;
+};
+export type PriceSubGroup = {
+  id: string;
+  key: string;
+  title: string;
+  priceLabel?: string;
+  items: PriceItem[];
+};
 export type PriceSection = {
   id: string;
+  key: string;
   n: number | null;
   label: string;
   icon: string;
@@ -26,7 +45,9 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["sections"]): PriceSection[] {
+export function toPriceSections(
+  raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["sections"],
+): PriceSection[] {
   const normalized = normalizePricelistData({
     settings: {
       language: "en",
@@ -39,18 +60,27 @@ function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["se
 
   return normalized.sections.map((section) => ({
     id: section.id,
+    key: section.key ?? section.id,
     n: section.n,
     label: section.label,
     icon: section.icon,
     groups: section.groups.map((group) => ({
       id: group.id,
+      key: group.key ?? group.id,
       title: group.title,
       priceLabel: group.price_label ?? undefined,
       items: group.items.map((item) => ({
         id: item.id,
+        key: item.key ?? item.id,
         name: item.name,
         price: item.price,
         note: item.note || undefined,
+        usageCount: item.usage_count,
+        isUsed: item.is_used,
+        canEditName: item.can_edit_name,
+        canEditNote: item.can_edit_note,
+        canDelete: item.can_delete,
+        canEditPrice: item.can_edit_price,
       })),
     })),
   }));
@@ -62,7 +92,7 @@ async function loadPricelist(force = false) {
   inflight = (async () => {
     try {
       const res = await clinicApi.pricelist.get();
-      state = toSections(res.sections);
+      state = toPriceSections(res.sections);
       loaded = true;
       emit();
     } finally {
@@ -76,7 +106,11 @@ export function usePricelist() {
   useEffect(() => {
     void loadPricelist();
   }, []);
-  return useSyncExternalStore(subscribe, () => state, () => state);
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  );
 }
 
 function norm(s: string) {

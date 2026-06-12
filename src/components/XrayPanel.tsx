@@ -98,7 +98,7 @@ export function XrayPanel({ planId, xrays, onClose }: XrayPanelProps) {
           {/* Image area */}
           <div
             className={cn(
-              "relative flex aspect-[4/3] min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-[oklch(0.18_0.01_240)] text-white/70",
+              "relative flex aspect-[4/3] min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-[#0e1216] text-white/70",
               !current && "border-2 border-dashed border-border/60 bg-muted/40 text-muted-foreground",
             )}
             onDragOver={(e) => {

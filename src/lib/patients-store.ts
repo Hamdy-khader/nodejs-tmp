@@ -21,9 +21,15 @@ export interface ToothState {
 export interface TreatmentItem {
   id: string;
   name: string;
+  catalogSectionKey?: string;
+  catalogGroupKey?: string;
+  catalogItemId?: string;
+  catalogItemKey?: string;
   toothNumber?: number;
   amount: number;
   unitPrice: number;
+  priceSource?: "catalog";
+  manualPriceOverride?: boolean;
 }
 
 export type TreatmentRow =
@@ -85,6 +91,31 @@ const FDI_NUMBERS = [
 export const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 export const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
+const TOOTH_STATUS_SET = new Set<ToothStatus>([
+  "intact",
+  "missing",
+  "caries",
+  "filled",
+  "crown",
+  "root-treated",
+  "implant",
+  "bridge",
+]);
+
+function normalizeToothStatus(value: unknown): ToothStatus {
+  const raw = String(value ?? "intact").trim().toLowerCase();
+  if (TOOTH_STATUS_SET.has(raw as ToothStatus)) return raw as ToothStatus;
+
+  switch (raw) {
+    case "root_treated":
+    case "root treated":
+    case "roottreated":
+      return "root-treated";
+    default:
+      return "intact";
+  }
+}
+
 export function defaultTeeth(): Record<number, ToothState> {
   const out: Record<number, ToothState> = {};
   for (const n of FDI_NUMBERS) out[n] = { number: n, status: "intact" };
@@ -133,7 +164,7 @@ function toPatient(raw: Record<string, unknown>): Patient {
 function toTooth(raw: Record<string, unknown>): ToothState {
   return {
     number: Number(raw.tooth_number ?? raw.number ?? 0),
-    status: String(raw.status ?? "intact") as ToothStatus,
+    status: normalizeToothStatus(raw.status),
     note: raw.note ? String(raw.note) : undefined,
     diagnosis: Array.isArray(raw.diagnosis) ? raw.diagnosis.map(String) : undefined,
   };
@@ -143,12 +174,21 @@ function toTreatmentItem(raw: Record<string, unknown>): TreatmentItem {
   return {
     id: String(raw.id ?? uid()),
     name: String(raw.name ?? ""),
+    catalogSectionKey: raw.catalog_section_key ? String(raw.catalog_section_key) : undefined,
+    catalogGroupKey: raw.catalog_group_key ? String(raw.catalog_group_key) : undefined,
+    catalogItemId: raw.catalog_item_id ? String(raw.catalog_item_id) : undefined,
+    catalogItemKey: raw.catalog_item_key ? String(raw.catalog_item_key) : undefined,
     toothNumber:
       raw.tooth_number === null || raw.tooth_number === undefined
         ? undefined
         : Number(raw.tooth_number),
     amount: Number(raw.amount ?? 1),
     unitPrice: Number(raw.unit_price ?? 0),
+    priceSource: raw.price_source === "catalog" ? "catalog" : undefined,
+    manualPriceOverride:
+      raw.manual_price_override === null || raw.manual_price_override === undefined
+        ? undefined
+        : Boolean(raw.manual_price_override),
   };
 }
 
@@ -303,10 +343,16 @@ function serializeTreatmentRows(treatments: TreatmentRow[]) {
       row.kind === "visit"
         ? row.items.map((item, itemIndex) => ({
             id: item.id,
+            catalog_section_key: item.catalogSectionKey ?? null,
+            catalog_group_key: item.catalogGroupKey ?? null,
+            catalog_item_id: item.catalogItemId ?? null,
+            catalog_item_key: item.catalogItemKey ?? null,
             name: item.name,
             tooth_number: item.toothNumber ?? null,
             amount: item.amount,
             unit_price: item.unitPrice,
+            price_source: item.priceSource ?? (item.catalogItemId ? "catalog" : null),
+            manual_price_override: item.manualPriceOverride ?? false,
             sort_order: itemIndex + 1,
           }))
         : [],
@@ -349,7 +395,9 @@ async function loadPlansFor(patientId: string, force = false) {
       const plans = rows.map((item) => toPlan(item, patientId));
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
       // preserve any plans already fetched via the detail endpoint (they have full data)
-      const merged = plans.map((p) => (planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p));
+      const merged = plans.map((p) =>
+        planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p,
+      );
       state = { ...state, plans: [...merged, ...rest] };
       plansLoadedFor.add(patientId);
       emit();
@@ -629,6 +677,20 @@ export const patientsStore = {
       updateLocalPlan(planId, { treatments: rows });
       void clinicApi.plans
         .createRow(planId, { kind: "visit", sort_order: rows.length })
+        .then((createdRow) =>
+          clinicApi.plans.createItem(planId, String(createdRow.id), {
+            catalog_section_key: newItem.catalogSectionKey ?? null,
+            catalog_group_key: newItem.catalogGroupKey ?? null,
+            catalog_item_id: newItem.catalogItemId ?? null,
+            catalog_item_key: newItem.catalogItemKey ?? null,
+            name: newItem.name,
+            tooth_number: newItem.toothNumber ?? null,
+            amount: newItem.amount,
+            unit_price: newItem.unitPrice,
+            manual_price_override: newItem.manualPriceOverride ?? false,
+            sort_order: 1,
+          }),
+        )
         .then(() => loadPlan(plan.patientId, planId, true))
         .catch(() => null);
       return;
@@ -639,10 +701,15 @@ export const patientsStore = {
     updateLocalPlan(planId, { treatments: rows });
     void clinicApi.plans
       .createItem(planId, row.id, {
+        catalog_section_key: newItem.catalogSectionKey ?? null,
+        catalog_group_key: newItem.catalogGroupKey ?? null,
+        catalog_item_id: newItem.catalogItemId ?? null,
+        catalog_item_key: newItem.catalogItemKey ?? null,
         name: newItem.name,
         tooth_number: newItem.toothNumber ?? null,
         amount: newItem.amount,
         unit_price: newItem.unitPrice,
+        manual_price_override: newItem.manualPriceOverride ?? false,
         sort_order: row.items.length + 1,
       })
       .catch(() => null);
@@ -669,11 +736,13 @@ export const patientsStore = {
   ) {
     const plan = getPlanById(planId);
     if (!plan) return;
+    const nextPatch =
+      patch.unitPrice !== undefined ? { ...patch, manualPriceOverride: true } : patch;
     const treatments = (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
         ? {
             ...row,
-            items: row.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+            items: row.items.map((item) => (item.id === itemId ? { ...item, ...nextPatch } : item)),
           }
         : row,
     );
@@ -688,6 +757,7 @@ export const patientsStore = {
       tooth_number: item.toothNumber ?? null,
       amount: item.amount,
       unit_price: item.unitPrice,
+      manual_price_override: item.manualPriceOverride ?? true,
     });
   },
 
@@ -751,13 +821,20 @@ export const patientsStore = {
   },
 };
 
-export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string; bg: string }> = {
-  intact:        { label: "Intact",       color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
-  missing:       { label: "Missing",      color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
-  caries:        { label: "Caries",       color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
-  filled:        { label: "Filled",       color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
-  crown:         { label: "Crown",        color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
-  "root-treated":{ label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
-  implant:       { label: "Implant",      color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
-  bridge:        { label: "Bridge",       color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
+export const STATUS_META: Record<
+  ToothStatus,
+  { label: string; color: string; ring: string; bg: string }
+> = {
+  intact: { label: "Intact", color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
+  missing: { label: "Missing", color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
+  caries: { label: "Caries", color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
+  filled: { label: "Filled", color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
+  crown: { label: "Crown", color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
+  "root-treated": { label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
+  implant: { label: "Implant", color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
+  bridge: { label: "Bridge", color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
 };
+
+export function getStatusMeta(status: unknown) {
+  return STATUS_META[normalizeToothStatus(status)];
+}
