@@ -24,6 +24,11 @@ import { cn } from "@/lib/utils";
 interface TreatmentMenuItem {
   label: string;
   value: string;
+  itemId?: string;
+  itemKey?: string;
+  sectionKey?: string;
+  groupKey?: string;
+  unitPrice?: number;
 }
 
 interface TreatmentGroup {
@@ -202,17 +207,25 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         items.push({
           label: `${group.title}: ${item.name}`,
           value: item.name,
+          itemId: item.id,
+          itemKey: item.key,
+          sectionKey: section.key,
+          groupKey: group.key,
+          unitPrice: item.price,
         });
       });
     });
     return {
-      id: section.id,
+      id: section.key,
       label: section.label,
       items,
     };
   });
   const treatmentLookup = buildTreatmentLookup(treatmentGroups);
   const toothAnnotations = buildToothAnnotations(rows, treatmentLookup);
+  const defaultBridgeItem = treatmentGroups
+    .find((group) => group.id === "bridge")
+    ?.items.find((item) => item.itemId);
 
   const toggleBridgeTooth = (n: number) => {
     setBridgeSel((prev) =>
@@ -229,10 +242,16 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       name: item.value,
       toothNumber: selected ?? undefined,
       amount: 1,
-      unitPrice: pricelistStore.getPriceFor(item.value),
+      unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
+      catalogSectionKey: item.sectionKey,
+      catalogGroupKey: item.groupKey,
+      catalogItemId: item.itemId,
+      catalogItemKey: item.itemKey,
+      priceSource: item.itemId ? "catalog" : undefined,
+      manualPriceOverride: false,
     });
     if (selected != null) {
-      const nextStatus = getToothStatusForTreatment(group.id, item.value);
+      const nextStatus = getToothStatusForTreatment(item.sectionKey ?? group.id, item.value);
       if (nextStatus) {
         const tooth = plan.teeth[selected];
         patientsStore.setTooth(plan.id, {
@@ -283,7 +302,13 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
       name: bridgeName,
       amount: 1,
-      unitPrice: pricelistStore.getPriceFor("Bridge"),
+      unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
+      catalogSectionKey: defaultBridgeItem?.sectionKey ?? "bridge",
+      catalogGroupKey: defaultBridgeItem?.groupKey ?? "bridge",
+      catalogItemId: defaultBridgeItem?.itemId,
+      catalogItemKey: defaultBridgeItem?.itemKey,
+      priceSource: "catalog",
+      manualPriceOverride: false,
     });
     cancelBridge();
   };

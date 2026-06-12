@@ -322,6 +322,7 @@ function norm(value: string) {
 function buildSectionLookup(sections: PricelistSection[]) {
   const byKey = new Map<string, PricelistSection>();
   sections.forEach((section) => {
+    if (section.key) byKey.set(norm(section.key), section);
     byKey.set(norm(section.id), section);
     byKey.set(norm(section.label), section);
   });
@@ -331,6 +332,7 @@ function buildSectionLookup(sections: PricelistSection[]) {
 function buildGroupLookup(groups: PricelistGroup[]) {
   const byTitle = new Map<string, PricelistGroup>();
   groups.forEach((group) => {
+    if (group.key) byTitle.set(norm(group.key), group);
     byTitle.set(norm(group.title), group);
   });
   return byTitle;
@@ -359,6 +361,7 @@ function toSectionFromTemplate(
       const found = itemsByName.get(norm(itemTemplate.name));
       return {
         id: found?.item.id ?? `${template.key}-${groupTemplate.key}-${itemTemplate.key}`,
+        key: found?.item.key ?? itemTemplate.key,
         name: itemTemplate.name,
         price: found?.item.price ?? itemTemplate.price,
         note: found?.item.note ?? "",
@@ -367,6 +370,7 @@ function toSectionFromTemplate(
 
     return {
       id: sourceGroup?.id ?? `${template.key}-${groupTemplate.key}`,
+      key: sourceGroup?.key ?? groupTemplate.key,
       title: groupTemplate.title,
       price_label: sourceGroup?.price_label ?? null,
       items,
@@ -375,6 +379,7 @@ function toSectionFromTemplate(
 
   return {
     id: sourceSection?.id ?? template.key,
+    key: sourceSection?.key ?? template.key,
     n: template.n,
     label: template.label,
     icon: template.icon,

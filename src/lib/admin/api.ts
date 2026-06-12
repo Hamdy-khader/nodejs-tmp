@@ -178,6 +178,7 @@ export interface PricelistSettings {
 
 export interface PricelistItem {
   id: string;
+  key?: string;
   name: string;
   price: number;
   note: string;
@@ -185,6 +186,7 @@ export interface PricelistItem {
 
 export interface PricelistGroup {
   id: string;
+  key?: string;
   title: string;
   price_label: string | null;
   items: PricelistItem[];
@@ -192,6 +194,7 @@ export interface PricelistGroup {
 
 export interface PricelistSection {
   id: string;
+  key?: string;
   n: number | null;
   label: string;
   icon: string;

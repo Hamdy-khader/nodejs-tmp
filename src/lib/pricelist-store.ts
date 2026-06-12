@@ -2,10 +2,23 @@ import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
 import { normalizePricelistData } from "@/lib/treatment-catalog";
 
-export type PriceItem = { id: string; name: string; price: number; note?: string };
-export type PriceSubGroup = { id: string; title: string; priceLabel?: string; items: PriceItem[] };
+export type PriceItem = {
+  id: string;
+  key: string;
+  name: string;
+  price: number;
+  note?: string;
+};
+export type PriceSubGroup = {
+  id: string;
+  key: string;
+  title: string;
+  priceLabel?: string;
+  items: PriceItem[];
+};
 export type PriceSection = {
   id: string;
+  key: string;
   n: number | null;
   label: string;
   icon: string;
@@ -39,15 +52,18 @@ function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["se
 
   return normalized.sections.map((section) => ({
     id: section.id,
+    key: section.key ?? section.id,
     n: section.n,
     label: section.label,
     icon: section.icon,
     groups: section.groups.map((group) => ({
       id: group.id,
+      key: group.key ?? group.id,
       title: group.title,
       priceLabel: group.price_label ?? undefined,
       items: group.items.map((item) => ({
         id: item.id,
+        key: item.key ?? item.id,
         name: item.name,
         price: item.price,
         note: item.note || undefined,

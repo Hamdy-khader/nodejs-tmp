@@ -21,9 +21,15 @@ export interface ToothState {
 export interface TreatmentItem {
   id: string;
   name: string;
+  catalogSectionKey?: string;
+  catalogGroupKey?: string;
+  catalogItemId?: string;
+  catalogItemKey?: string;
   toothNumber?: number;
   amount: number;
   unitPrice: number;
+  priceSource?: "catalog";
+  manualPriceOverride?: boolean;
 }
 
 export type TreatmentRow =
@@ -143,12 +149,21 @@ function toTreatmentItem(raw: Record<string, unknown>): TreatmentItem {
   return {
     id: String(raw.id ?? uid()),
     name: String(raw.name ?? ""),
+    catalogSectionKey: raw.catalog_section_key ? String(raw.catalog_section_key) : undefined,
+    catalogGroupKey: raw.catalog_group_key ? String(raw.catalog_group_key) : undefined,
+    catalogItemId: raw.catalog_item_id ? String(raw.catalog_item_id) : undefined,
+    catalogItemKey: raw.catalog_item_key ? String(raw.catalog_item_key) : undefined,
     toothNumber:
       raw.tooth_number === null || raw.tooth_number === undefined
         ? undefined
         : Number(raw.tooth_number),
     amount: Number(raw.amount ?? 1),
     unitPrice: Number(raw.unit_price ?? 0),
+    priceSource: raw.price_source === "catalog" ? "catalog" : undefined,
+    manualPriceOverride:
+      raw.manual_price_override === null || raw.manual_price_override === undefined
+        ? undefined
+        : Boolean(raw.manual_price_override),
   };
 }
 
@@ -302,13 +317,19 @@ function serializeTreatmentRows(treatments: TreatmentRow[]) {
     items:
       row.kind === "visit"
         ? row.items.map((item, itemIndex) => ({
-            id: item.id,
-            name: item.name,
-            tooth_number: item.toothNumber ?? null,
-            amount: item.amount,
-            unit_price: item.unitPrice,
-            sort_order: itemIndex + 1,
-          }))
+          id: item.id,
+          catalog_section_key: item.catalogSectionKey ?? null,
+          catalog_group_key: item.catalogGroupKey ?? null,
+          catalog_item_id: item.catalogItemId ?? null,
+          catalog_item_key: item.catalogItemKey ?? null,
+          name: item.name,
+          tooth_number: item.toothNumber ?? null,
+          amount: item.amount,
+          unit_price: item.unitPrice,
+          price_source: item.priceSource ?? (item.catalogItemId ? "catalog" : null),
+          manual_price_override: item.manualPriceOverride ?? false,
+          sort_order: itemIndex + 1,
+        }))
         : [],
   }));
 }
@@ -639,10 +660,12 @@ export const patientsStore = {
     updateLocalPlan(planId, { treatments: rows });
     void clinicApi.plans
       .createItem(planId, row.id, {
-        name: newItem.name,
+        catalog_section_key: newItem.catalogSectionKey ?? null,
+        catalog_group_key: newItem.catalogGroupKey ?? null,
+        catalog_item_id: newItem.catalogItemId ?? null,
+        catalog_item_key: newItem.catalogItemKey ?? null,
         tooth_number: newItem.toothNumber ?? null,
         amount: newItem.amount,
-        unit_price: newItem.unitPrice,
         sort_order: row.items.length + 1,
       })
       .catch(() => null);
@@ -669,11 +692,15 @@ export const patientsStore = {
   ) {
     const plan = getPlanById(planId);
     if (!plan) return;
+    const nextPatch =
+      patch.unitPrice !== undefined
+        ? { ...patch, manualPriceOverride: true }
+        : patch;
     const treatments = (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
         ? {
             ...row,
-            items: row.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+            items: row.items.map((item) => (item.id === itemId ? { ...item, ...nextPatch } : item)),
           }
         : row,
     );
@@ -684,10 +711,10 @@ export const patientsStore = {
     const item = row?.items.find((entry) => entry.id === itemId);
     if (!item) return;
     void clinicApi.plans.updateItem(planId, rowId, itemId, {
-      name: item.name,
       tooth_number: item.toothNumber ?? null,
       amount: item.amount,
       unit_price: item.unitPrice,
+      manual_price_override: item.manualPriceOverride ?? true,
     });
   },
 
