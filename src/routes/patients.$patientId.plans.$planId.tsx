@@ -62,7 +62,6 @@ export const Route = createFileRoute("/patients/$patientId/plans/$planId")({
 const STEPS = [
   { id: "diagnosis", label: "Diagnosis" },
   { id: "treatments", label: "Treatments" },
-  { id: "animation", label: "Animation" },
   { id: "documents", label: "Documents" },
   { id: "overview", label: "Overview" },
 ] as const;
@@ -195,6 +194,7 @@ function PlanPage() {
 
   const selectedTooth = selected != null ? plan.teeth[selected] : null;
   const canSelectStatus = selectedTooth != null;
+  const showRightRail = step === "diagnosis" || step === "treatments";
 
   const setStatus = (s: ToothStatus) => {
     if (!selectedTooth) return;
@@ -246,7 +246,12 @@ function PlanPage() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-[1600px] min-w-0 grid-cols-1 gap-4 p-3 sm:p-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div
+        className={cn(
+          "mx-auto grid w-full max-w-[1600px] min-w-0 grid-cols-1 gap-4 p-3 sm:p-5",
+          showRightRail && "xl:grid-cols-[minmax(0,1fr)_280px]",
+        )}
+      >
         {/* Main column */}
         <div className="space-y-5">
           {/* Plan header (back + name) */}
@@ -550,6 +555,7 @@ function PlanPage() {
         </div>
 
         {/* Right rail */}
+         {showRightRail && (
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
           {filledPanelOpen &&
             selectedTooth &&
@@ -716,6 +722,7 @@ function PlanPage() {
             )}
           </div>
         </aside>
+         )}
       </div>
 
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>

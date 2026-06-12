@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as StatisticsRouteImport } from './routes/statistics'
 import { Route as PlanSettingsRouteImport } from './routes/plan-settings'
 import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as OverviewRouteImport } from './routes/overview'
@@ -40,6 +42,16 @@ const UsersRoute = UsersRouteImport.update({
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatisticsRoute = StatisticsRouteImport.update({
+  id: '/statistics',
+  path: '/statistics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanSettingsRoute = PlanSettingsRouteImport.update({
@@ -152,6 +164,8 @@ export interface FileRoutesByFullPath {
   '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
+  '/statistics': typeof StatisticsRoute
+  '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -175,6 +189,8 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsRoute
   '/overview': typeof OverviewRoute
   '/plan-settings': typeof PlanSettingsRoute
+  '/statistics': typeof StatisticsRoute
+  '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -199,6 +215,8 @@ export interface FileRoutesById {
   '/overview': typeof OverviewRoute
   '/patients': typeof PatientsRouteWithChildren
   '/plan-settings': typeof PlanSettingsRoute
+  '/statistics': typeof StatisticsRoute
+  '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -225,6 +243,8 @@ export interface FileRouteTypes {
     | '/overview'
     | '/patients'
     | '/plan-settings'
+    | '/statistics'
+    | '/support'
     | '/templates'
     | '/users'
     | '/admin/dashboard'
@@ -248,6 +268,8 @@ export interface FileRouteTypes {
     | '/documents'
     | '/overview'
     | '/plan-settings'
+    | '/statistics'
+    | '/support'
     | '/templates'
     | '/users'
     | '/admin/dashboard'
@@ -271,6 +293,8 @@ export interface FileRouteTypes {
     | '/overview'
     | '/patients'
     | '/plan-settings'
+    | '/statistics'
+    | '/support'
     | '/templates'
     | '/users'
     | '/admin/dashboard'
@@ -296,6 +320,8 @@ export interface RootRouteChildren {
   OverviewRoute: typeof OverviewRoute
   PatientsRoute: typeof PatientsRouteWithChildren
   PlanSettingsRoute: typeof PlanSettingsRoute
+  StatisticsRoute: typeof StatisticsRoute
+  SupportRoute: typeof SupportRoute
   TemplatesRoute: typeof TemplatesRoute
   UsersRoute: typeof UsersRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
@@ -323,6 +349,20 @@ declare module '@tanstack/react-router' {
       path: '/templates'
       fullPath: '/templates'
       preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/statistics': {
+      id: '/statistics'
+      path: '/statistics'
+      fullPath: '/statistics'
+      preLoaderRoute: typeof StatisticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plan-settings': {
@@ -503,6 +543,8 @@ const rootRouteChildren: RootRouteChildren = {
   OverviewRoute: OverviewRoute,
   PatientsRoute: PatientsRouteWithChildren,
   PlanSettingsRoute: PlanSettingsRoute,
+  StatisticsRoute: StatisticsRoute,
+  SupportRoute: SupportRoute,
   TemplatesRoute: TemplatesRoute,
   UsersRoute: UsersRoute,
   AdminDashboardRoute: AdminDashboardRoute,

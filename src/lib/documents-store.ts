@@ -33,6 +33,18 @@ function emptyOrder(): Record<DocSectionId, string[]> {
   };
 }
 
+function normalizeOrder(
+  order?: Partial<Record<DocSectionId, string[]>>,
+): Record<DocSectionId, string[]> {
+  return {
+    clinic: Array.isArray(order?.clinic) ? order.clinic.map(String) : [],
+    opg: Array.isArray(order?.opg) ? order.opg.map(String) : [],
+    diagnosis: Array.isArray(order?.diagnosis) ? order.diagnosis.map(String) : [],
+    treatments: Array.isArray(order?.treatments) ? order.treatments.map(String) : [],
+    other: Array.isArray(order?.other) ? order.other.map(String) : [],
+  };
+}
+
 let state: StoreData = {
   selectedIds: [...DEFAULT_SELECTED],
   order: emptyOrder(),
@@ -79,13 +91,7 @@ function applyRemote(raw: Record<string, unknown>) {
     selectedIds: Array.isArray(raw.selected_ids)
       ? raw.selected_ids.map(String)
       : [...DEFAULT_SELECTED],
-    order: {
-      clinic: Array.isArray(order.clinic) ? order.clinic.map(String) : [],
-      opg: Array.isArray(order.opg) ? order.opg.map(String) : [],
-      diagnosis: Array.isArray(order.diagnosis) ? order.diagnosis.map(String) : [],
-      treatments: Array.isArray(order.treatments) ? order.treatments.map(String) : [],
-      other: Array.isArray(order.other) ? order.other.map(String) : [],
-    },
+    order: normalizeOrder(order),
     loaded: true,
   };
   emit();
@@ -106,9 +112,14 @@ async function loadDocuments(force = false) {
 }
 
 async function persist() {
+  const payload = {
+    selected_ids: [...state.selectedIds],
+    order: normalizeOrder(state.order),
+  };
+
   await clinicApi.documents.save({
-    selected_ids: state.selectedIds,
-    order: state.order,
+    selected_ids: payload.selected_ids,
+    order: payload.order,
   });
 }
 
@@ -197,7 +208,7 @@ export const documentsStore = {
   reorder(section: DocSectionId, orderedIds: string[]) {
     commit({
       order: {
-        ...state.order,
+        ...normalizeOrder(state.order),
         [section]: orderedIds,
       },
     });

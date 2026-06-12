@@ -84,8 +84,8 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/users")({
   head: () => ({
     meta: [
-      { title: "Users Management - BrightPlans" },
-      { name: "description", content: "Manage clinic users, status and branch assignment." },
+      { title: "Users Management — Treatly" },
+      { name: "description", content: "Manage clinic users, roles, permissions and audit logs." },
     ],
   }),
   component: UsersPage,

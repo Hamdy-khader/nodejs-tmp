@@ -81,7 +81,7 @@ function AdminLoginPage() {
           Admin System
         </div>
 
-        <div className="adm-login-logo">Bright<span>Plans</span></div>
+        <div className="adm-login-logo">treatly<span>online</span></div>
         <p className="adm-login-sub">Sign in to manage the platform</p>
 
         {error && <Alert type="error" message={error} />}
@@ -92,7 +92,7 @@ function AdminLoginPage() {
             <input
               className={`adm-input${fieldErrors.email ? " err" : ""}`}
               type="email"
-              placeholder="admin@brightplans.io"
+              placeholder="admin@treatlyonline.de"
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(""); }}
               autoComplete="email"
@@ -126,7 +126,7 @@ function AdminLoginPage() {
         </form>
 
         <div style={{ marginTop: 24, borderTop: "1px solid var(--adm-border)", paddingTop: 18, textAlign: "center", fontSize: 12, color: "var(--adm-muted2)" }}>
-          BrightPlans Admin · Authorized access only
+          Treatly Admin · Authorized access only
         </div>
       </div>
     </div>

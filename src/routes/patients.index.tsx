@@ -20,7 +20,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/patients/")({
   component: PatientsList,
-  head: () => ({ meta: [{ title: "Patients — BrightPlans" }] }),
+  head: () => ({ meta: [{ title: "Patients — Treatly" }] }),
 });
 
 function initials(name: string) {

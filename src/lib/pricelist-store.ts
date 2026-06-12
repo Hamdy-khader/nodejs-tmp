@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
+import { normalizePricelistData } from "@/lib/treatment-catalog";
 
 export type PriceItem = { id: string; name: string; price: number; note?: string };
 export type PriceSubGroup = { id: string; title: string; priceLabel?: string; items: PriceItem[] };
@@ -26,7 +27,17 @@ function subscribe(listener: () => void) {
 }
 
 function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["sections"]): PriceSection[] {
-  return raw.map((section) => ({
+  const normalized = normalizePricelistData({
+    settings: {
+      language: "en",
+      currency_code: "USD",
+      currency_label: "United States dollar",
+      currency_symbol: "$",
+    },
+    sections: raw,
+  });
+
+  return normalized.sections.map((section) => ({
     id: section.id,
     n: section.n,
     label: section.label,

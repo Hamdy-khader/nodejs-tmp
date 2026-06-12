@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  Youtube,
   Save,
   DollarSign,
   ArrowUpDown,
-  QrCode,
   FileText,
   Check,
   Globe,
@@ -37,7 +35,7 @@ import {
 export const Route = createFileRoute("/plan-settings")({
   head: () => ({
     meta: [
-      { title: "Plan Settings — BrightPlans" },
+      { title: "Plan Settings — Treatly" },
       { name: "description", content: "Configure your treatment plan PDF design." },
     ],
   }),
@@ -177,26 +175,36 @@ function PlanSettingsPage() {
               label="Front cover"
               action="EDIT"
               onClick={() => setEditor("frontCover")}
-              preview={<FrontCoverPreview title={settings.pageDesign.frontCover.title} subtitle={settings.pageDesign.frontCover.subtitle} />}
+              preview={
+                <FrontCoverPreview
+                  clinicName={settings.pageDesign.frontCover.clinicName}
+                  title={settings.pageDesign.frontCover.title}
+                  subtitle={settings.pageDesign.frontCover.subtitle}
+                />
+              }
             />
             <DesignCard
               label="Inner pages"
               action="EDIT"
               onClick={() => setEditor("innerPages")}
-              preview={<InnerPagesPreview headerText={settings.pageDesign.innerPages.headerText} />}
-            />
-            <DesignCard
-              label="Animation (QR code) page"
-              action="CUSTOM"
-              actionVariant="outline"
-              onClick={() => setEditor("animationPage")}
-              preview={<AnimationPreview />}
+              preview={
+                <InnerPagesPreview
+                  headerText={settings.pageDesign.innerPages.headerText}
+                  footerLeft={settings.pageDesign.innerPages.footerLeft}
+                  footerRight={settings.pageDesign.innerPages.footerRight}
+                />
+              }
             />
             <DesignCard
               label="Back cover"
               action="EDIT"
               onClick={() => setEditor("backCover")}
-              preview={<BackCoverPreview note={settings.pageDesign.backCover.note} />}
+              preview={
+                <BackCoverPreview
+                  title={settings.pageDesign.backCover.title}
+                  note={settings.pageDesign.backCover.note}
+                />
+              }
             />
           </div>
 
@@ -273,10 +281,18 @@ function SettingTile({
   );
 }
 
-function FrontCoverPreview({ title, subtitle }: { title: string; subtitle?: string }) {
+function FrontCoverPreview({
+  clinicName,
+  title,
+  subtitle,
+}: {
+  clinicName: string;
+  title: string;
+  subtitle?: string;
+}) {
   return (
     <div className="flex h-full w-full flex-col justify-between bg-[oklch(0.18_0.03_60)] p-3 text-center text-white">
-      <div className="font-serif text-sm italic tracking-wide text-amber-200">BrightPlans</div>
+      <div className="font-serif text-sm italic tracking-wide text-amber-200">{clinicName}</div>
       <div className="space-y-1 pb-2">
         <div className="text-[10px] tracking-[0.3em] text-amber-200/80">{title}</div>
         {subtitle && <div className="text-[9px] tracking-[0.25em] text-amber-100/70">{subtitle}</div>}
@@ -285,7 +301,15 @@ function FrontCoverPreview({ title, subtitle }: { title: string; subtitle?: stri
   );
 }
 
-function InnerPagesPreview({ headerText }: { headerText: string }) {
+function InnerPagesPreview({
+  headerText,
+  footerLeft,
+  footerRight,
+}: {
+  headerText: string;
+  footerLeft: string;
+  footerRight: string;
+}) {
   return (
     <div className="flex h-full w-full flex-col justify-between p-3">
       <div className="flex items-center justify-between border-b border-border pb-1.5">
@@ -298,34 +322,19 @@ function InnerPagesPreview({ headerText }: { headerText: string }) {
         ))}
       </div>
       <div className="flex items-center justify-between border-t border-border pt-1.5 text-[7px] text-muted-foreground">
-        <span>Footer (left)</span>
+        <span>{footerLeft}</span>
         <span>1 / 1</span>
-        <span>Footer (right)</span>
+        <span>{footerRight}</span>
       </div>
     </div>
   );
 }
 
-function AnimationPreview() {
+function BackCoverPreview({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-between p-3 text-center">
-      <div className="space-y-0.5">
-        <div className="text-[8px] font-semibold tracking-wider">YOUR TREATMENT PLAN</div>
-        <div className="text-[9px] font-bold">WATCH YOUR OWN</div>
-        <div className="text-[9px] font-bold">3D TREATMENT ANIMATION!</div>
-      </div>
-      <div className="grid size-16 place-items-center border border-foreground/40">
-        <QrCode className="size-12" />
-      </div>
-      <div className="text-[7px] text-muted-foreground">OR CLICK HERE TO VIEW</div>
-    </div>
-  );
-}
-
-function BackCoverPreview({ note }: { note?: string }) {
-  return (
-    <div className="flex h-full w-full items-center justify-center p-3 text-[10px] text-muted-foreground">
-      {note || "Back cover"}
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center text-[10px] text-muted-foreground">
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/70">{title}</span>
+      <span>{note || "Back cover"}</span>
     </div>
   );
 }
@@ -343,7 +352,13 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
     title = "Edit Front Cover";
     body = (
       <div className="space-y-3">
-        <Field label="Title">
+        <Field label="Clinic name">
+          <Input
+            defaultValue={settings.pageDesign.frontCover.clinicName}
+            onChange={(e) => planSettingsStore.updatePageDesign("frontCover", { clinicName: e.target.value })}
+          />
+        </Field>
+        <Field label="Main title">
           <Input
             defaultValue={settings.pageDesign.frontCover.title}
             onChange={(e) => planSettingsStore.updatePageDesign("frontCover", { title: e.target.value })}
@@ -374,6 +389,18 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
             onChange={(e) => planSettingsStore.updatePageDesign("innerPages", { headerText: e.target.value })}
           />
         </Field>
+        <Field label="Footer left">
+          <Input
+            defaultValue={settings.pageDesign.innerPages.footerLeft}
+            onChange={(e) => planSettingsStore.updatePageDesign("innerPages", { footerLeft: e.target.value })}
+          />
+        </Field>
+        <Field label="Footer right">
+          <Input
+            defaultValue={settings.pageDesign.innerPages.footerRight}
+            onChange={(e) => planSettingsStore.updatePageDesign("innerPages", { footerRight: e.target.value })}
+          />
+        </Field>
         <ToggleRow
           label="Show footer"
           checked={settings.pageDesign.innerPages.showFooter}
@@ -381,34 +408,16 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
         />
       </div>
     );
-  } else if (editor === "animationPage") {
-    title = "Customize Animation Page";
-    body = (
-      <div className="space-y-3">
-        <Field label="Mode">
-          <Select
-            value={settings.pageDesign.animationPage.mode}
-            onValueChange={(v) => planSettingsStore.updatePageDesign("animationPage", { mode: v as "default" | "custom" })}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Custom note">
-          <Input
-            defaultValue={settings.pageDesign.animationPage.customNote ?? ""}
-            onChange={(e) => planSettingsStore.updatePageDesign("animationPage", { customNote: e.target.value })}
-          />
-        </Field>
-      </div>
-    );
   } else if (editor === "backCover") {
     title = "Edit Back Cover";
     body = (
       <div className="space-y-3">
+        <Field label="Title">
+          <Input
+            defaultValue={settings.pageDesign.backCover.title}
+            onChange={(e) => planSettingsStore.updatePageDesign("backCover", { title: e.target.value })}
+          />
+        </Field>
         <Field label="Note">
           <Input
             defaultValue={settings.pageDesign.backCover.note ?? ""}
@@ -478,7 +487,6 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
       <div className="space-y-3">
         <ToggleRow label="Diagnosis" checked={s.showDiagnosis} onChange={(v) => planSettingsStore.update({ planSections: { ...s, showDiagnosis: v } })} />
         <ToggleRow label="Treatments" checked={s.showTreatments} onChange={(v) => planSettingsStore.update({ planSections: { ...s, showTreatments: v } })} />
-        <ToggleRow label="Animation" checked={s.showAnimation} onChange={(v) => planSettingsStore.update({ planSections: { ...s, showAnimation: v } })} />
         <ToggleRow label="Documents" checked={s.showDocuments} onChange={(v) => planSettingsStore.update({ planSections: { ...s, showDocuments: v } })} />
         <ToggleRow label="Overview" checked={s.showOverview} onChange={(v) => planSettingsStore.update({ planSections: { ...s, showOverview: v } })} />
       </div>

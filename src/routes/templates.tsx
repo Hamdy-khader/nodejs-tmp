@@ -47,7 +47,7 @@ import {
 export const Route = createFileRoute("/templates")({
   head: () => ({
     meta: [
-      { title: "Templates — BrightPlans" },
+      { title: "Templates — Treatly" },
       { name: "description", content: "Manage your clinic document templates." },
     ],
   }),
@@ -197,11 +197,6 @@ function TemplatesPage() {
               </button>
             );
           })}
-          <div className="my-2 h-px bg-border/60" />
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-            <Youtube className="size-4 text-destructive" />
-            <span>Videos</span>
-          </button>
           <div className="my-2 h-px bg-border/60" />
           <button
             onClick={openNew}

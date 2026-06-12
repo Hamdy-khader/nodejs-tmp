@@ -18,127 +18,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
 import { cn } from "@/lib/utils";
+
+interface TreatmentMenuItem {
+  label: string;
+  value: string;
+}
 
 interface TreatmentGroup {
   id: string;
   label: string;
-  items?: string[];
-  /** When true, render as a single direct-action button (no dropdown). */
-  flat?: boolean;
+  items: TreatmentMenuItem[];
 }
-
-const TREATMENT_GROUPS: TreatmentGroup[] = [
-  {
-    id: "extraction",
-    label: "Extraction",
-    items: ["Extraction", "Wisdom Extraction", "Surgical extraction", "Remove existing implant"],
-  },
-  {
-    id: "prosthesis",
-    label: "Prosthesis removal",
-    items: ["Prosthesis removal", "Bridge removal", "Crown removal"],
-  },
-  {
-    id: "filling",
-    label: "Filling",
-    items: [
-      "Filling",
-      "Temporary filling",
-      "Medicated filling",
-      "Inlay",
-      "Onlay",
-      "Inlay preparation",
-      "Onlay preparation",
-    ],
-  },
-  {
-    id: "dentures",
-    label: "Dentures",
-    items: ["Temporary bridge", "Temporary crown", "Overdenture", "Overdentures", "Pred-vertix"],
-  },
-  {
-    id: "rct",
-    label: "Root canal treatment",
-    items: [
-      "Root canal treatment",
-      "Root canal treatment - 1 root",
-      "Root canal treatment - 2 root",
-      "Root canal treatment - 3 root",
-      "Root canal re-treatment",
-      "Post (Composite)",
-      "Post preparation",
-      "Parapulpal pin",
-    ],
-  },
-  {
-    id: "implant",
-    label: "Implant",
-    items: [
-      "Implant",
-      "Abutment",
-      "Implant + abutment",
-      "Implant (one-phase)",
-      "Healing screw",
-      "Gingiva former",
-      "Bar",
-      "Prosthetic screw (lateral)",
-      "Prosthetic screw",
-    ],
-  },
-  {
-    id: "crown",
-    label: "Crown",
-    items: ["Crown", "Veneer", "Veneer preparation", "Telescopic crown", "Filing"],
-  },
-  { id: "bridge", label: "Bridge", flat: true },
-  {
-    id: "general",
-    label: "General",
-    items: [
-      "Custom...",
-      "All on 6 Bredent German",
-      "All on 4 Nobel Swiss",
-      "Premium Hollywood Smile",
-      "Standard Smile Design",
-      "Panoramic X-ray",
-      "Impression",
-      "Sinus lift",
-      "IV sedation",
-      "Medical Pack",
-      "Clear Aligners",
-      "Fixed ceramic braces",
-      "Fixed metal braces",
-      "Functional appliance",
-      "Removable appliance",
-      "Lingual braces",
-      "Orthodontic retainer",
-      "Teeth Whitening (External Bleach)",
-      "Teeth Whitening (Internal Bleach)",
-      "Dental Hygiene Treatment",
-      "Prevention & hygiene",
-      "Topical fluoride",
-    ],
-  },
-  {
-    id: "other",
-    label: "Other",
-    items: [
-      "Custom...",
-      "Local X-ray",
-      "Accommodation",
-      "Transportation (Airport-Hotel-Clinic)",
-      "Apicoectomy",
-      "Core build-up",
-      "Crown lengthening",
-      "Gingival graft",
-      "Gingivectomy",
-      "Laser gingivectomy",
-      "Pocket reduction",
-      "Scaling / root planing",
-    ],
-  },
-];
 
 /** Ordered FDI map across both jaws for finding "between" teeth. */
 const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
@@ -157,10 +49,8 @@ function teethBetween(a: number, b: number): number[] {
 
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
-  usePricelist();
+  const pricelistSections = usePricelist();
   const [selected, setSelected] = useState<number | null>(null);
-  const [customOpen, setCustomOpen] = useState<{ groupId: string } | null>(null);
-  const [customText, setCustomText] = useState("");
   const [bridgeMode, setBridgeMode] = useState(false);
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
   const [insOpen, setInsOpen] = useState(false);
@@ -168,6 +58,28 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
 
   const rows = plan.treatments ?? [];
   const billingMode = plan.billingMode ?? "insurance";
+  const treatmentGroups: TreatmentGroup[] = pricelistSections.map((section) => {
+    const items: TreatmentMenuItem[] = [];
+    if (section.label === "Bridge") {
+      items.push({
+        label: "Bridge Span...",
+        value: "__bridge_span__",
+      });
+    }
+    section.groups.forEach((group) => {
+      group.items.forEach((item) => {
+        items.push({
+          label: `${group.title}: ${item.name}`,
+          value: item.name,
+        });
+      });
+    });
+    return {
+      id: section.id,
+      label: section.label,
+      items,
+    };
+  });
 
   const toggleBridgeTooth = (n: number) => {
     setBridgeSel((prev) =>
@@ -175,18 +87,27 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     );
   };
 
-  const handlePick = (group: TreatmentGroup, item: string) => {
-    if (item === "Custom...") {
-      setCustomText("");
-      setCustomOpen({ groupId: group.id });
+  const handlePick = (group: TreatmentGroup, item: TreatmentMenuItem) => {
+    if (item.value === "__bridge_span__") {
+      startBridge();
       return;
     }
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
-      name: item,
+      name: item.value,
       toothNumber: selected ?? undefined,
       amount: 1,
-      unitPrice: pricelistStore.getPriceFor(item),
+      unitPrice: pricelistStore.getPriceFor(item.value),
     });
+    if (selected != null) {
+      const nextStatus = getToothStatusForTreatment(group.id, item.value);
+      if (nextStatus) {
+        const tooth = plan.teeth[selected];
+        patientsStore.setTooth(plan.id, {
+          ...(tooth ?? { number: selected, status: "intact" }),
+          status: nextStatus,
+        });
+      }
+    }
   };
 
   const startBridge = () => {
@@ -225,7 +146,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       });
     }
     // Add a treatment line summarizing the bridge span
-    const bridgeName = `Bridge ${lo}–${hi}`;
+    const bridgeName = `Bridge ${lo}-${hi}`;
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
       name: bridgeName,
       amount: 1,
@@ -313,51 +234,31 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            {TREATMENT_GROUPS.map((group) => {
-              if (group.flat) {
-                const isActive = group.id === "bridge" && bridgeMode;
-                return (
-                  <button
-                    key={group.id}
-                    onClick={() => {
-                      if (group.id === "bridge") {
-                        if (bridgeMode) cancelBridge();
-                        else startBridge();
-                      }
-                    }}
-                    className={cn(
-                      "flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                      isActive
-                        ? "bg-[oklch(0.55_0.18_290)] text-white"
-                        : "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
-                    )}
-                  >
-                    <span className="truncate">{group.label}</span>
-                    {isActive && <Check className="h-3.5 w-3.5 shrink-0" />}
-                  </button>
-                );
-              }
+            {treatmentGroups.map((group) => {
+              const isActive = group.id === "bridge" && bridgeMode;
               return (
                 <DropdownMenu key={group.id}>
                   <DropdownMenuTrigger asChild>
                     <button
                       className={cn(
                         "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                        "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
+                        isActive
+                          ? "bg-[oklch(0.55_0.18_290)] text-white"
+                          : "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
                       )}
                     >
                       <span className="truncate">{group.label}</span>
-                      <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      {isActive ? <Check className="h-3.5 w-3.5 shrink-0 opacity-90" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />}
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
                     {group.items?.map((item) => (
                       <DropdownMenuItem
-                        key={item}
+                        key={`${group.id}-${item.groupTitle}-${item.value}-${item.label}`}
                         onSelect={() => handlePick(group, item)}
                         className="text-xs font-medium"
                       >
-                        <span className="truncate">{item}</span>
+                        <span className="truncate">{item.label}</span>
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -507,67 +408,6 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
       </div>
-
-      {/* Custom dialog */}
-      {customOpen && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-          onClick={() => setCustomOpen(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-bold">Custom treatment</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Enter a custom treatment name.
-            </p>
-            <Input
-              autoFocus
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="e.g. Custom procedure"
-              className="mt-3"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && customText.trim()) {
-                  const name = customText.trim();
-                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name,
-                    toothNumber: selected ?? undefined,
-                    amount: 1,
-                    unitPrice: pricelistStore.getPriceFor(name),
-                  });
-                  setCustomOpen(null);
-                }
-              }}
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setCustomOpen(null)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!customText.trim()) return;
-                  const name = customText.trim();
-                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name,
-                    toothNumber: selected ?? undefined,
-                    amount: 1,
-                    unitPrice: pricelistStore.getPriceFor(name),
-                  });
-                  setCustomOpen(null);
-                }}
-                className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {insOpen && (
         <InsuranceDialog
