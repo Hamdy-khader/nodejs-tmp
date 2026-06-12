@@ -301,7 +301,7 @@ function PlanPage() {
           ) : step === "documents" ? (
             <DocumentsPanel />
           ) : step === "overview" ? (
-            <OverviewPanel />
+            <OverviewPanel plan={plan} />
           ) : step !== "diagnosis" ? (
             <div className="rounded-2xl border border-dashed border-border/60 bg-card p-12 text-center shadow-[var(--shadow-soft)]">
               <p className="text-sm text-muted-foreground">

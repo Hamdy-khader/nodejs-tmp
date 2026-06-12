@@ -9,7 +9,7 @@ import {
   LOWER_TEETH,
 } from "@/lib/patients-store";
 import { pricelistStore, usePricelist } from "@/lib/pricelist-store";
-import { TeethChart } from "@/components/TeethChart";
+import { TeethChart, type ToothAnnotation } from "@/components/TeethChart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,8 +32,78 @@ interface TreatmentGroup {
   items: TreatmentMenuItem[];
 }
 
+const TREATMENT_VISUALS: Record<
+  string,
+  { shortLabel: string; color: string; background: string; border: string }
+> = {
+  extraction: {
+    shortLabel: "EXT",
+    color: "#9f2f28",
+    background: "rgba(201, 73, 59, 0.14)",
+    border: "rgba(201, 73, 59, 0.34)",
+  },
+  filling: {
+    shortLabel: "FIL",
+    color: "#1f5fa8",
+    background: "rgba(66, 133, 244, 0.14)",
+    border: "rgba(66, 133, 244, 0.34)",
+  },
+  "root-canal-treatment": {
+    shortLabel: "RCT",
+    color: "#b54d19",
+    background: "rgba(229, 115, 35, 0.14)",
+    border: "rgba(229, 115, 35, 0.34)",
+  },
+  implant: {
+    shortLabel: "IMP",
+    color: "#38567d",
+    background: "rgba(90, 122, 167, 0.14)",
+    border: "rgba(90, 122, 167, 0.34)",
+  },
+  crown: {
+    shortLabel: "CRN",
+    color: "#8c6512",
+    background: "rgba(224, 184, 64, 0.16)",
+    border: "rgba(200, 152, 12, 0.34)",
+  },
+  veneer: {
+    shortLabel: "VNR",
+    color: "#7b4bb3",
+    background: "rgba(177, 122, 255, 0.14)",
+    border: "rgba(177, 122, 255, 0.34)",
+  },
+  bridge: {
+    shortLabel: "BRG",
+    color: "#6a2ec0",
+    background: "rgba(128, 64, 200, 0.14)",
+    border: "rgba(128, 64, 200, 0.34)",
+  },
+  dentures: {
+    shortLabel: "DNS",
+    color: "#0d766e",
+    background: "rgba(20, 184, 166, 0.14)",
+    border: "rgba(20, 184, 166, 0.34)",
+  },
+  general: {
+    shortLabel: "GEN",
+    color: "#475467",
+    background: "rgba(71, 84, 103, 0.10)",
+    border: "rgba(71, 84, 103, 0.26)",
+  },
+  other: {
+    shortLabel: "AUX",
+    color: "#475467",
+    background: "rgba(71, 84, 103, 0.10)",
+    border: "rgba(71, 84, 103, 0.26)",
+  },
+};
+
 /** Ordered FDI map across both jaws for finding "between" teeth. */
 const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
+
+function norm(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function teethBetween(a: number, b: number): number[] {
   for (const row of JAW_ORDER) {
@@ -45,6 +115,67 @@ function teethBetween(a: number, b: number): number[] {
     }
   }
   return [];
+}
+
+function buildTreatmentLookup(groups: TreatmentGroup[]) {
+  const lookup = new Map<string, string>();
+  groups.forEach((group) => {
+    group.items.forEach((item) => {
+      if (!item.value.startsWith("__")) {
+        lookup.set(norm(item.value), group.id);
+      }
+    });
+  });
+  return lookup;
+}
+
+function buildToothAnnotations(
+  rows: TreatmentRow[],
+  treatmentLookup: Map<string, string>,
+): Record<number, ToothAnnotation[]> {
+  const perTooth = new Map<number, Map<string, ToothAnnotation & { count: number }>>();
+
+  rows.forEach((row) => {
+    if (row.kind !== "visit") return;
+
+    row.items.forEach((item) => {
+      if (item.toothNumber == null) return;
+
+      const sectionId = treatmentLookup.get(norm(item.name)) ?? "general";
+      const visual = TREATMENT_VISUALS[sectionId] ?? TREATMENT_VISUALS.general;
+      const toothBucket = perTooth.get(item.toothNumber) ?? new Map();
+      const key = `${sectionId}:${item.name}`;
+      const current = toothBucket.get(key);
+
+      if (current) {
+        current.count += Math.max(1, item.amount);
+      } else {
+        toothBucket.set(key, {
+          id: key,
+          label: item.name,
+          shortLabel: visual.shortLabel,
+          color: visual.color,
+          background: visual.background,
+          border: visual.border,
+          count: Math.max(1, item.amount),
+        });
+      }
+
+      perTooth.set(item.toothNumber, toothBucket);
+    });
+  });
+
+  return Object.fromEntries(
+    [...perTooth.entries()].map(([toothNumber, bucket]) => [
+      toothNumber,
+      [...bucket.values()]
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+        .map(({ count, ...annotation }) => ({
+          ...annotation,
+          shortLabel: count > 1 ? `${annotation.shortLabel}${count}` : annotation.shortLabel,
+        })),
+    ]),
+  );
 }
 
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
@@ -80,6 +211,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       items,
     };
   });
+  const treatmentLookup = buildTreatmentLookup(treatmentGroups);
+  const toothAnnotations = buildToothAnnotations(rows, treatmentLookup);
 
   const toggleBridgeTooth = (n: number) => {
     setBridgeSel((prev) =>
@@ -181,6 +314,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             selected={bridgeMode ? null : selected}
             onSelect={bridgeMode ? toggleBridgeTooth : setSelected}
             highlighted={bridgeMode ? bridgeSel : undefined}
+            annotations={toothAnnotations}
           />
           {bridgeMode && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[oklch(0.55_0.18_290)]/40 bg-[oklch(0.55_0.18_290)]/10 px-3 py-2">
@@ -254,7 +388,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                   <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
                     {group.items?.map((item) => (
                       <DropdownMenuItem
-                        key={`${group.id}-${item.groupTitle}-${item.value}-${item.label}`}
+                        key={`${group.id}-${item.value}-${item.label}`}
                         onSelect={() => handlePick(group, item)}
                         className="text-xs font-medium"
                       >

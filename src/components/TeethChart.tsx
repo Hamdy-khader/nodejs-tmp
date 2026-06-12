@@ -6,6 +6,16 @@ interface Props {
   selected?: number | null;
   onSelect?: (n: number) => void;
   highlighted?: number[];
+  annotations?: Record<number, ToothAnnotation[]>;
+}
+
+export interface ToothAnnotation {
+  id: string;
+  label: string;
+  shortLabel: string;
+  color: string;
+  background: string;
+  border: string;
 }
 
 type Cat = "molar" | "premolar" | "canine" | "incisor";
@@ -378,6 +388,24 @@ function ToothSVG({
   );
 }
 
+export function ToothIllustration({
+  number,
+  status,
+  note,
+  className,
+}: {
+  number: number;
+  status: ToothStatus;
+  note?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("aspect-[1/2] w-full max-w-[44px]", className)}>
+      <ToothSVG number={number} status={status} note={note} />
+    </div>
+  );
+}
+
 // ─── Bridge run detection ────────────────────────────────────────────────────
 function bridgeRuns(numbers: number[], teeth: Record<number, ToothState>) {
   const runs: { start: number; end: number }[] = [];
@@ -412,6 +440,7 @@ function Row({
   selected,
   onSelect,
   highlighted,
+  annotations,
 }: { numbers: number[]; isUpper: boolean } & Props) {
   const hSet = new Set(highlighted ?? []);
   const runs = bridgeRuns(numbers, teeth);
@@ -461,6 +490,9 @@ function Row({
         const bridgePos = runLookup.get(idx);
         const hasStatus = status !== "intact";
         const stripCls  = STATUS_STRIP[status];
+        const noteSet = annotations?.[n] ?? [];
+        const visibleNotes = noteSet.slice(0, 2);
+        const overflowCount = Math.max(0, noteSet.length - visibleNotes.length);
 
         return (
           <button
@@ -468,10 +500,34 @@ function Row({
             type="button"
             onClick={() => onSelect?.(n)}
             className={cn(
-              "group relative z-10 flex min-w-0 flex-1 flex-col items-center transition-all",
+              "group relative z-10 flex min-w-0 flex-1 flex-col items-center pt-12 transition-all",
               isUpper ? "flex-col" : "flex-col-reverse",
             )}
           >
+            {visibleNotes.length > 0 && (
+              <div className="pointer-events-none absolute left-1/2 top-1 flex min-w-[3.4rem] -translate-x-1/2 flex-col items-center gap-1">
+                {visibleNotes.map((annotation) => (
+                  <div
+                    key={annotation.id}
+                    className="max-w-[4.25rem] rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] shadow-sm backdrop-blur-sm"
+                    style={{
+                      color: annotation.color,
+                      background: annotation.background,
+                      borderColor: annotation.border,
+                    }}
+                    title={annotation.label}
+                  >
+                    {annotation.shortLabel}
+                  </div>
+                ))}
+                {overflowCount > 0 && (
+                  <div className="rounded-full border border-border/60 bg-card/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-muted-foreground shadow-sm">
+                    +{overflowCount}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Tooth SVG wrapper */}
             <div
               className={cn(
@@ -532,7 +588,7 @@ function Row({
 }
 
 // ─── Public component ─────────────────────────────────────────────────────────
-export function TeethChart({ teeth, selected, onSelect, highlighted }: Props) {
+export function TeethChart({ teeth, selected, onSelect, highlighted, annotations }: Props) {
   return (
     <div className="space-y-4 rounded-2xl border border-border/60 bg-gradient-to-b from-card to-muted/30 p-3 shadow-inner sm:p-5">
       {/* Upper label */}
@@ -548,6 +604,7 @@ export function TeethChart({ teeth, selected, onSelect, highlighted }: Props) {
         selected={selected}
         onSelect={onSelect}
         highlighted={highlighted}
+        annotations={annotations}
       />
 
       {/* Midline / gum divider */}
@@ -568,6 +625,7 @@ export function TeethChart({ teeth, selected, onSelect, highlighted }: Props) {
         selected={selected}
         onSelect={onSelect}
         highlighted={highlighted}
+        annotations={annotations}
       />
 
       {/* Lower label */}
