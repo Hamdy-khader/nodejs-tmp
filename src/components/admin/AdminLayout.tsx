@@ -60,7 +60,7 @@ export function AdminLayout({ children, title = "Admin Panel" }: AdminLayoutProp
       {/* ── Sidebar ── */}
       <aside className="adm-sidebar">
         <div className="adm-logo-area">
-          <div className="adm-logo">Bright<span>Plans</span></div>
+          <div className="adm-logo">treatly<span>online</span></div>
           <div className="adm-logo-sub">Admin Panel</div>
         </div>
 

@@ -137,6 +137,38 @@ function toDashboardStats(raw: Record<string, unknown>): DashboardStats {
   };
 }
 
+export interface ClinicOverviewStats {
+  totalPatients: number;
+  activePlans: number;
+  completedPlans: number;
+  totalRevenue: number;
+  currency: string;
+  period: string;
+}
+
+export interface ClinicRevenuePoint {
+  period: string;
+  revenue: number;
+}
+
+function toClinicOverviewStats(raw: Record<string, unknown>): ClinicOverviewStats {
+  return {
+    totalPatients: Number(raw.totalPatients ?? raw.total_patients ?? 0),
+    activePlans: Number(raw.activePlans ?? raw.active_plans ?? 0),
+    completedPlans: Number(raw.completedPlans ?? raw.completed_plans ?? 0),
+    totalRevenue: Number(raw.totalRevenue ?? raw.total_revenue ?? 0),
+    currency: String(raw.currency ?? "USD"),
+    period: String(raw.period ?? ""),
+  };
+}
+
+function toClinicRevenuePoint(raw: Record<string, unknown>): ClinicRevenuePoint {
+  return {
+    period: String(raw.period ?? ""),
+    revenue: Number(raw.revenue ?? 0),
+  };
+}
+
 export interface PricelistSettings {
   language: string;
   currency_code: string;
@@ -633,17 +665,20 @@ export const clinicApi = {
   },
 
   overview: {
-    stats: (): Promise<Record<string, unknown>> => clinicReq("GET", "/clinic/overview/stats"),
+    stats: async (): Promise<ClinicOverviewStats> => {
+      const raw = await clinicReq<Record<string, unknown>>("GET", "/clinic/overview/stats");
+      return toClinicOverviewStats(raw);
+    },
     revenue: (params?: {
       from?: string;
       to?: string;
       group?: string;
-    }): Promise<Record<string, unknown>> =>
-      clinicReq(
+    }): Promise<ClinicRevenuePoint[]> =>
+      clinicReq<Record<string, unknown>[]>(
         "GET",
         "/clinic/overview/revenue",
         undefined,
         params as Record<string, string | number | boolean | undefined>,
-      ),
+      ).then((rows) => rows.map((item) => toClinicRevenuePoint(item))),
   },
 };

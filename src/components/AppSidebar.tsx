@@ -36,7 +36,6 @@ const items = [
   { title: "Overview", url: "/overview", icon: FileText },
   { title: "Plan settings", url: "/plan-settings", icon: Settings },
   { title: "Statistics", url: "/statistics", icon: BarChart3 },
-  { title: "What's new", url: "/whats-new", icon: Sparkles },
   { title: "Support", url: "/support", icon: LifeBuoy },
 ];
 

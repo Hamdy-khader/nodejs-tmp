@@ -81,7 +81,7 @@ function AdminLoginPage() {
           Admin System
         </div>
 
-        <div className="adm-login-logo">Bright<span>Plans</span></div>
+        <div className="adm-login-logo">treatly<span>online</span></div>
         <p className="adm-login-sub">Sign in to manage the platform</p>
 
         {error && <Alert type="error" message={error} />}

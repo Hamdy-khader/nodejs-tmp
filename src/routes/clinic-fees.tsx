@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi, clinicTokenStore, type PricelistData, type PricelistGroup, type PricelistItem, type PricelistSection } from "@/lib/admin/api";
+import { isCustomGroup, isDefaultItem, normalizePricelistData } from "@/lib/treatment-catalog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -88,20 +89,6 @@ const isPersistedId = (id: string) => /^\d+$/.test(id);
 
 function newLocalItem(): PricelistItem {
   return { id: localId(), name: "New treatment", price: 0, note: "" };
-}
-
-function newLocalGroup(): PricelistGroup {
-  return { id: localId(), title: "New group", price_label: "Unit price", items: [] };
-}
-
-function newLocalSection(nextNumber: number): PricelistSection {
-  return {
-    id: localId(),
-    n: nextNumber,
-    label: "New section",
-    icon: "package",
-    groups: [newLocalGroup()],
-  };
 }
 
 function updateGroup(
@@ -161,13 +148,14 @@ function ClinicFeesPage() {
     clinicApi.pricelist
       .get()
       .then((next) => {
-        setData(next);
-        setPendingLang(next.settings.language);
-        setPendingCurrency(next.settings.currency_code);
+        const normalized = normalizePricelistData(next);
+        setData(normalized);
+        setPendingLang(normalized.settings.language);
+        setPendingCurrency(normalized.settings.currency_code);
         const current: Currency = {
-          code: next.settings.currency_code,
-          label: next.settings.currency_label,
-          symbol: next.settings.currency_symbol,
+          code: normalized.settings.currency_code,
+          label: normalized.settings.currency_label,
+          symbol: normalized.settings.currency_symbol,
         };
         setCurrencies((prev) => (prev.some((c) => c.code === current.code) ? prev : [...prev, current]));
       })
@@ -193,7 +181,7 @@ function ClinicFeesPage() {
 
       setSaving(true);
       try {
-        const saved = await clinicApi.pricelist.save(payload);
+        const saved = normalizePricelistData(await clinicApi.pricelist.save(payload));
         setData(saved);
         setDirty(false);
         toast.success("Pricelist saved");
@@ -250,7 +238,7 @@ function ClinicFeesPage() {
         await clinicApi.pricelist.updateItem(itemId, patch);
       } catch {
         toast.error("Failed to save item changes.");
-        clinicApi.pricelist.get().then(setData).catch(() => null);
+        clinicApi.pricelist.get().then((next) => setData(normalizePricelistData(next))).catch(() => null);
       }
     },
     [],
@@ -296,65 +284,8 @@ function ClinicFeesPage() {
       await clinicApi.pricelist.deleteItem(itemId);
     } catch {
       toast.error("Failed to delete item.");
-      clinicApi.pricelist.get().then(setData).catch(() => null);
+      clinicApi.pricelist.get().then((next) => setData(normalizePricelistData(next))).catch(() => null);
     }
-  }, []);
-
-  const patchSection = useCallback((sectionId: string, patch: Partial<Pick<PricelistSection, "label" | "n" | "icon">>) => {
-    setData((prev) =>
-      prev ? { ...prev, sections: prev.sections.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)) } : prev,
-    );
-    setDirty(true);
-  }, []);
-
-  const addSection = useCallback(() => {
-    setData((prev) => {
-      if (!prev) return prev;
-      const maxNumber = prev.sections.reduce((max, section) => Math.max(max, section.n ?? 0), 0);
-      return { ...prev, sections: [...prev.sections, newLocalSection(maxNumber + 1)] };
-    });
-    setDirty(true);
-  }, []);
-
-  const removeSection = useCallback((sectionId: string) => {
-    setData((prev) => (prev ? { ...prev, sections: prev.sections.filter((section) => section.id !== sectionId) } : prev));
-    setDirty(true);
-  }, []);
-
-  const patchGroup = useCallback(
-    (sectionId: string, groupId: string, patch: Partial<Pick<PricelistGroup, "title" | "price_label">>) => {
-      setData((prev) => (prev ? updateGroup(prev, sectionId, groupId, (group) => ({ ...group, ...patch })) : prev));
-      setDirty(true);
-    },
-    [],
-  );
-
-  const addGroup = useCallback((sectionId: string) => {
-    setData((prev) =>
-      prev
-        ? {
-            ...prev,
-            sections: prev.sections.map((section) =>
-              section.id === sectionId ? { ...section, groups: [...section.groups, newLocalGroup()] } : section,
-            ),
-          }
-        : prev,
-    );
-    setDirty(true);
-  }, []);
-
-  const removeGroup = useCallback((sectionId: string, groupId: string) => {
-    setData((prev) =>
-      prev
-        ? {
-            ...prev,
-            sections: prev.sections.map((section) =>
-              section.id === sectionId ? { ...section, groups: section.groups.filter((group) => group.id !== groupId) } : section,
-            ),
-          }
-        : prev,
-    );
-    setDirty(true);
   }, []);
 
   const scrollTo = (id: string) => sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -441,24 +372,11 @@ function ClinicFeesPage() {
               registerRef={(el) => {
                 sectionRefs.current[section.id] = el;
               }}
-              onSectionPatch={(patch) => patchSection(section.id, patch)}
-              onSectionRemove={() => removeSection(section.id)}
-              onGroupPatch={(groupId, patch) => patchGroup(section.id, groupId, patch)}
-              onGroupAdd={() => addGroup(section.id)}
-              onGroupRemove={(groupId) => removeGroup(section.id, groupId)}
               onItemPatch={(groupId, itemId, patch) => patchItem(section.id, groupId, itemId, patch)}
               onItemAdd={(groupId) => addItem(section.id, groupId)}
               onItemRemove={(groupId, itemId) => removeItem(section.id, groupId, itemId)}
             />
           ))}
-
-          <button
-            type="button"
-            onClick={addSection}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/40 bg-card px-4 py-5 text-sm font-semibold text-primary transition hover:bg-primary/5"
-          >
-            <Plus className="h-4 w-4" /> Add section
-          </button>
         </div>
 
         <aside className="hidden lg:block">
@@ -481,13 +399,6 @@ function ClinicFeesPage() {
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={addSection}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-xs font-semibold text-primary hover:bg-primary/5"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add section
-            </button>
           </div>
         </aside>
       </div>
@@ -577,11 +488,6 @@ function SectionCard({
   section,
   currency,
   registerRef,
-  onSectionPatch,
-  onSectionRemove,
-  onGroupPatch,
-  onGroupAdd,
-  onGroupRemove,
   onItemPatch,
   onItemAdd,
   onItemRemove,
@@ -589,11 +495,6 @@ function SectionCard({
   section: PricelistSection;
   currency: Currency;
   registerRef: (el: HTMLDivElement | null) => void;
-  onSectionPatch: (patch: Partial<Pick<PricelistSection, "label" | "n" | "icon">>) => void;
-  onSectionRemove: () => void;
-  onGroupPatch: (groupId: string, patch: Partial<Pick<PricelistGroup, "title" | "price_label">>) => void;
-  onGroupAdd: () => void;
-  onGroupRemove: (groupId: string) => void;
   onItemPatch: (groupId: string, itemId: string, patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
   onItemAdd: (groupId: string) => void;
   onItemRemove: (groupId: string, itemId: string) => void;
@@ -611,39 +512,16 @@ function SectionCard({
             {section.n != null ? `Button ${section.n}` : "Section"}
           </div>
           <div className="grid gap-2 sm:grid-cols-[minmax(160px,1fr)_88px_128px]">
-            <Input
-              value={section.label}
-              onChange={(event) => onSectionPatch({ label: event.target.value })}
-              className="h-8 bg-background text-sm font-semibold uppercase tracking-wide"
-            />
-            <Input
-              type="number"
-              value={section.n ?? ""}
-              onChange={(event) => onSectionPatch({ n: event.target.value === "" ? null : Math.max(0, Number(event.target.value) || 0) })}
-              className="h-8 bg-background text-sm"
-              placeholder="No."
-            />
-            <Select value={section.icon} onValueChange={(icon) => onSectionPatch({ icon })}>
-              <SelectTrigger className="h-8 bg-background text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ICON_OPTIONS.map((icon) => (
-                  <SelectItem key={icon} value={icon}>
-                    {icon}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-sm font-semibold uppercase tracking-wide">
+              {section.label}
+            </div>
+            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-sm">
+              {section.n ?? "-"}
+            </div>
+            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs">
+              {section.icon}
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onGroupAdd}>
-            <Plus className="h-3.5 w-3.5" /> Group
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={onSectionRemove}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -656,10 +534,9 @@ function SectionCard({
         {section.groups.map((group) => (
           <SubGroupBlock
             key={group.id}
+            sectionId={section.id}
             group={group}
             currency={currency}
-            onGroupPatch={(patch) => onGroupPatch(group.id, patch)}
-            onGroupRemove={() => onGroupRemove(group.id)}
             onItemPatch={(itemId, patch) => onItemPatch(group.id, itemId, patch)}
             onItemAdd={() => onItemAdd(group.id)}
             onItemRemove={(itemId) => onItemRemove(group.id, itemId)}
@@ -671,18 +548,16 @@ function SectionCard({
 }
 
 function SubGroupBlock({
+  sectionId,
   group,
   currency,
-  onGroupPatch,
-  onGroupRemove,
   onItemPatch,
   onItemAdd,
   onItemRemove,
 }: {
+  sectionId: string;
   group: PricelistGroup;
   currency: Currency;
-  onGroupPatch: (patch: Partial<Pick<PricelistGroup, "title" | "price_label">>) => void;
-  onGroupRemove: () => void;
   onItemPatch: (itemId: string, patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
   onItemAdd: () => void;
   onItemRemove: (itemId: string) => void;
@@ -695,14 +570,9 @@ function SubGroupBlock({
         <button type="button" onClick={() => setOpen((value) => !value)} className="grid h-8 w-8 place-items-center rounded-md hover:bg-secondary">
           <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
         </button>
-        <Input
-          value={group.title}
-          onChange={(event) => onGroupPatch({ title: event.target.value })}
-          className="h-8 min-w-[180px] flex-1 bg-background text-sm font-semibold"
-        />
-        <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={onGroupRemove}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex h-8 min-w-[180px] flex-1 items-center rounded-md border border-input bg-background px-3 text-sm font-semibold">
+          {group.title}
+        </div>
       </div>
 
       {open && (
@@ -713,19 +583,23 @@ function SubGroupBlock({
           {group.items.map((item) => (
             <PriceRow
               key={item.id}
+              sectionId={sectionId}
+              groupTitle={group.title}
               item={item}
               currency={currency}
               onPatch={(patch) => onItemPatch(item.id, patch)}
               onRemove={() => onItemRemove(item.id)}
             />
           ))}
-          <button
-            type="button"
-            onClick={onItemAdd}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-xs font-semibold text-primary transition hover:bg-primary/5"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add to {group.title || "group"}
-          </button>
+          {isCustomGroup(sectionId, group.title) && (
+            <button
+              type="button"
+              onClick={onItemAdd}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-xs font-semibold text-primary transition hover:bg-primary/5"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add to {group.title || "group"}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -733,11 +607,15 @@ function SubGroupBlock({
 }
 
 function PriceRow({
+  sectionId,
+  groupTitle,
   item,
   currency,
   onPatch,
   onRemove,
 }: {
+  sectionId: string;
+  groupTitle: string;
   item: PricelistItem;
   currency: Currency;
   onPatch: (patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
@@ -774,6 +652,7 @@ function PriceRow({
   };
 
   const hasNote = Boolean(localNote.trim());
+  const isTemplateItem = isDefaultItem(sectionId, groupTitle, item.name);
 
   return (
     <div className="group rounded-xl border border-transparent bg-secondary/40 px-3 py-2 transition hover:border-border hover:bg-secondary/70">
@@ -782,7 +661,11 @@ function PriceRow({
           value={localName}
           onChange={(event) => setLocalName(event.target.value)}
           onBlur={handleNameBlur}
-          className="h-8 min-w-[220px] flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-1"
+          readOnly={isTemplateItem}
+          className={cn(
+            "h-8 min-w-[220px] flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-1",
+            isTemplateItem && "cursor-default text-foreground/80 focus-visible:ring-0",
+          )}
         />
 
         <div className="flex items-center gap-1 rounded-md bg-background px-2 py-1 ring-1 ring-border/60">
@@ -808,14 +691,16 @@ function PriceRow({
           <StickyNote className="h-4 w-4" />
         </button>
 
-        <button
-          type="button"
-          onClick={onRemove}
-          className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
-          title="Delete"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {!isTemplateItem && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {(editingNote || hasNote) && (
