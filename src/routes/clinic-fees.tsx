@@ -15,14 +15,12 @@ import {
   Loader2,
   MoreHorizontal,
   Package,
-  Plus,
   Save,
   Scissors,
   Settings,
   Smile,
   Sparkles,
   StickyNote,
-  Trash2,
   Wrench,
   X,
 } from "lucide-react";
@@ -32,7 +30,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { clinicApi, clinicTokenStore, type PricelistData, type PricelistGroup, type PricelistItem, type PricelistSection } from "@/lib/admin/api";
-import { isCustomGroup, isDefaultItem, normalizePricelistData } from "@/lib/treatment-catalog";
+import { isDefaultItem, normalizePricelistData } from "@/lib/treatment-catalog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -84,12 +82,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);
-const localId = () => `local_${Math.random().toString(36).slice(2, 10)}`;
 const isPersistedId = (id: string) => /^\d+$/.test(id);
-
-function newLocalItem(): PricelistItem {
-  return { id: localId(), name: "New treatment", price: 0, note: "" };
-}
 
 function updateGroup(
   data: PricelistData,
@@ -244,50 +237,6 @@ function ClinicFeesPage() {
     [],
   );
 
-  const addItem = useCallback(async (sectionId: string, groupId: string) => {
-    if (!isPersistedId(groupId)) {
-      setData((prev) =>
-        prev
-          ? updateGroup(prev, sectionId, groupId, (group) => ({ ...group, items: [...group.items, newLocalItem()] }))
-          : prev,
-      );
-      setDirty(true);
-      return;
-    }
-
-    try {
-      const item = await clinicApi.pricelist.addItem({ group_id: groupId, name: "New treatment", price: 0, note: "" });
-      setData((prev) =>
-        prev ? updateGroup(prev, sectionId, groupId, (group) => ({ ...group, items: [...group.items, item] })) : prev,
-      );
-    } catch {
-      toast.error("Failed to add item.");
-    }
-  }, []);
-
-  const removeItem = useCallback(async (sectionId: string, groupId: string, itemId: string) => {
-    setData((prev) =>
-      prev
-        ? updateGroup(prev, sectionId, groupId, (group) => ({
-            ...group,
-            items: group.items.filter((item) => item.id !== itemId),
-          }))
-        : prev,
-    );
-
-    if (!isPersistedId(itemId)) {
-      setDirty(true);
-      return;
-    }
-
-    try {
-      await clinicApi.pricelist.deleteItem(itemId);
-    } catch {
-      toast.error("Failed to delete item.");
-      clinicApi.pricelist.get().then((next) => setData(normalizePricelistData(next))).catch(() => null);
-    }
-  }, []);
-
   const scrollTo = (id: string) => sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const settings = data?.settings;
@@ -373,8 +322,6 @@ function ClinicFeesPage() {
                 sectionRefs.current[section.id] = el;
               }}
               onItemPatch={(groupId, itemId, patch) => patchItem(section.id, groupId, itemId, patch)}
-              onItemAdd={(groupId) => addItem(section.id, groupId)}
-              onItemRemove={(groupId, itemId) => removeItem(section.id, groupId, itemId)}
             />
           ))}
         </div>
@@ -489,15 +436,11 @@ function SectionCard({
   currency,
   registerRef,
   onItemPatch,
-  onItemAdd,
-  onItemRemove,
 }: {
   section: PricelistSection;
   currency: Currency;
   registerRef: (el: HTMLDivElement | null) => void;
   onItemPatch: (groupId: string, itemId: string, patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
-  onItemAdd: (groupId: string) => void;
-  onItemRemove: (groupId: string, itemId: string) => void;
 }) {
   const Icon = ICON_MAP[section.icon] ?? Package;
 
@@ -538,8 +481,6 @@ function SectionCard({
             group={group}
             currency={currency}
             onItemPatch={(itemId, patch) => onItemPatch(group.id, itemId, patch)}
-            onItemAdd={() => onItemAdd(group.id)}
-            onItemRemove={(itemId) => onItemRemove(group.id, itemId)}
           />
         ))}
       </div>
@@ -552,15 +493,11 @@ function SubGroupBlock({
   group,
   currency,
   onItemPatch,
-  onItemAdd,
-  onItemRemove,
 }: {
   sectionId: string;
   group: PricelistGroup;
   currency: Currency;
   onItemPatch: (itemId: string, patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
-  onItemAdd: () => void;
-  onItemRemove: (itemId: string) => void;
 }) {
   const [open, setOpen] = useState(true);
 
@@ -588,18 +525,8 @@ function SubGroupBlock({
               item={item}
               currency={currency}
               onPatch={(patch) => onItemPatch(item.id, patch)}
-              onRemove={() => onItemRemove(item.id)}
             />
           ))}
-          {isCustomGroup(sectionId, group.title) && (
-            <button
-              type="button"
-              onClick={onItemAdd}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/40 py-2 text-xs font-semibold text-primary transition hover:bg-primary/5"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add to {group.title || "group"}
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -612,14 +539,12 @@ function PriceRow({
   item,
   currency,
   onPatch,
-  onRemove,
 }: {
   sectionId: string;
   groupTitle: string;
   item: PricelistItem;
   currency: Currency;
   onPatch: (patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
-  onRemove: () => void;
 }) {
   const [localName, setLocalName] = useState(item.name);
   const [localPrice, setLocalPrice] = useState(String(item.price));
@@ -691,16 +616,6 @@ function PriceRow({
           <StickyNote className="h-4 w-4" />
         </button>
 
-        {!isTemplateItem && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       {(editingNote || hasNote) && (

@@ -4,10 +4,9 @@ import { clinicApi } from "@/lib/admin/api";
 export type PageSize = "A4" | "Letter" | "Legal";
 
 export interface PageDesign {
-  frontCover: { coverImage?: string; title: string; subtitle?: string };
-  innerPages: { headerText: string; showFooter: boolean };
-  animationPage: { mode: "default" | "custom"; customNote?: string };
-  backCover: { backImage?: string; note?: string };
+  frontCover: { coverImage?: string; clinicName: string; title: string; subtitle?: string };
+  innerPages: { headerText: string; footerLeft: string; footerRight: string; showFooter: boolean };
+  backCover: { backImage?: string; title: string; note?: string };
 }
 
 export interface PlanSettings {
@@ -26,7 +25,6 @@ export interface PlanSettings {
   planSections: {
     showDiagnosis: boolean;
     showTreatments: boolean;
-    showAnimation: boolean;
     showDocuments: boolean;
     showOverview: boolean;
   };
@@ -50,15 +48,22 @@ const defaults: PlanSettings = {
   planSections: {
     showDiagnosis: true,
     showTreatments: true,
-    showAnimation: true,
     showDocuments: true,
     showOverview: true,
   },
   pageDesign: {
-    frontCover: { title: "TREATMENT PLAN", subtitle: "[PATIENT NAME]" },
-    innerPages: { headerText: "TITLE", showFooter: true },
-    animationPage: { mode: "default" },
-    backCover: { note: "" },
+    frontCover: {
+      clinicName: "Treatly",
+      title: "TREATMENT PLAN",
+      subtitle: "[PATIENT NAME]",
+    },
+    innerPages: {
+      headerText: "Inner pages",
+      footerLeft: "Footer (left)",
+      footerRight: "Footer (right)",
+      showFooter: true,
+    },
+    backCover: { title: "Back cover", note: "" },
   },
   updatedAt: Date.now(),
 };
@@ -83,7 +88,6 @@ function applyRemote(raw: Record<string, unknown>) {
   const pageDesign = (raw.page_design ?? {}) as Record<string, unknown>;
   const frontCover = (pageDesign.front_cover ?? {}) as Record<string, unknown>;
   const innerPages = (pageDesign.inner_pages ?? {}) as Record<string, unknown>;
-  const animationPage = (pageDesign.animation_page ?? {}) as Record<string, unknown>;
   const backCover = (pageDesign.back_cover ?? {}) as Record<string, unknown>;
 
   state = {
@@ -102,26 +106,25 @@ function applyRemote(raw: Record<string, unknown>) {
     planSections: {
       showDiagnosis: Boolean(planSections.show_diagnosis ?? defaults.planSections.showDiagnosis),
       showTreatments: Boolean(planSections.show_treatments ?? defaults.planSections.showTreatments),
-      showAnimation: Boolean(planSections.show_animation ?? defaults.planSections.showAnimation),
       showDocuments: Boolean(planSections.show_documents ?? defaults.planSections.showDocuments),
       showOverview: Boolean(planSections.show_overview ?? defaults.planSections.showOverview),
     },
     pageDesign: {
       frontCover: {
         coverImage: frontCover.cover_image ? String(frontCover.cover_image) : undefined,
+        clinicName: String(frontCover.clinic_name ?? defaults.pageDesign.frontCover.clinicName),
         title: String(frontCover.title ?? defaults.pageDesign.frontCover.title),
         subtitle: frontCover.subtitle ? String(frontCover.subtitle) : defaults.pageDesign.frontCover.subtitle,
       },
       innerPages: {
         headerText: String(innerPages.header_text ?? defaults.pageDesign.innerPages.headerText),
+        footerLeft: String(innerPages.footer_left ?? defaults.pageDesign.innerPages.footerLeft),
+        footerRight: String(innerPages.footer_right ?? defaults.pageDesign.innerPages.footerRight),
         showFooter: Boolean(innerPages.show_footer ?? defaults.pageDesign.innerPages.showFooter),
-      },
-      animationPage: {
-        mode: String(animationPage.mode ?? defaults.pageDesign.animationPage.mode) as "default" | "custom",
-        customNote: animationPage.custom_note ? String(animationPage.custom_note) : undefined,
       },
       backCover: {
         backImage: backCover.back_image ? String(backCover.back_image) : undefined,
+        title: String(backCover.title ?? defaults.pageDesign.backCover.title),
         note: backCover.note ? String(backCover.note) : "",
       },
     },
@@ -162,26 +165,25 @@ function toPayload(settings: PlanSettings) {
     plan_sections: {
       show_diagnosis: settings.planSections.showDiagnosis,
       show_treatments: settings.planSections.showTreatments,
-      show_animation: settings.planSections.showAnimation,
       show_documents: settings.planSections.showDocuments,
       show_overview: settings.planSections.showOverview,
     },
     page_design: {
       front_cover: {
         cover_image: settings.pageDesign.frontCover.coverImage ?? null,
+        clinic_name: settings.pageDesign.frontCover.clinicName,
         title: settings.pageDesign.frontCover.title,
         subtitle: settings.pageDesign.frontCover.subtitle ?? null,
       },
       inner_pages: {
         header_text: settings.pageDesign.innerPages.headerText,
+        footer_left: settings.pageDesign.innerPages.footerLeft,
+        footer_right: settings.pageDesign.innerPages.footerRight,
         show_footer: settings.pageDesign.innerPages.showFooter,
-      },
-      animation_page: {
-        mode: settings.pageDesign.animationPage.mode,
-        custom_note: settings.pageDesign.animationPage.customNote ?? null,
       },
       back_cover: {
         back_image: settings.pageDesign.backCover.backImage ?? null,
+        title: settings.pageDesign.backCover.title,
         note: settings.pageDesign.backCover.note ?? null,
       },
     },

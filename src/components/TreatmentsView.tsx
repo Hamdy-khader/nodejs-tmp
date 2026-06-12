@@ -18,13 +18,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
 import { cn } from "@/lib/utils";
 
 interface TreatmentMenuItem {
-  groupTitle: string;
   label: string;
   value: string;
-  custom?: boolean;
 }
 
 interface TreatmentGroup {
@@ -52,8 +51,6 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
   const pricelistSections = usePricelist();
   const [selected, setSelected] = useState<number | null>(null);
-  const [customOpen, setCustomOpen] = useState<{ groupId: string; groupLabel: string } | null>(null);
-  const [customText, setCustomText] = useState("");
   const [bridgeMode, setBridgeMode] = useState(false);
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
   const [insOpen, setInsOpen] = useState(false);
@@ -65,7 +62,6 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     const items: TreatmentMenuItem[] = [];
     if (section.label === "Bridge") {
       items.push({
-        groupTitle: section.label,
         label: "Bridge Span...",
         value: "__bridge_span__",
       });
@@ -73,19 +69,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     section.groups.forEach((group) => {
       group.items.forEach((item) => {
         items.push({
-          groupTitle: group.title,
           label: `${group.title}: ${item.name}`,
           value: item.name,
         });
       });
-      if (group.title.toLowerCase() === "other treatments" || (section.label === "Other" && group.title.toLowerCase() === "other")) {
-        items.push({
-          groupTitle: group.title,
-          label: `${group.title}: Manual entry...`,
-          value: "__custom__",
-          custom: true,
-        });
-      }
     });
     return {
       id: section.id,
@@ -105,17 +92,22 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       startBridge();
       return;
     }
-    if (item.custom) {
-      setCustomText("");
-      setCustomOpen({ groupId: group.id, groupLabel: item.groupTitle });
-      return;
-    }
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
       name: item.value,
       toothNumber: selected ?? undefined,
       amount: 1,
       unitPrice: pricelistStore.getPriceFor(item.value),
     });
+    if (selected != null) {
+      const nextStatus = getToothStatusForTreatment(group.id, item.value);
+      if (nextStatus) {
+        const tooth = plan.teeth[selected];
+        patientsStore.setTooth(plan.id, {
+          ...(tooth ?? { number: selected, status: "intact" }),
+          status: nextStatus,
+        });
+      }
+    }
   };
 
   const startBridge = () => {
@@ -416,67 +408,6 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
       </div>
-
-      {/* Custom dialog */}
-      {customOpen && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-          onClick={() => setCustomOpen(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-background p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-bold">Custom treatment</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Enter a custom treatment name for {customOpen.groupLabel}.
-            </p>
-            <Input
-              autoFocus
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="e.g. Custom procedure"
-              className="mt-3"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && customText.trim()) {
-                  const name = customText.trim();
-                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name,
-                    toothNumber: selected ?? undefined,
-                    amount: 1,
-                    unitPrice: pricelistStore.getPriceFor(name),
-                  });
-                  setCustomOpen(null);
-                }
-              }}
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setCustomOpen(null)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!customText.trim()) return;
-                  const name = customText.trim();
-                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    name,
-                    toothNumber: selected ?? undefined,
-                    amount: 1,
-                    unitPrice: pricelistStore.getPriceFor(name),
-                  });
-                  setCustomOpen(null);
-                }}
-                className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {insOpen && (
         <InsuranceDialog

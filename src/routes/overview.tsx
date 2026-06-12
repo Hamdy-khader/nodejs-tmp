@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { jsPDF } from "jspdf";
 import {
   Globe,
   DollarSign,
@@ -18,17 +17,11 @@ import {
   FileText,
   Sparkles,
   ScrollText,
-  Smartphone,
-  QrCode,
   Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   useSelectedIds,
   useSectionOrder,
@@ -39,12 +32,13 @@ import {
 import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
 import { useTabs } from "@/lib/tabs-store";
+import { saveTreatmentPlanPdf, type TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/overview")({
   head: () => ({
     meta: [
-      { title: "Overview — Treatly" },
+      { title: "Overview â€” Treatly" },
       { name: "description", content: "Preview the final treatment plan PDF before download." },
     ],
   }),
@@ -106,11 +100,7 @@ function getDocumentBody(id: string, templates: ClinicTemplate[]) {
   return FIXED_DOCUMENT_BODIES[id] ?? "No content available for this document yet.";
 }
 
-function buildSection(
-  sectionId: DocSectionId,
-  templates: ClinicTemplate[],
-  order: string[],
-): DocRow[] {
+function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], order: string[]): DocRow[] {
   let rows: DocRow[] = [];
   if (sectionId === "clinic") {
     rows = [
@@ -144,12 +134,37 @@ function buildSection(
       { id: "fixed:other:note", title: "Custom note", body: getDocumentBody("fixed:other:note", templates) },
     ];
   }
+
   if (order.length === 0) return rows;
   const map = new Map(rows.map((r) => [r.id, r]));
   const ordered: DocRow[] = [];
   for (const id of order) if (map.has(id)) ordered.push(map.get(id)!);
-  for (const r of rows) if (!order.includes(r.id)) ordered.push(r);
+  for (const row of rows) if (!order.includes(row.id)) ordered.push(row);
   return ordered;
+}
+
+type PageKind = "cover" | "status" | "suggested" | "document" | "back";
+
+function buildPdfPages(selectedDocs: DocRow[]): TreatmentPlanPdfPage[] {
+  return [
+    { kind: "cover", title: "Cover" },
+    {
+      kind: "status",
+      title: "Your current dental status",
+      body: "This section summarizes the patient's current dental status and can be filled with the diagnosis details shown in the treatment plan.",
+    },
+    {
+      kind: "suggested",
+      title: "Your suggested treatment",
+      body: "This section summarizes the suggested treatment items and price table settings selected for the patient's plan.",
+    },
+    ...selectedDocs.map((doc) => ({
+      kind: "document" as const,
+      title: doc.title,
+      body: doc.body,
+    })),
+    { kind: "back", title: "Back cover" },
+  ];
 }
 
 function OverviewPage() {
@@ -161,33 +176,17 @@ function OverviewPage() {
   const [layout, setLayout] = useState<"grid" | "single">("grid");
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-
   const selectedDocs = useMemo(() => {
     const out: DocRow[] = [];
-    (["clinic", "diagnosis", "treatments", "other"] as DocSectionId[]).forEach((s) => {
-      buildSection(s, templates, order[s]).forEach((r) => {
-        if (selectedSet.has(r.id)) out.push(r);
+    (["clinic", "diagnosis", "treatments", "other"] as DocSectionId[]).forEach((section) => {
+      buildSection(section, templates, order[section]).forEach((doc) => {
+        if (selectedSet.has(doc.id)) out.push(doc);
       });
     });
     return out;
   }, [templates, order, selectedSet]);
 
-  // System pages
-  const systemPages: { id: string; kind: PageKind; title: string }[] = [
-    { id: "cover", kind: "cover", title: "Cover" },
-    { id: "status", kind: "status", title: "Your current dental status" },
-    { id: "suggested", kind: "suggested", title: "Your suggested treatment" },
-    { id: "animation", kind: "animation", title: "Your 3D treatment animation" },
-  ];
-
-  const docPages = selectedDocs.map((d) => ({
-    id: d.id,
-    kind: "document" as const,
-    title: d.title,
-    body: d.body,
-  }));
-
-  const allPages = [...systemPages, ...docPages];
+  const allPages = buildPdfPages(selectedDocs);
 
   return (
     <div className="min-h-screen bg-[oklch(0.93_0.005_240)]">
@@ -198,8 +197,8 @@ function OverviewPage() {
             <span className="text-sm text-white/80">Elene</span>
             <div className="ml-4 flex items-center gap-1">
               <span className="flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs">
-                Your suggested treat…
-                <button className="opacity-70 hover:opacity-100">×</button>
+                Your suggested treatâ€¦
+                <button className="opacity-70 hover:opacity-100">أ—</button>
               </span>
               <button className="grid size-6 place-items-center rounded text-white/80 hover:bg-white/10">+</button>
             </div>
@@ -213,7 +212,6 @@ function OverviewPage() {
       <StepProgress active="overview" />
 
       <div className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 lg:grid-cols-[1fr_240px]">
-        {/* Main: pages grid */}
         <main>
           <div className="mb-4 flex justify-end">
             <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -243,14 +241,14 @@ function OverviewPage() {
           <div
             className={cn(
               "grid gap-5",
-              layout === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1 max-w-xl mx-auto",
+              layout === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "mx-auto max-w-xl grid-cols-1",
             )}
           >
-            {allPages.map((p, i) => (
+            {allPages.map((page, index) => (
               <PageCard
-                key={p.id}
-                page={p}
-                index={i + 1}
+                key={`${page.kind}-${page.title}-${index}`}
+                page={page}
+                index={index + 1}
                 total={allPages.length}
                 settings={settings}
               />
@@ -258,23 +256,26 @@ function OverviewPage() {
           </div>
         </main>
 
-        {/* Right sidebar */}
-        <RightSidebar canUndo={canUndo} canRedo={canRedo} />
+        <RightSidebar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          selectedDocs={selectedDocs}
+          settings={settings}
+        />
       </div>
     </div>
   );
 }
 
-/* ---------- Step Progress ---------- */
 function StepProgress({ active }: { active: string }) {
   return (
     <nav className="border-b border-border/60 bg-white">
       <div className="mx-auto flex max-w-[1600px] items-stretch">
-        {STEPS.map((s, i) => {
-          const isActive = s.id === active;
-          const target = s.id === "documents" ? "/documents" : s.id === "overview" ? "/overview" : "/documents";
+        {STEPS.map((step, index) => {
+          const isActive = step.id === active;
+          const target = step.id === "documents" ? "/documents" : step.id === "overview" ? "/overview" : "/documents";
           return (
-            <div key={s.id} className="flex flex-1 items-center">
+            <div key={step.id} className="flex flex-1 items-center">
               <Link
                 to={target as any}
                 className={cn(
@@ -282,14 +283,18 @@ function StepProgress({ active }: { active: string }) {
                   isActive ? "bg-amber-300 text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <span className={cn(
-                  "grid size-7 place-items-center rounded-full text-xs",
-                  isActive ? "bg-foreground text-amber-300" : "bg-muted text-foreground/70",
-                )}>{i + 1}</span>
-                <s.icon className="size-4" />
-                <span>{s.label}</span>
+                <span
+                  className={cn(
+                    "grid size-7 place-items-center rounded-full text-xs",
+                    isActive ? "bg-foreground text-amber-300" : "bg-muted text-foreground/70",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <step.icon className="size-4" />
+                <span>{step.label}</span>
               </Link>
-              {i < STEPS.length - 1 && <div className="h-6 w-px bg-border/60" />}
+              {index < STEPS.length - 1 && <div className="h-6 w-px bg-border/60" />}
             </div>
           );
         })}
@@ -298,17 +303,13 @@ function StepProgress({ active }: { active: string }) {
   );
 }
 
-/* ---------- Page Card ---------- */
-
-type PageKind = "cover" | "status" | "suggested" | "animation" | "document";
-
 function PageCard({
   page,
   index,
   total,
   settings,
 }: {
-  page: { id: string; kind: PageKind; title: string; body?: string };
+  page: TreatmentPlanPdfPage;
   index: number;
   total: number;
   settings: ReturnType<typeof usePlanSettings>;
@@ -328,46 +329,48 @@ function PageCard({
       )}
 
       <div className="flex-1 overflow-hidden px-4 py-3">
-        {page.kind === "cover" && <CoverContent />}
+        {page.kind === "cover" && <CoverContent settings={settings} />}
         {page.kind === "status" && <StatusContent />}
         {page.kind === "suggested" && <SuggestedContent settings={settings} />}
-        {page.kind === "animation" && <AnimationContent />}
         {page.kind === "document" && <DocumentContent title={page.title} body={page.body} />}
+        {page.kind === "back" && <BackCoverContent settings={settings} />}
       </div>
 
-      <footer className="flex items-center justify-center border-t border-border/50 py-1.5 text-[9px] text-muted-foreground">
-        {index} / {total} · Made with Treatly
-      </footer>
+      {page.kind !== "cover" && page.kind !== "back" && settings.pageDesign.innerPages.showFooter && (
+        <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
+          <span>{settings.pageDesign.innerPages.footerLeft}</span>
+          <span>{index} / {total}</span>
+          <span>{settings.pageDesign.innerPages.footerRight}</span>
+        </footer>
+      )}
     </article>
   );
 }
 
-function sectionHeader(page: { kind: PageKind; title: string }) {
+function sectionHeader(page: TreatmentPlanPdfPage) {
   switch (page.kind) {
-    case "status": return "Your current dental status";
-    case "suggested": return "Your suggested treatment";
-    case "animation": return "Your 3D treatment animation";
-    case "document": return "Descriptions and Declarations";
-    default: return page.title;
+    case "status":
+      return "Your current dental status";
+    case "suggested":
+      return "Your suggested treatment";
+    case "document":
+      return "Descriptions and Declarations";
+    default:
+      return page.title;
   }
 }
 
-function CoverContent() {
+function CoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
+  const { frontCover } = settings.pageDesign;
   return (
     <div className="flex h-full flex-col items-center justify-between bg-[oklch(0.18_0.04_60)] text-white">
       <div className="w-full bg-[oklch(0.15_0.04_60)] px-6 py-4 text-center">
-        <p className="font-serif text-2xl italic text-[oklch(0.85_0.08_85)]">Berge Dent</p>
-        <p className="mt-1 text-[9px] tracking-[0.2em] text-[oklch(0.85_0.08_85)]/80">
-          VADISTANBUL / ATAKÖY
-        </p>
-        <p className="mt-0.5 text-[8px] tracking-wider text-white/70">
-          Esthetic Dentistry & Implantology
-        </p>
+        <p className="font-serif text-2xl italic text-[oklch(0.85_0.08_85)]">{frontCover.clinicName}</p>
       </div>
-      <div className="grid flex-1 w-full place-items-center bg-[oklch(0.85_0.02_60)]">
+      <div className="grid w-full flex-1 place-items-center bg-[oklch(0.85_0.02_60)]">
         <div className="text-center text-[oklch(0.3_0.04_60)]">
-          <p className="text-[10px] tracking-[0.3em]">TREATMENT PLAN</p>
-          <p className="mt-1 font-serif text-base italic">Elene</p>
+          <p className="text-[10px] tracking-[0.3em]">{frontCover.title}</p>
+          <p className="mt-1 font-serif text-base italic">{frontCover.subtitle}</p>
         </div>
       </div>
     </div>
@@ -394,7 +397,7 @@ function StatusContent() {
         ))}
       </div>
       <div className="mt-2 space-y-0.5">
-        <p className="text-[8px] font-semibold text-foreground/80">Diagnosis – Upper jaw</p>
+        <p className="text-[8px] font-semibold text-foreground/80">Diagnosis â€“ Upper jaw</p>
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex gap-3 text-[7px] text-muted-foreground">
             <span>{11 + i}. Intact</span>
@@ -408,6 +411,7 @@ function StatusContent() {
 
 function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
   const { showPrices, showSubtotal, showTotal, showInsurance, currency } = settings.pricePage;
+
   return (
     <div className="space-y-2 text-[8px]">
       <div className="flex items-end justify-center gap-0.5">
@@ -415,10 +419,12 @@ function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSet
           const isTreated = i >= 4 && i <= 8;
           return (
             <div key={i} className="flex flex-col items-center">
-              <div className={cn(
-                "h-6 w-2.5 rounded-sm border",
-                isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
-              )} />
+              <div
+                className={cn(
+                  "h-6 w-2.5 rounded-sm border",
+                  isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
+                )}
+              />
               <span className="mt-0.5 text-[6px] text-muted-foreground">{i + 11}</span>
             </div>
           );
@@ -430,10 +436,12 @@ function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSet
           return (
             <div key={i} className="flex flex-col items-center">
               <span className="mb-0.5 text-[6px] text-muted-foreground">{i + 41}</span>
-              <div className={cn(
-                "h-6 w-2.5 rounded-sm border",
-                isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
-              )} />
+              <div
+                className={cn(
+                  "h-6 w-2.5 rounded-sm border",
+                  isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
+                )}
+              />
             </div>
           );
         })}
@@ -444,8 +452,8 @@ function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSet
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-border/50 pb-1 text-[7px] font-semibold uppercase tracking-wider text-muted-foreground">
             <span>Treatment</span><span>Amount</span><span>Unit</span><span>Price</span>
           </div>
-          <Row label="Bridge – Metal-ceramic (22-24)" amt="3" unit={`${currency === "USD" ? "$" : ""} 350`} price={`${currency === "USD" ? "$" : ""} 1,050`} />
-          <Row label="Bridge – Metal-ceramic (42-47)" amt="6" unit={`${currency === "USD" ? "$" : ""} 400`} price={`${currency === "USD" ? "$" : ""} 2,400`} />
+          <Row label="Bridge â€“ Metal-ceramic (22-24)" amt="3" unit={`${currency === "USD" ? "$" : ""} 350`} price={`${currency === "USD" ? "$" : ""} 1,050`} />
+          <Row label="Bridge â€“ Metal-ceramic (42-47)" amt="6" unit={`${currency === "USD" ? "$" : ""} 400`} price={`${currency === "USD" ? "$" : ""} 2,400`} />
           {showSubtotal && (
             <div className="flex justify-between border-t border-border/50 pt-1 text-[8px] text-foreground/70">
               <span>Subtotal</span><span>$ 3,450</span>
@@ -483,21 +491,16 @@ function Row({ label, amt, unit, price }: { label: string; amt: string; unit: st
   );
 }
 
-function AnimationContent() {
+function BackCoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
+  const { backCover } = settings.pageDesign;
   return (
-    <div className="flex h-full flex-col items-center justify-between text-center">
-      <div>
-        <p className="text-[9px] font-bold tracking-wider text-foreground/80">WATCH YOUR OWN</p>
-        <p className="text-[11px] font-bold text-foreground">3D TREATMENT ANIMATION!</p>
-      </div>
-      <div className="my-2 flex items-center gap-3">
-        <Smartphone className="size-10 text-foreground/60" />
-        <div className="grid size-14 place-items-center rounded border border-foreground/50">
-          <QrCode className="size-10 text-foreground/70" />
-        </div>
-      </div>
-      <p className="text-[8px] font-semibold uppercase tracking-wider">Or click here to view</p>
-      <p className="text-[6px] italic text-muted-foreground">[link & QR generated on download]</p>
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
+        {backCover.title}
+      </p>
+      <p className="max-w-[80%] text-[9px] leading-relaxed text-muted-foreground">
+        {backCover.note || "Back cover"}
+      </p>
     </div>
   );
 }
@@ -523,14 +526,18 @@ function DocumentContent({ title, body }: { title: string; body?: string }) {
   );
 }
 
-/* ---------- Right Sidebar ---------- */
-
-function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean }) {
-  const settings = usePlanSettings();
+function RightSidebar({
+  canUndo,
+  canRedo,
+  selectedDocs,
+  settings,
+}: {
+  canUndo: boolean;
+  canRedo: boolean;
+  selectedDocs: DocRow[];
+  settings: ReturnType<typeof usePlanSettings>;
+}) {
   const price = settings.pricePage;
-  const templates = useTemplates();
-  const selectedIds = useSelectedIds();
-  const order = useSectionOrder();
   const tabs = useTabs();
   const activePlanTab = [...tabs].reverse().find((tab) => tab.planId);
   const [downloading, setDownloading] = useState(false);
@@ -539,64 +546,14 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
     planSettingsStore.update({ pricePage: { ...price, ...patch } });
 
   const handleDownload = async () => {
-    const selectedSet = new Set(selectedIds);
-    const selectedDocs: DocRow[] = [];
-
-    (["clinic", "diagnosis", "treatments", "other"] as DocSectionId[]).forEach((section) => {
-      buildSection(section, templates, order[section]).forEach((doc) => {
-        if (selectedSet.has(doc.id)) selectedDocs.push(doc);
-      });
-    });
-
-    if (selectedDocs.length === 0) {
-      toast.error("Select at least one document before downloading.");
-      return;
-    }
-
     setDownloading(true);
     try {
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "pt",
-        format: "a4",
-      });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 56;
-      const contentWidth = pageWidth - margin * 2;
-
-      selectedDocs.forEach((doc, index) => {
-        if (index > 0) pdf.addPage();
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(20);
-        pdf.text(doc.title, margin, 72);
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(11);
-
-        const paragraphs = (doc.body || "No content available for this document yet.")
-          .split(/\n{2,}/)
-          .map((item) => item.trim())
-          .filter(Boolean);
-
-        let y = 108;
-        paragraphs.forEach((paragraph) => {
-          const lines = pdf.splitTextToSize(paragraph, contentWidth);
-          const neededHeight = lines.length * 16;
-
-          if (y + neededHeight > pageHeight - margin) {
-            pdf.addPage();
-            y = 72;
-          }
-
-          pdf.text(lines, margin, y);
-          y += neededHeight + 10;
-        });
-      });
-
       const safePlanName = (activePlanTab?.planName || "treatment-plan").replace(/[\\/:*?\"<>|]+/g, "-");
-      pdf.save(`${safePlanName}.pdf`);
+      saveTreatmentPlanPdf({
+        fileName: `${safePlanName}.pdf`,
+        pages: buildPdfPages(selectedDocs),
+        settings,
+      });
       toast.success("Treatment plan downloaded.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not download treatment plan.");
@@ -607,18 +564,17 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
 
   return (
     <aside className="self-start space-y-3">
-      {/* English / Currency */}
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
         <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
           <Globe className="size-4 text-muted-foreground" />
           <span>English</span>
         </button>
         <button className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-          <DollarSign className="size-4 text-muted-foreground mt-0.5" />
-          <span className="leading-tight text-left">
+          <DollarSign className="mt-0.5 size-4 text-muted-foreground" />
+          <span className="text-left leading-tight">
             USD
             <br />
-            <span className="text-[11px] text-muted-foreground">United States do…</span>
+            <span className="text-[11px] text-muted-foreground">United States doâ€¦</span>
           </span>
         </button>
         <div className="my-2 h-px bg-border/60" />
@@ -639,7 +595,9 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
           <span>Redo</span>
         </button>
         <button
-          onClick={() => { if (confirm("Reset?")) documentsStore.reset(); }}
+          onClick={() => {
+            if (confirm("Reset?")) documentsStore.reset();
+          }}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60"
         >
           <RotateCcw className="size-4 text-muted-foreground" />
@@ -647,7 +605,6 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
         </button>
       </div>
 
-      {/* Download */}
       <button
         onClick={() => void handleDownload()}
         disabled={downloading}
@@ -657,7 +614,6 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
         {downloading ? "Downloading..." : "Download"}
       </button>
 
-      {/* Price table popover */}
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
         <Popover>
           <PopoverTrigger asChild>
@@ -670,46 +626,16 @@ function RightSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean
             <h4 className="mb-3 text-sm font-semibold">Price table options</h4>
             <div className="space-y-3">
               <label className="flex cursor-pointer items-center gap-3 text-sm">
-                <Checkbox
-                  checked={price.showPrices}
-                  onCheckedChange={(v) => setPrice({ showPrices: !!v })}
-                />
+                <Checkbox checked={price.showPrices} onCheckedChange={(v) => setPrice({ showPrices: !!v })} />
                 <span className="font-medium">Show prices in PDF</span>
               </label>
               <div className="space-y-2 border-t border-border/60 pt-3 pl-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Line items
-                </p>
-                <CheckRow
-                  label="Subtotal"
-                  checked={price.showSubtotal}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showSubtotal: v })}
-                />
-                <CheckRow
-                  label="Discount"
-                  checked={price.showDiscount}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showDiscount: v })}
-                />
-                <CheckRow
-                  label="Tax"
-                  checked={price.showTax}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showTax: v })}
-                />
-                <CheckRow
-                  label="Total"
-                  checked={price.showTotal}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showTotal: v })}
-                />
-                <CheckRow
-                  label="Insurance coverage"
-                  checked={price.showInsurance}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showInsurance: v })}
-                />
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Line items</p>
+                <CheckRow label="Subtotal" checked={price.showSubtotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showSubtotal: v })} />
+                <CheckRow label="Discount" checked={price.showDiscount} disabled={!price.showPrices} onChange={(v) => setPrice({ showDiscount: v })} />
+                <CheckRow label="Tax" checked={price.showTax} disabled={!price.showPrices} onChange={(v) => setPrice({ showTax: v })} />
+                <CheckRow label="Total" checked={price.showTotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showTotal: v })} />
+                <CheckRow label="Insurance coverage" checked={price.showInsurance} disabled={!price.showPrices} onChange={(v) => setPrice({ showInsurance: v })} />
               </div>
             </div>
           </PopoverContent>
@@ -737,11 +663,7 @@ function CheckRow({
 }) {
   return (
     <label className={cn("flex items-center gap-3 text-sm", disabled && "opacity-40")}>
-      <Checkbox
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={(v) => onChange(!!v)}
-      />
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange(!!v)} />
       <span>{label}</span>
     </label>
   );

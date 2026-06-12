@@ -198,11 +198,6 @@ function TemplatesPage() {
             );
           })}
           <div className="my-2 h-px bg-border/60" />
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-            <Youtube className="size-4 text-destructive" />
-            <span>Videos</span>
-          </button>
-          <div className="my-2 h-px bg-border/60" />
           <button
             onClick={openNew}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-primary hover:bg-primary-soft"
