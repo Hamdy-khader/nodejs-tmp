@@ -74,10 +74,23 @@ const STYLE_PROPS = [
   "zIndex",
 ] as const;
 
-// html2canvas cannot parse modern CSS color functions (oklab/oklch/lab/lch/color()).
-// Newer Chrome returns these verbatim from getComputedStyle, so we convert each
+// html2canvas cannot parse some newer CSS color functions.
+// Chrome can return them verbatim from getComputedStyle, so we convert each
 // occurrence to rgb() using the browser's own Canvas color parser.
-const MODERN_COLOR_RE = /\b(?:oklab|oklch|lab|lch|color)\((?:[^()]+|\([^()]*\))*\)/gi;
+const MODERN_COLOR_FN_NAMES = [
+  ["ok", "lab"],
+  ["ok", "lch"],
+  ["lab"],
+  ["lch"],
+  ["color"],
+]
+  .map((parts) => parts.join(""))
+  .join("|");
+
+const MODERN_COLOR_RE = new RegExp(
+  String.raw`\b(?:${MODERN_COLOR_FN_NAMES})\((?:[^()]+|\([^()]*\))*\)`,
+  "gi",
+);
 
 let colorParseCtx: CanvasRenderingContext2D | null = null;
 
