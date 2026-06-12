@@ -9,7 +9,6 @@ type CatalogItemTemplate = {
 type CatalogGroupTemplate = {
   key: string;
   title: string;
-  allowCustomItems?: boolean;
   items: CatalogItemTemplate[];
 };
 
@@ -41,7 +40,7 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
           { key: "remove-existing-implant", name: "Remove Existing Implant", price: 0 },
         ],
       },
-      { key: "other", title: OTHER_TREATMENTS, allowCustomItems: true, items: [] },
+      { key: "other", title: OTHER_TREATMENTS, items: [] },
     ],
   },
   {
@@ -79,7 +78,7 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
           { key: "onlay", name: "Onlay", price: 300 },
         ],
       },
-      { key: "other", title: OTHER_TREATMENTS, allowCustomItems: true, items: [] },
+      { key: "other", title: OTHER_TREATMENTS, items: [] },
     ],
   },
   {
@@ -121,7 +120,7 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
           { key: "parapulpal-pin", name: "Parapulpal Pin", price: 0 },
         ],
       },
-      { key: "other", title: OTHER_TREATMENTS, allowCustomItems: true, items: [] },
+      { key: "other", title: OTHER_TREATMENTS, items: [] },
     ],
   },
   {
@@ -203,7 +202,6 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
       {
         key: "other",
         title: OTHER_TREATMENTS,
-        allowCustomItems: true,
         items: [
           { key: "telescopic-crown", name: "Telescopic crown", price: 0 },
           { key: "filling-other", name: "Filling", price: 0 },
@@ -295,7 +293,6 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
       {
         key: "other",
         title: "Other",
-        allowCustomItems: true,
         items: [
           { key: "local-x-ray", name: "Local X-Ray", price: 0 },
           { key: "accommodation", name: "Accommodation", price: 0 },
@@ -349,37 +346,17 @@ function buildItemLookup(groups: PricelistGroup[]) {
   return byName;
 }
 
-function extraItemsForSection(
-  template: CatalogSectionTemplate,
-  sourceSection: PricelistSection | undefined,
-  usedItemNames: Set<string>,
-): PricelistItem[] {
-  if (!sourceSection) return [];
-  const extras: PricelistItem[] = [];
-  sourceSection.groups.forEach((group) => {
-    group.items.forEach((item) => {
-      const itemKey = norm(item.name);
-      if (!usedItemNames.has(itemKey)) {
-        extras.push(item);
-      }
-    });
-  });
-  return extras;
-}
-
 function toSectionFromTemplate(
   template: CatalogSectionTemplate,
   sourceSection: PricelistSection | undefined,
 ): PricelistSection {
   const groupsByTitle = buildGroupLookup(sourceSection?.groups ?? []);
   const itemsByName = buildItemLookup(sourceSection?.groups ?? []);
-  const usedItemNames = new Set<string>();
 
   const groups = template.groups.map((groupTemplate) => {
     const sourceGroup = groupsByTitle.get(norm(groupTemplate.title));
     const items = groupTemplate.items.map((itemTemplate) => {
       const found = itemsByName.get(norm(itemTemplate.name));
-      usedItemNames.add(norm(itemTemplate.name));
       return {
         id: found?.item.id ?? `${template.key}-${groupTemplate.key}-${itemTemplate.key}`,
         name: itemTemplate.name,
@@ -395,17 +372,6 @@ function toSectionFromTemplate(
       items,
     };
   });
-
-  const extras = extraItemsForSection(template, sourceSection, usedItemNames);
-  if (extras.length > 0) {
-    const customGroupTemplate = template.groups.find((group) => group.allowCustomItems);
-    if (customGroupTemplate) {
-      const customGroup = groups.find((group) => norm(group.title) === norm(customGroupTemplate.title));
-      if (customGroup) {
-        customGroup.items.push(...extras);
-      }
-    }
-  }
 
   return {
     id: sourceSection?.id ?? template.key,
@@ -435,20 +401,34 @@ export function getCatalogSectionById(sectionId: string) {
   return TREATMENT_CATALOG.find((section) => section.key === sectionId);
 }
 
-export function isCustomGroup(sectionId: string, groupTitle: string) {
-  return Boolean(
-    getCatalogSectionById(sectionId)?.groups.find(
-      (group) => norm(group.title) === norm(groupTitle) && group.allowCustomItems,
-    ),
-  );
-}
-
 export function isDefaultItem(sectionId: string, groupTitle: string, itemName: string) {
   const group = getCatalogSectionById(sectionId)?.groups.find(
     (entry) => norm(entry.title) === norm(groupTitle),
   );
   if (!group) return false;
   return group.items.some((item) => norm(item.name) === norm(itemName));
+}
+
+export function getToothStatusForTreatment(
+  sectionId: string,
+  treatmentName: string,
+): "missing" | "filled" | "root-treated" | "implant" | "crown" | "bridge" | null {
+  const item = norm(treatmentName);
+
+  if (sectionId === "extraction") return "missing";
+  if (sectionId === "filling") return "filled";
+  if (sectionId === "root-canal-treatment") return "root-treated";
+  if (sectionId === "implant") return "implant";
+  if (sectionId === "crown" || sectionId === "veneer") return "crown";
+  if (sectionId === "bridge") return "bridge";
+
+  if (sectionId === "dentures") {
+    if (item.includes("temporary crown")) return "crown";
+    if (item.includes("temporary bridge")) return "bridge";
+    return null;
+  }
+
+  return null;
 }
 
 export function getTreatmentSections() {

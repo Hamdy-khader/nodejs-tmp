@@ -14,8 +14,9 @@ The system should behave as follows:
 - The catalog is the same data shown in `Price List`.
 - The plan page reads its treatment dropdown from that catalog.
 - When the user selects a treatment in the plan page, the current clinic price is filled automatically.
-- Custom clinic-specific treatments can still be added, but only under `Other treatments` or `Other`.
-- Fixed categories stay stable and are not user-editable from the frontend.
+- The original treatment list is fixed and cannot be extended, renamed, or reduced by clinics.
+- Clinics can update prices only.
+- Selecting a treatment in the plan page should also update the tooth visual status automatically when the treatment maps to a tooth state.
 
 ## Fixed Sections
 
@@ -84,7 +85,7 @@ Each section should have a stable `key`, `label`, `icon`, and `sort_order`.
             "title": "Other treatments",
             "sort_order": 2,
             "is_fixed": true,
-            "allow_custom_items": true,
+            "allow_custom_items": false,
             "items": []
           }
         ]
@@ -98,10 +99,10 @@ Each section should have a stable `key`, `label`, `icon`, and `sort_order`.
 
 - Seed missing fixed sections/groups/items automatically for every clinic.
 - Preserve stable `key` values for sections, groups, and fixed items.
-- Allow custom items only in groups where `allow_custom_items = true`.
 - Reject deleting fixed sections, fixed groups, or fixed items.
-- Allow price and note updates for fixed items.
-- Allow creating and deleting custom items only.
+- Reject creating new items from the clinic UI or API.
+- Allow price updates for fixed items.
+- Optional: allow note updates for fixed items if documents still use that field.
 
 ## 2. Add Catalog References to Treatment Plan Items
 
@@ -138,10 +139,7 @@ Each treatment item should also store catalog references:
 
 ### POST `/clinic/plans/{planId}/rows/{rowId}/items`
 
-The endpoint should accept either:
-
-1. a catalog item selection
-2. a manual custom entry
+The endpoint should accept a catalog item selection only.
 
 ### Catalog-based request
 
@@ -162,26 +160,14 @@ Backend behavior:
 - Copy current `price` into `unit_price`.
 - Save the catalog references on the plan item.
 - Mark `price_source = "catalog"`.
-
-### Manual request
-
-```json
-{
-  "catalog_section_key": "filling",
-  "catalog_group_key": "other",
-  "name": "Custom filling repair",
-  "tooth_number": 11,
-  "amount": 1,
-  "unit_price": 0,
-  "price_source": "manual"
-}
-```
-
-Backend behavior:
-
-- Accept manual entries only in `allow_custom_items = true` groups.
-- Save the free-text `name`.
-- Keep `catalog_item_id = null`.
+- Apply the mapped tooth status if the selected treatment belongs to a tooth-based category.
+- Suggested mappings:
+  - `extraction` -> `missing`
+  - `filling` -> `filled`
+  - `root-canal-treatment` -> `root-treated`
+  - `implant` -> `implant`
+  - `crown` and `veneer` -> `crown`
+  - bridge span workflow -> `bridge`
 
 ### PATCH `/clinic/plans/{planId}/rows/{rowId}/items/{itemId}`
 
@@ -224,10 +210,10 @@ The backend should validate by `key` and `is_fixed`, not just by free text label
 - `sections[].key`: required
 - `sections[].groups[].key`: required
 - `sections[].groups[].allow_custom_items`: boolean
-- `sections[].groups[].items[].key`: nullable for custom items, required for fixed items
+- `sections[].groups[].items[].key`: required for all items
 - fixed items cannot be deleted
 - fixed item `name` should not be changed by clinics
-- custom item `name` can be changed
+- backend should reject unknown item keys
 
 ## 6. Recommended Database Changes
 
@@ -260,7 +246,7 @@ treatment_plan_items
 - catalog_group_key nullable
 - catalog_item_id nullable
 - catalog_item_key nullable
-- price_source enum('catalog','manual')
+- price_source enum('catalog')
 - manual_price_override boolean default false
 ```
 
@@ -268,8 +254,9 @@ treatment_plan_items
 
 - `GET /clinic/pricelist` always returns the fixed treatment sections in the same order.
 - Clinics can edit prices for fixed items.
-- Clinics can add custom items only inside `Other treatments` or `Other`.
+- Clinics cannot add, delete, or rename treatments.
 - The plan page can create treatment items from a catalog item id.
 - The backend fills the item name and price from the catalog automatically.
+- The backend returns or applies tooth-status mapping for the selected treatment.
 - `GET plan` returns the catalog references for every treatment item.
 - Existing old records without catalog references still load safely.
