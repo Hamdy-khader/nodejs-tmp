@@ -317,11 +317,11 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             annotations={toothAnnotations}
           />
           {bridgeMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[oklch(0.55_0.18_290)]/40 bg-[oklch(0.55_0.18_290)]/10 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2">
               <p className="text-xs font-medium text-foreground">
                 Bridge mode — pick 2+ teeth across a missing tooth
                 {bridgeSel.length > 0 && (
-                  <span className="ml-2 font-semibold text-[oklch(0.45_0.18_290)]">
+                  <span className="ml-2 font-semibold text-violet-700">
                     Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
                   </span>
                 )}
@@ -336,7 +336,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 <button
                   onClick={applyBridge}
                   disabled={bridgeSel.length < 2}
-                  className="rounded-md bg-[oklch(0.55_0.18_290)] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  className="rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   Apply Bridge
                 </button>
@@ -354,7 +354,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                 bridgeMode
-                  ? "bg-[oklch(0.55_0.18_290)]/15 text-[oklch(0.45_0.18_290)]"
+                  ? "bg-violet-500/15 text-violet-700"
                   : selected
                     ? "bg-primary/15 text-primary"
                     : "bg-muted text-muted-foreground",
@@ -377,8 +377,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                       className={cn(
                         "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
                         isActive
-                          ? "bg-[oklch(0.55_0.18_290)] text-white"
-                          : "bg-[oklch(0.62_0.18_150)] text-white hover:bg-[oklch(0.55_0.2_150)]",
+                          ? "bg-violet-600 text-white"
+                          : "bg-emerald-500 text-white hover:bg-emerald-600",
                       )}
                     >
                       <span className="truncate">{group.label}</span>
