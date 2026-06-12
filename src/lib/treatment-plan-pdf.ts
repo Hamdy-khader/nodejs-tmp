@@ -74,30 +74,49 @@ const STYLE_PROPS = [
   "zIndex",
 ] as const;
 
+// html2canvas cannot parse modern CSS color functions (oklab/oklch/lab/lch/color()).
+// Newer Chrome returns these verbatim from getComputedStyle, so we convert each
+// occurrence to rgb() using the browser's own Canvas color parser.
+const MODERN_COLOR_RE = /\b(?:oklab|oklch|lab|lch|color)\((?:[^()]+|\([^()]*\))*\)/gi;
+
+let colorParseCtx: CanvasRenderingContext2D | null = null;
+
+function colorToRgb(color: string): string | null {
+  if (!colorParseCtx) {
+    colorParseCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!colorParseCtx) return null;
+  // Use a sentinel so we can detect when the canvas fails to parse the color.
+  colorParseCtx.fillStyle = "#000000";
+  colorParseCtx.fillStyle = color;
+  const parsed = colorParseCtx.fillStyle;
+  colorParseCtx.fillStyle = "#ffffff";
+  colorParseCtx.fillStyle = color;
+  // If parsing fails, fillStyle keeps the previous value, so the two probes differ.
+  return parsed === colorParseCtx.fillStyle ? parsed : null;
+}
+
+function sanitizeColorValue(value: string): string {
+  if (!MODERN_COLOR_RE.test(value)) return value;
+  return value.replace(MODERN_COLOR_RE, (match) => colorToRgb(match) ?? "rgb(0, 0, 0)");
+}
+
 function inlineComputedStyles(source: Element, target: Element) {
   const computed = window.getComputedStyle(source);
   const targetStyle = (target as HTMLElement | SVGElement).style;
-
-  for (const prop of STYLE_PROPS) {
-    const value = computed.getPropertyValue(prop);
-    if (!value) continue;
-    if (value.includes("oklch(")) continue;
-    targetStyle.setProperty(prop, value);
-  }
 
   if (target instanceof HTMLElement) {
     target.className = "";
   } else {
     target.removeAttribute("class");
   }
-
   target.removeAttribute("data-slot");
   target.removeAttribute("style");
+
   for (const prop of STYLE_PROPS) {
     const value = computed.getPropertyValue(prop);
     if (!value) continue;
-    if (value.includes("oklch(")) continue;
-    targetStyle.setProperty(prop, value);
+    targetStyle.setProperty(prop, sanitizeColorValue(value));
   }
 }
 
