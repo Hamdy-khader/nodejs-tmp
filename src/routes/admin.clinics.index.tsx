@@ -1,12 +1,19 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { StatusBadge, Btn, ConfirmDialog, Spinner, Empty, toast } from "@/components/admin/ui";
+import { Btn, ConfirmDialog, Empty, Spinner, StatusBadge, toast } from "@/components/admin/ui";
 import { adminApi, type Clinic } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/admin/clinics/")({
   component: AdminClinicsPage,
 });
+
+function subscriptionStatusFor(clinic: Clinic) {
+  if (clinic.status === "suspended") return "cancelled";
+  if (clinic.status === "trial") return "pending";
+  if (clinic.status === "inactive") return "expired";
+  return "active";
+}
 
 function AdminClinicsPage() {
   const navigate = useNavigate();
@@ -26,7 +33,10 @@ function AdminClinicsPage() {
     setLoading(true);
     adminApi.clinics
       .list({ q: search || undefined, status: statusFilter || undefined, page, limit: 15 })
-      .then((res) => { setClinics(res.data); setTotal(res.meta.total); })
+      .then((res) => {
+        setClinics(res.data);
+        setTotal(res.meta.total);
+      })
       .catch(() => toast("Failed to load clinics", "error"))
       .finally(() => setLoading(false));
   }, [search, statusFilter, page]);
@@ -34,7 +44,7 @@ function AdminClinicsPage() {
   useEffect(() => {
     const t = setTimeout(load, search ? 350 : 0);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [load, search]);
 
   const doSuspend = async () => {
     if (!suspendTarget) return;
@@ -44,8 +54,11 @@ function AdminClinicsPage() {
       toast(`"${suspendTarget.name}" suspended`);
       setSuspendTarget(null);
       load();
-    } catch { toast("Failed to suspend clinic", "error"); }
-    finally { setActing(false); }
+    } catch {
+      toast("Failed to suspend clinic", "error");
+    } finally {
+      setActing(false);
+    }
   };
 
   const doActivate = async () => {
@@ -56,8 +69,11 @@ function AdminClinicsPage() {
       toast(`"${activateTarget.name}" activated`);
       setActivateTarget(null);
       load();
-    } catch { toast("Failed to activate clinic", "error"); }
-    finally { setActing(false); }
+    } catch {
+      toast("Failed to activate clinic", "error");
+    } finally {
+      setActing(false);
+    }
   };
 
   const doDelete = async () => {
@@ -68,8 +84,11 @@ function AdminClinicsPage() {
       toast(`"${deleteTarget.name}" deleted`);
       setDeleteTarget(null);
       load();
-    } catch { toast("Failed to delete clinic", "error"); }
-    finally { setActing(false); }
+    } catch {
+      toast("Failed to delete clinic", "error");
+    } finally {
+      setActing(false);
+    }
   };
 
   const totalPages = Math.ceil(total / 15);
@@ -78,38 +97,53 @@ function AdminClinicsPage() {
     <AdminLayout title="Clinics">
       <div className="adm-page-hdr">
         <div>
-          <div className="adm-page-title">All Clinics</div>
+          <div className="adm-page-title">Clinics Management</div>
           <div className="adm-page-sub">{total} clinics registered</div>
         </div>
-        <a href="/admin/clinics/create" className="adm-btn primary">+ Add Clinic</a>
+        <a href="/admin/clinics/create" className="adm-btn primary">
+          + Add Clinic
+        </a>
       </div>
 
-      {/* Filters */}
       <div className="adm-filters">
         <div className="adm-search-wrap">
-          <span className="adm-search-icon">🔍</span>
+          <span className="adm-search-icon">S</span>
           <input
             className="adm-search"
-            placeholder="Search by name, email, phone…"
+            placeholder="Search by clinic name, owner, email, or phone..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
-        <select className="adm-filter-select" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+        <select
+          className="adm-filter-select"
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+        >
           <option value="">All statuses</option>
           <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
           <option value="suspended">Suspended</option>
+          <option value="trial">Trial</option>
         </select>
       </div>
 
-      {/* Table */}
       {loading ? (
-        <Spinner label="Loading clinics…" />
+        <Spinner label="Loading clinics..." />
       ) : clinics.length === 0 ? (
         <Empty
-          icon="🏥"
           message="No clinics found."
-          action={<a href="/admin/clinics/create" className="adm-btn primary">Add first clinic</a>}
+          action={
+            <a href="/admin/clinics/create" className="adm-btn primary">
+              Add first clinic
+            </a>
+          }
         />
       ) : (
         <>
@@ -117,47 +151,72 @@ function AdminClinicsPage() {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>Clinic</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Contact</th>
-                  <th>Created</th>
+                  <th>Clinic Name</th>
+                  <th>Owner Name</th>
+                  <th>Email</th>
+                  <th>Phone Number</th>
+                  <th>Country</th>
+                  <th>City</th>
+                  <th>Registration Date</th>
+                  <th>Clinic Status</th>
+                  <th>Subscription Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {clinics.map((c) => (
-                  <tr key={c.id}>
+                {clinics.map((clinic) => (
+                  <tr key={clinic.id}>
+                    <td style={{ fontWeight: 600 }}>{clinic.name}</td>
+                    <td>{clinic.contact_person_name || "Not assigned"}</td>
+                    <td>{clinic.email}</td>
+                    <td>{clinic.phone || "Not set"}</td>
+                    <td>{clinic.country || "Not set"}</td>
+                    <td>{clinic.city || "Not set"}</td>
+                    <td>{new Date(clinic.created_at).toLocaleDateString()}</td>
                     <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg,#2563eb,#1a9e7e)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 13, color: "white", flexShrink: 0 }}>
-                          {c.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
-                          <div style={{ fontSize: 11, color: "var(--adm-muted2)" }}>{c.email}</div>
-                        </div>
-                      </div>
+                      <StatusBadge status={clinic.status} />
                     </td>
-                    <td style={{ fontSize: 12, color: "var(--adm-muted)" }}>
-                      {[c.city, c.country].filter(Boolean).join(", ") || "—"}
-                    </td>
-                    <td><StatusBadge status={c.status} /></td>
-                    <td style={{ fontSize: 12, color: "var(--adm-muted)" }}>
-                      {c.contact_person_name || c.phone || "—"}
-                    </td>
-                    <td style={{ fontSize: 11, color: "var(--adm-muted2)", fontVariantNumeric: "tabular-nums" }}>
-                      {new Date(c.created_at).toLocaleDateString()}
+                    <td>
+                      <StatusBadge status={subscriptionStatusFor(clinic)} />
                     </td>
                     <td>
                       <div className="adm-actions">
-                        <Btn variant="ghost" size="sm" onClick={() => navigate({ to: "/admin/clinics/$id", params: { id: String(c.id) } })}>View</Btn>
-                        <Btn variant="ghost" size="sm" onClick={() => navigate({ to: "/admin/clinics/$id/edit", params: { id: String(c.id) } })}>Edit</Btn>
-                        <Btn variant="ghost" size="sm" onClick={() => navigate({ to: "/admin/clinics/$id/users", params: { id: String(c.id) } })}>Users</Btn>
-                        {c.status === "active"
-                          ? <Btn variant="danger" size="sm" onClick={() => setSuspendTarget(c)}>Suspend</Btn>
-                          : <Btn variant="teal" size="sm" onClick={() => setActivateTarget(c)}>Activate</Btn>}
-                        <Btn variant="danger" size="sm" onClick={() => setDeleteTarget(c)}>Delete</Btn>
+                        <Btn
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            navigate({
+                              to: "/admin/clinics/$id",
+                              params: { id: String(clinic.id) },
+                            })
+                          }
+                        >
+                          View
+                        </Btn>
+                        <Btn
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            navigate({
+                              to: "/admin/clinics/$id/edit",
+                              params: { id: String(clinic.id) },
+                            })
+                          }
+                        >
+                          Edit
+                        </Btn>
+                        {clinic.status === "active" ? (
+                          <Btn variant="danger" size="sm" onClick={() => setSuspendTarget(clinic)}>
+                            Suspend
+                          </Btn>
+                        ) : (
+                          <Btn variant="teal" size="sm" onClick={() => setActivateTarget(clinic)}>
+                            Activate
+                          </Btn>
+                        )}
+                        <Btn variant="danger" size="sm" onClick={() => setDeleteTarget(clinic)}>
+                          Delete
+                        </Btn>
                       </div>
                     </td>
                   </tr>
@@ -166,22 +225,69 @@ function AdminClinicsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="adm-pagination">
-              <Btn variant="ghost" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Prev</Btn>
+              <Btn
+                variant="ghost"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Prev
+              </Btn>
               {Array.from({ length: totalPages }, (_, i) => (
-                <Btn key={i} variant={page === i + 1 ? "primary" : "ghost"} size="sm" onClick={() => setPage(i + 1)}>{i + 1}</Btn>
+                <Btn
+                  key={i}
+                  variant={page === i + 1 ? "primary" : "ghost"}
+                  size="sm"
+                  onClick={() => setPage(i + 1)}
+                >
+                  {i + 1}
+                </Btn>
               ))}
-              <Btn variant="ghost" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>Next →</Btn>
+              <Btn
+                variant="ghost"
+                size="sm"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Btn>
             </div>
           )}
         </>
       )}
 
-      <ConfirmDialog open={Boolean(suspendTarget)} title="Suspend Clinic" message={`Suspend "${suspendTarget?.name}"? Users will lose access immediately.`} confirmLabel="Suspend" type="danger" loading={acting} onConfirm={doSuspend} onCancel={() => setSuspendTarget(null)} />
-      <ConfirmDialog open={Boolean(activateTarget)} title="Activate Clinic" message={`Activate "${activateTarget?.name}"? Users will regain access.`} confirmLabel="Activate" type="warn" loading={acting} onConfirm={doActivate} onCancel={() => setActivateTarget(null)} />
-      <ConfirmDialog open={Boolean(deleteTarget)} title="Delete Clinic" message={`Permanently delete "${deleteTarget?.name}"? This cannot be undone.`} confirmLabel="Delete permanently" type="danger" loading={acting} onConfirm={doDelete} onCancel={() => setDeleteTarget(null)} />
+      <ConfirmDialog
+        open={Boolean(suspendTarget)}
+        title="Suspend Clinic"
+        message={`Suspend "${suspendTarget?.name}"? The clinic account will lose access immediately.`}
+        confirmLabel="Suspend"
+        type="danger"
+        loading={acting}
+        onConfirm={doSuspend}
+        onCancel={() => setSuspendTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(activateTarget)}
+        title="Activate Clinic"
+        message={`Activate "${activateTarget?.name}"? The clinic account will regain access.`}
+        confirmLabel="Activate"
+        type="warn"
+        loading={acting}
+        onConfirm={doActivate}
+        onCancel={() => setActivateTarget(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Clinic"
+        message={`Permanently delete "${deleteTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete permanently"
+        type="danger"
+        loading={acting}
+        onConfirm={doDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </AdminLayout>
   );
 }

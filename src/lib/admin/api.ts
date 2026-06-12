@@ -82,7 +82,7 @@ export interface Clinic {
   logo: string | null;
   contact_person_name: string | null;
   contact_person_phone: string | null;
-  status: "active" | "suspended";
+  status: "active" | "inactive" | "suspended" | "trial";
   notes: string | null;
   users_count?: number;
   created_at: string;
@@ -122,17 +122,26 @@ export interface PaginatedResponse<T> {
 export interface DashboardStats {
   totalClinics: number;
   activeClinics: number;
+  inactiveClinics: number;
   suspendedClinics: number;
-  totalClinicUsers: number;
   newClinicsThisMonth: number;
 }
 
 function toDashboardStats(raw: Record<string, unknown>): DashboardStats {
+  const totalClinics = Number(raw.totalClinics ?? raw.total_clinics ?? 0);
+  const activeClinics = Number(raw.activeClinics ?? raw.active_clinics ?? 0);
+  const suspendedClinics = Number(raw.suspendedClinics ?? raw.suspended_clinics ?? 0);
+  const inactiveClinics = Number(
+    raw.inactiveClinics ??
+      raw.inactive_clinics ??
+      Math.max(totalClinics - activeClinics - suspendedClinics, 0),
+  );
+
   return {
-    totalClinics: Number(raw.totalClinics ?? raw.total_clinics ?? 0),
-    activeClinics: Number(raw.activeClinics ?? raw.active_clinics ?? 0),
-    suspendedClinics: Number(raw.suspendedClinics ?? raw.suspended_clinics ?? 0),
-    totalClinicUsers: Number(raw.totalClinicUsers ?? raw.total_clinic_users ?? 0),
+    totalClinics,
+    activeClinics,
+    inactiveClinics,
+    suspendedClinics,
     newClinicsThisMonth: Number(raw.newClinicsThisMonth ?? raw.new_clinics_this_month ?? 0),
   };
 }

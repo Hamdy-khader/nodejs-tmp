@@ -56,6 +56,10 @@ const ADMIN_CSS = `
   .adm-badge.active { background: rgba(45,212,167,.14); color: var(--adm-teal-ink); border: 1px solid rgba(45,212,167,.3); }
   .adm-badge.suspended { background: rgba(232,93,107,.12); color: var(--adm-coral-ink); border: 1px solid rgba(232,93,107,.3); }
   .adm-badge.inactive { background: rgba(107,114,128,.12); color: #6b7280; border: 1px solid rgba(107,114,128,.25); }
+  .adm-badge.trial, .adm-badge.pending, .adm-badge.in_progress { background: rgba(201,168,76,.14); color: #9a741f; border: 1px solid rgba(201,168,76,.3); }
+  .adm-badge.expired, .adm-badge.cancelled, .adm-badge.failed { background: rgba(232,93,107,.12); color: var(--adm-coral-ink); border: 1px solid rgba(232,93,107,.3); }
+  .adm-badge.paid, .adm-badge.open { background: rgba(45,212,167,.14); color: var(--adm-teal-ink); border: 1px solid rgba(45,212,167,.3); }
+  .adm-badge.refunded, .adm-badge.closed { background: rgba(107,114,128,.12); color: #6b7280; border: 1px solid rgba(107,114,128,.25); }
   .adm-badge.clinic_owner { background: rgba(37,99,235,.12); color: var(--adm-blue); border: 1px solid rgba(37,99,235,.25); }
   .adm-badge.clinic_admin { background: rgba(45,212,167,.14); color: var(--adm-teal-ink); border: 1px solid rgba(45,212,167,.3); }
   .adm-badge.clinic_staff { background: rgba(107,114,128,.12); color: #6b7280; border: 1px solid rgba(107,114,128,.25); }
@@ -182,7 +186,14 @@ interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   full?: boolean;
 }
 
-export function Btn({ variant = "ghost", size = "md", loading, full, children, ...rest }: BtnProps) {
+export function Btn({
+  variant = "ghost",
+  size = "md",
+  loading,
+  full,
+  children,
+  ...rest
+}: BtnProps) {
   return (
     <button
       className={`adm-btn ${variant}${size === "sm" ? " sm" : ""}${full ? " full" : ""}`}
@@ -208,18 +219,31 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, footer, large }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const handleKey = useCallback((e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }, [onClose]);
+  const handleKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    },
+    [onClose],
+  );
   useEffect(() => {
     if (open) document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [open, handleKey]);
   if (!open) return null;
   return (
-    <div className="adm-overlay" ref={overlayRef} onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}>
+    <div
+      className="adm-overlay"
+      ref={overlayRef}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
+    >
       <div className={`adm-modal${large ? " adm-modal-lg" : ""}`}>
         <div className="adm-modal-hdr">
           <span className="adm-modal-title">{title}</span>
-          <button className="adm-close-btn" onClick={onClose}>✕</button>
+          <button className="adm-close-btn" onClick={onClose}>
+            ✕
+          </button>
         </div>
         <div className="adm-modal-body">{children}</div>
         {footer && <div className="adm-modal-footer">{footer}</div>}
@@ -241,7 +265,16 @@ interface ConfirmProps {
   onCancel: () => void;
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel = "Confirm", type = "danger", loading, onConfirm, onCancel }: ConfirmProps) {
+export function ConfirmDialog({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirm",
+  type = "danger",
+  loading,
+  onConfirm,
+  onCancel,
+}: ConfirmProps) {
   if (!open) return null;
   return (
     <div className="adm-overlay" onClick={onCancel}>
@@ -251,8 +284,15 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "Confirm", 
           <p style={{ fontSize: 13, color: "var(--adm-muted)", lineHeight: 1.65 }}>{message}</p>
         </div>
         <div className="adm-modal-footer">
-          <Btn variant="ghost" onClick={onCancel} disabled={loading}>Cancel</Btn>
-          <Btn variant={type === "danger" ? "danger" : "primary"} onClick={onConfirm} loading={loading} style={{ padding: "9px 20px" }}>
+          <Btn variant="ghost" onClick={onCancel} disabled={loading}>
+            Cancel
+          </Btn>
+          <Btn
+            variant={type === "danger" ? "danger" : "primary"}
+            onClick={onConfirm}
+            loading={loading}
+            style={{ padding: "9px 20px" }}
+          >
             {confirmLabel}
           </Btn>
         </div>
@@ -263,10 +303,23 @@ export function ConfirmDialog({ open, title, message, confirmLabel = "Confirm", 
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 
-export function Field({ label, error, children, required }: { label: string; error?: string; children: ReactNode; required?: boolean }) {
+export function Field({
+  label,
+  error,
+  children,
+  required,
+}: {
+  label: string;
+  error?: string;
+  children: ReactNode;
+  required?: boolean;
+}) {
   return (
     <div className="adm-field">
-      <label className="adm-label">{label}{required && <span style={{ color: "var(--adm-coral)", marginLeft: 2 }}>*</span>}</label>
+      <label className="adm-label">
+        {label}
+        {required && <span style={{ color: "var(--adm-coral)", marginLeft: 2 }}>*</span>}
+      </label>
       {children}
       {error && <div className="adm-field-err">{error}</div>}
     </div>
@@ -276,10 +329,23 @@ export function Field({ label, error, children, required }: { label: string; err
 // ─── Spinner / Empty / Alert ──────────────────────────────────────────────────
 
 export function Spinner({ label }: { label?: string }) {
-  return <div className="adm-loading"><span className="adm-spinner" />{label && <span>{label}</span>}</div>;
+  return (
+    <div className="adm-loading">
+      <span className="adm-spinner" />
+      {label && <span>{label}</span>}
+    </div>
+  );
 }
 
-export function Empty({ icon = "📭", message, action }: { icon?: string; message: string; action?: ReactNode }) {
+export function Empty({
+  icon = "📭",
+  message,
+  action,
+}: {
+  icon?: string;
+  message: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="adm-empty">
       <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>{icon}</div>
@@ -305,7 +371,8 @@ let toastCtr: HTMLDivElement | null = null;
 export function toast(msg: string, type: "success" | "error" = "success", ms = 3500) {
   if (!toastCtr) {
     const style = document.createElement("style");
-    style.textContent = ".adm-toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}.adm-toast{background:#111c2e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px;font-size:13px;color:#eef2f7;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:320px;pointer-events:all;animation:at-in .2s ease}.adm-toast.success{border-left:3px solid #2dd4a7}.adm-toast.error{border-left:3px solid #e85d6b}@keyframes at-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}";
+    style.textContent =
+      ".adm-toasts{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}.adm-toast{background:#111c2e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px;font-size:13px;color:#eef2f7;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:320px;pointer-events:all;animation:at-in .2s ease}.adm-toast.success{border-left:3px solid #2dd4a7}.adm-toast.error{border-left:3px solid #e85d6b}@keyframes at-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}";
     document.head.appendChild(style);
     toastCtr = document.createElement("div");
     toastCtr.className = "adm-toasts";

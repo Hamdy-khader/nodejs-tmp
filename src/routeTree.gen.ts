@@ -24,8 +24,16 @@ import { Route as PatientsIndexRouteImport } from './routes/patients.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as PatientsPatientIdRouteImport } from './routes/patients.$patientId'
 import { Route as ClinicLoginRouteImport } from './routes/clinic_.login'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSupportCenterRouteImport } from './routes/admin.support-center'
+import { Route as AdminSubscriptionsRouteImport } from './routes/admin.subscriptions'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminFinancialRouteImport } from './routes/admin.financial'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminBranchStatisticsRouteImport } from './routes/admin.branch-statistics'
+import { Route as AdminBackupsRouteImport } from './routes/admin.backups'
 import { Route as PatientsPatientIdIndexRouteImport } from './routes/patients.$patientId.index'
 import { Route as AdminClinicsIndexRouteImport } from './routes/admin.clinics.index'
 import { Route as AdminClinicsCreateRouteImport } from './routes/admin.clinics.create'
@@ -109,14 +117,54 @@ const ClinicLoginRoute = ClinicLoginRouteImport.update({
   path: '/clinic/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSupportCenterRoute = AdminSupportCenterRouteImport.update({
+  id: '/admin/support-center',
+  path: '/admin/support-center',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSubscriptionsRoute = AdminSubscriptionsRouteImport.update({
+  id: '/admin/subscriptions',
+  path: '/admin/subscriptions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFinancialRoute = AdminFinancialRouteImport.update({
+  id: '/admin/financial',
+  path: '/admin/financial',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/admin/dashboard',
   path: '/admin/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBranchStatisticsRoute = AdminBranchStatisticsRouteImport.update({
+  id: '/admin/branch-statistics',
+  path: '/admin/branch-statistics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBackupsRoute = AdminBackupsRouteImport.update({
+  id: '/admin/backups',
+  path: '/admin/backups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PatientsPatientIdIndexRoute = PatientsPatientIdIndexRouteImport.update({
@@ -168,8 +216,16 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/backups': typeof AdminBackupsRoute
+  '/admin/branch-statistics': typeof AdminBranchStatisticsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/financial': typeof AdminFinancialRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/support-center': typeof AdminSupportCenterRoute
+  '/admin/users': typeof AdminUsersRoute
   '/clinic/login': typeof ClinicLoginRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -193,8 +249,16 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/backups': typeof AdminBackupsRoute
+  '/admin/branch-statistics': typeof AdminBranchStatisticsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/financial': typeof AdminFinancialRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/support-center': typeof AdminSupportCenterRoute
+  '/admin/users': typeof AdminUsersRoute
   '/clinic/login': typeof ClinicLoginRoute
   '/admin': typeof AdminIndexRoute
   '/patients': typeof PatientsIndexRoute
@@ -219,8 +283,16 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/templates': typeof TemplatesRoute
   '/users': typeof UsersRoute
+  '/admin/backups': typeof AdminBackupsRoute
+  '/admin/branch-statistics': typeof AdminBranchStatisticsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/financial': typeof AdminFinancialRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/support-center': typeof AdminSupportCenterRoute
+  '/admin/users': typeof AdminUsersRoute
   '/clinic_/login': typeof ClinicLoginRoute
   '/patients/$patientId': typeof PatientsPatientIdRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -247,8 +319,16 @@ export interface FileRouteTypes {
     | '/support'
     | '/templates'
     | '/users'
+    | '/admin/backups'
+    | '/admin/branch-statistics'
     | '/admin/dashboard'
+    | '/admin/financial'
     | '/admin/login'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/subscriptions'
+    | '/admin/support-center'
+    | '/admin/users'
     | '/clinic/login'
     | '/patients/$patientId'
     | '/admin/'
@@ -272,8 +352,16 @@ export interface FileRouteTypes {
     | '/support'
     | '/templates'
     | '/users'
+    | '/admin/backups'
+    | '/admin/branch-statistics'
     | '/admin/dashboard'
+    | '/admin/financial'
     | '/admin/login'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/subscriptions'
+    | '/admin/support-center'
+    | '/admin/users'
     | '/clinic/login'
     | '/admin'
     | '/patients'
@@ -297,8 +385,16 @@ export interface FileRouteTypes {
     | '/support'
     | '/templates'
     | '/users'
+    | '/admin/backups'
+    | '/admin/branch-statistics'
     | '/admin/dashboard'
+    | '/admin/financial'
     | '/admin/login'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/subscriptions'
+    | '/admin/support-center'
+    | '/admin/users'
     | '/clinic_/login'
     | '/patients/$patientId'
     | '/admin/'
@@ -324,8 +420,16 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TemplatesRoute: typeof TemplatesRoute
   UsersRoute: typeof UsersRoute
+  AdminBackupsRoute: typeof AdminBackupsRoute
+  AdminBranchStatisticsRoute: typeof AdminBranchStatisticsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminFinancialRoute: typeof AdminFinancialRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSubscriptionsRoute: typeof AdminSubscriptionsRoute
+  AdminSupportCenterRoute: typeof AdminSupportCenterRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   ClinicLoginRoute: typeof ClinicLoginRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminClinicsCreateRoute: typeof AdminClinicsCreateRoute
@@ -442,6 +546,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClinicLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/support-center': {
+      id: '/admin/support-center'
+      path: '/admin/support-center'
+      fullPath: '/admin/support-center'
+      preLoaderRoute: typeof AdminSupportCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/subscriptions': {
+      id: '/admin/subscriptions'
+      path: '/admin/subscriptions'
+      fullPath: '/admin/subscriptions'
+      preLoaderRoute: typeof AdminSubscriptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/admin/login'
@@ -449,11 +588,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/financial': {
+      id: '/admin/financial'
+      path: '/admin/financial'
+      fullPath: '/admin/financial'
+      preLoaderRoute: typeof AdminFinancialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/admin/dashboard'
       fullPath: '/admin/dashboard'
       preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/branch-statistics': {
+      id: '/admin/branch-statistics'
+      path: '/admin/branch-statistics'
+      fullPath: '/admin/branch-statistics'
+      preLoaderRoute: typeof AdminBranchStatisticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/backups': {
+      id: '/admin/backups'
+      path: '/admin/backups'
+      fullPath: '/admin/backups'
+      preLoaderRoute: typeof AdminBackupsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/patients/$patientId/': {
@@ -547,8 +707,16 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TemplatesRoute: TemplatesRoute,
   UsersRoute: UsersRoute,
+  AdminBackupsRoute: AdminBackupsRoute,
+  AdminBranchStatisticsRoute: AdminBranchStatisticsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminFinancialRoute: AdminFinancialRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSubscriptionsRoute: AdminSubscriptionsRoute,
+  AdminSupportCenterRoute: AdminSupportCenterRoute,
+  AdminUsersRoute: AdminUsersRoute,
   ClinicLoginRoute: ClinicLoginRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminClinicsCreateRoute: AdminClinicsCreateRoute,
