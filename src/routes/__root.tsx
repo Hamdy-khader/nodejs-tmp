@@ -252,6 +252,16 @@ function RootComponent() {
     return <QueryClientProvider client={queryClient} />;
   }
 
+  // Admin panel — its own chrome (AdminLayout). Never render the clinic sidebar,
+  // otherwise the clinic nav flashes on top of the admin panel.
+  if (isAdminRoute) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    );
+  }
+
   if (
     !isAdminRoute &&
     !isClinicLogin &&

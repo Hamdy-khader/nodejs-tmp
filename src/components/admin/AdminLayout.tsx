@@ -45,7 +45,7 @@ export function AdminLayout({ children, title = "Admin Panel" }: AdminLayoutProp
 
   if (checking) {
     return (
-      <div className="adm" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#0d1520" }}>
+      <div className="adm" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f7fc" }}>
         <span className="adm-spinner" />
       </div>
     );
