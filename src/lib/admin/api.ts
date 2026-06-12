@@ -592,41 +592,17 @@ export const clinicApi = {
     update: (id: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("PUT", `/clinic/users/${id}`, body),
     delete: (id: string): Promise<void> => clinicReq("DELETE", `/clinic/users/${id}`),
-    bulkStatus: (body: { user_ids: string[]; status: string }): Promise<unknown> =>
-      clinicReq("POST", "/clinic/users/bulk-status", body),
-    bulkRole: (body: { user_ids: string[]; role: string }): Promise<unknown> =>
-      clinicReq("POST", "/clinic/users/bulk-role", body),
-    resetPassword: (id: string): Promise<unknown> =>
-      clinicReq("POST", `/clinic/users/${id}/reset-password`),
-  },
-
-  roles: {
-    list: (): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
-      clinicReq("GET", "/clinic/roles"),
-    create: (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
-      clinicReq("POST", "/clinic/roles", body),
-    update: (roleKey: string, body: Record<string, unknown>): Promise<Record<string, unknown>> =>
-      clinicReq("PUT", `/clinic/roles/${roleKey}`, body),
-    delete: (roleKey: string): Promise<void> => clinicReq("DELETE", `/clinic/roles/${roleKey}`),
-  },
-
-  permissions: {
-    list: (): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>
-      clinicReq("GET", "/clinic/permissions"),
-  },
-
-  auditLogs: {
-    list: (params?: {
-      actor?: string;
-      action?: string;
-      from?: string;
-      to?: string;
-      page?: number;
-      limit?: number;
-    }): Promise<PaginatedResponse<Record<string, unknown>>> =>
+    changePassword: (
+      id: string,
+      body: { password: string; password_confirmation: string },
+    ): Promise<unknown> => clinicReq("POST", `/clinic/users/${id}/change-password`, body),
+    loginHistory: (
+      id: string,
+      params?: { page?: number; limit?: number },
+    ): Promise<PaginatedResponse<Record<string, unknown>>> =>
       clinicReq(
         "GET",
-        "/clinic/audit-logs",
+        `/clinic/users/${id}/login-history`,
         undefined,
         params as Record<string, string | number | boolean | undefined>,
       ),

@@ -2,31 +2,12 @@ import { useEffect, useState } from "react";
 import { clinicApi } from "@/lib/admin/api";
 
 export type UserStatus = "active" | "inactive" | "suspended";
-
-export type RoleKey =
-  | "super_admin"
-  | "admin"
-  | "dentist"
-  | "assistant"
-  | "receptionist"
-  | "accountant"
-  | "lab_technician"
-  | "viewer"
-  | string;
-
-export interface Permission {
-  key: string;
-  group: string;
-  label: string;
-}
+export type RoleKey = "dentist" | "assistant";
 
 export interface Role {
   key: RoleKey;
   name: string;
-  description: string;
   color: string;
-  builtIn: boolean;
-  permissions: string[];
 }
 
 export interface ClinicUser {
@@ -55,24 +36,24 @@ export interface ClinicUser {
   online?: boolean;
 }
 
-export interface AuditLog {
+export interface LoginHistoryEntry {
   id: string;
-  at: string;
-  actor: string;
-  action: string;
-  target?: string;
-  details?: string;
+  loggedAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  status: "success" | "failed";
+  failureReason?: string;
 }
 
-export const ALL_PERMISSIONS: Permission[] = [];
-export const DEFAULT_ROLES: Role[] = [];
+export const SIMPLE_ROLES: Role[] = [
+  { key: "dentist", name: "Dentist", color: "from-cyan-600 to-blue-600" },
+  { key: "assistant", name: "Assistant", color: "from-emerald-600 to-teal-600" },
+];
+
 export const BRANCHES = ["Main Branch", "Downtown", "North Clinic", "Marina"];
 
 interface State {
   users: ClinicUser[];
-  roles: Role[];
-  logs: AuditLog[];
-  permissions: Permission[];
 }
 
 interface UserPasswordPayload {
@@ -82,9 +63,6 @@ interface UserPasswordPayload {
 
 let state: State = {
   users: [],
-  roles: [],
-  logs: [],
-  permissions: [],
 };
 
 const listeners = new Set<() => void>();
@@ -95,6 +73,14 @@ function emit() {
   listeners.forEach((listener) => listener());
 }
 
+function normalizeRole(value: unknown): RoleKey {
+  return value === "dentist" ? "dentist" : "assistant";
+}
+
+function normalizeStatus(value: unknown): UserStatus {
+  return value === "inactive" || value === "suspended" ? value : "active";
+}
+
 function toUser(raw: Record<string, unknown>): ClinicUser {
   return {
     id: String(raw.id ?? ""),
@@ -103,8 +89,8 @@ function toUser(raw: Record<string, unknown>): ClinicUser {
     email: String(raw.email ?? ""),
     phone: String(raw.phone ?? ""),
     avatarUrl: raw.avatar_url ? String(raw.avatar_url) : undefined,
-    role: String(raw.role ?? "viewer"),
-    status: String(raw.status ?? "active") as UserStatus,
+    role: normalizeRole(raw.role),
+    status: normalizeStatus(raw.status),
     branch: String(raw.branch ?? ""),
     department: raw.department ? String(raw.department) : undefined,
     specialty: raw.specialty ? String(raw.specialty) : undefined,
@@ -123,33 +109,14 @@ function toUser(raw: Record<string, unknown>): ClinicUser {
   };
 }
 
-function toRole(raw: Record<string, unknown>): Role {
-  return {
-    key: String(raw.key ?? raw.id ?? ""),
-    name: String(raw.name ?? ""),
-    description: String(raw.description ?? ""),
-    color: String(raw.color ?? "from-slate-400 to-slate-500"),
-    builtIn: Boolean(raw.built_in),
-    permissions: Array.isArray(raw.permissions) ? raw.permissions.map(String) : [],
-  };
-}
-
-function toPermission(raw: Record<string, unknown>): Permission {
-  return {
-    key: String(raw.key ?? ""),
-    group: String(raw.group ?? raw.group_name ?? "General"),
-    label: String(raw.label ?? ""),
-  };
-}
-
-function toAudit(raw: Record<string, unknown>): AuditLog {
+function toLoginHistory(raw: Record<string, unknown>): LoginHistoryEntry {
   return {
     id: String(raw.id ?? ""),
-    at: String(raw.at ?? raw.created_at ?? new Date().toISOString()),
-    actor: String(raw.actor ?? ""),
-    action: String(raw.action ?? ""),
-    target: raw.target ? String(raw.target) : undefined,
-    details: raw.details ? String(raw.details) : undefined,
+    loggedAt: String(raw.logged_at ?? raw.created_at ?? new Date().toISOString()),
+    ipAddress: raw.ip_address ? String(raw.ip_address) : undefined,
+    userAgent: raw.user_agent ? String(raw.user_agent) : undefined,
+    status: raw.status === "failed" ? "failed" : "success",
+    failureReason: raw.failure_reason ? String(raw.failure_reason) : undefined,
   };
 }
 
@@ -159,27 +126,10 @@ async function load(force = false) {
 
   inflight = (async () => {
     try {
-      const [usersRes, rolesRes, permissionsRes, logsRes] = await Promise.all([
-        clinicApi.users.list({ limit: 200 }),
-        clinicApi.roles.list(),
-        clinicApi.permissions.list(),
-        clinicApi.auditLogs.list({ limit: 200 }),
-      ]);
-
-      const rolesData = Array.isArray(rolesRes) ? rolesRes : (rolesRes.data ?? []);
-      const permissionsData = Array.isArray(permissionsRes) ? permissionsRes : (permissionsRes.data ?? []);
-
-      const mappedRoles = rolesData.map((item) => toRole(item));
-      const mappedPermissions = permissionsData.map((item) => toPermission(item));
+      const usersRes = await clinicApi.users.list({ limit: 200 });
       state = {
         users: usersRes.data.map((item) => toUser(item)),
-        roles: mappedRoles,
-        permissions: mappedPermissions,
-        logs: logsRes.data.map((item) => toAudit(item)),
       };
-      DEFAULT_ROLES.splice(0, DEFAULT_ROLES.length, ...mappedRoles);
-      ALL_PERMISSIONS.splice(0, ALL_PERMISSIONS.length, ...mappedPermissions);
-
       loaded = true;
       emit();
     } finally {
@@ -202,98 +152,57 @@ export const usersStore = {
   },
 
   async upsertUser(user: ClinicUser, passwordPayload?: UserPasswordPayload) {
+    const body = {
+      first_name: user.firstName,
+      last_name: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      avatar_url: user.avatarUrl ?? null,
+      role: user.role,
+      status: user.status,
+      branch: user.branch,
+      department: user.department ?? null,
+      specialty: user.specialty ?? null,
+      license_number: user.licenseNumber ?? null,
+      experience_years: user.experienceYears ?? null,
+      gender: user.gender ?? null,
+      dob: user.dob ?? null,
+      working_hours: user.workingHours ?? null,
+      calendar_color: user.calendarColor ?? null,
+      notes: user.notes ?? null,
+      tags: user.tags ?? [],
+      two_factor: user.twoFactor ?? false,
+    };
+
     if (user.id) {
-      await clinicApi.users.update(user.id, {
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        avatar_url: user.avatarUrl ?? null,
-        role: user.role,
-        status: user.status,
-        branch: user.branch,
-        department: user.department ?? null,
-        specialty: user.specialty ?? null,
-        license_number: user.licenseNumber ?? null,
-        experience_years: user.experienceYears ?? null,
-        gender: user.gender ?? null,
-        dob: user.dob ?? null,
-        working_hours: user.workingHours ?? null,
-        calendar_color: user.calendarColor ?? null,
-        notes: user.notes ?? null,
-        tags: user.tags ?? [],
-        two_factor: user.twoFactor ?? false,
-      });
+      await clinicApi.users.update(user.id, body);
     } else {
-      await clinicApi.users.create({
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        ...passwordPayload,
-        avatar_url: user.avatarUrl ?? null,
-        role: user.role,
-        status: user.status,
-        branch: user.branch,
-        department: user.department ?? null,
-        specialty: user.specialty ?? null,
-        license_number: user.licenseNumber ?? null,
-        experience_years: user.experienceYears ?? null,
-        gender: user.gender ?? null,
-        dob: user.dob ?? null,
-        working_hours: user.workingHours ?? null,
-        calendar_color: user.calendarColor ?? null,
-        notes: user.notes ?? null,
-        tags: user.tags ?? [],
-        two_factor: user.twoFactor ?? false,
-      });
+      await clinicApi.users.create({ ...body, ...passwordPayload });
     }
+
     await load(true);
   },
 
-  async deleteUsers(ids: string[]) {
-    await Promise.all(ids.map((id) => clinicApi.users.delete(id)));
+  async deleteUser(id: string) {
+    await clinicApi.users.delete(id);
     await load(true);
   },
 
-  async setStatus(ids: string[], status: UserStatus) {
-    await clinicApi.users.bulkStatus({ user_ids: ids, status });
+  async setStatus(id: string, status: UserStatus) {
+    await clinicApi.users.update(id, { status });
     await load(true);
   },
 
-  async changeRole(ids: string[], role: RoleKey) {
-    await clinicApi.users.bulkRole({ user_ids: ids, role });
-    await load(true);
+  async changePassword(id: string, password: string, passwordConfirmation: string) {
+    await clinicApi.users.changePassword(id, {
+      password,
+      password_confirmation: passwordConfirmation,
+    });
   },
 
-  async resetPassword(id: string) {
-    await clinicApi.users.resetPassword(id);
-  },
-
-  async upsertRole(role: Role) {
-    if (state.roles.some((item) => item.key === role.key)) {
-      await clinicApi.roles.update(role.key, {
-        key: role.key,
-        name: role.name,
-        description: role.description,
-        color: role.color,
-        permissions: role.permissions,
-      });
-    } else {
-      await clinicApi.roles.create({
-        key: role.key,
-        name: role.name,
-        description: role.description,
-        color: role.color,
-        permissions: role.permissions,
-      });
-    }
-    await load(true);
-  },
-
-  async deleteRole(key: string) {
-    await clinicApi.roles.delete(key);
-    await load(true);
+  async getLoginHistory(id: string) {
+    const response = await clinicApi.users.loginHistory(id, { limit: 50 });
+    return response.data.map((item) => toLoginHistory(item));
   },
 };
 
@@ -307,6 +216,7 @@ export function useUsersStore(): State {
   return usersStore.get();
 }
 
+export const roleByKey = (key: RoleKey) => SIMPLE_ROLES.find((role) => role.key === key);
 export const fullName = (user: ClinicUser) => `${user.firstName} ${user.lastName}`.trim();
 export const initials = (user: ClinicUser) =>
   `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "U";

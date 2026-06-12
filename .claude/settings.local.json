@@ -13,7 +13,12 @@
       "Bash(grep -n \"DocumentsPanel\\\\|OverviewPanel\\\\|RailRow\\\\|RailButton\\\\|usePlanSettings\\\\|Undo2\\\\|Redo2\\\\|Globe\\\\|DollarSign\" \"C:\\\\laragon\\\\www\\\\DENTAL\\\\treatlyonline.de\\\\src\\\\routes\\\\patients.\\\\$patientId.plans.\\\\$planId.tsx\")",
       "Bash(git log *)",
       "Bash(git show *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(find /c/laragon/www/dent -maxdepth 2 -type d 2>/dev/null | head -30 *)",
+      "Bash(mysql -uroot -h127.0.0.1 -P3306 dentist -e \"SELECT cps.id, c.name AS clinic, cps.label FROM clinic_pricelist_sections cps JOIN clinics c ON c.id = cps.clinic_id ORDER BY c.id, cps.display_order;\")",
+      "Read(//c/laragon/bin/mysql/**)",
+      "Read(//c/laragon/etc/**)",
+      "Read(//c/laragon/**)"
     ]
   }
 }
