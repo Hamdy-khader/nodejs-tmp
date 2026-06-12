@@ -641,10 +641,6 @@ function RightSidebar({
           </PopoverContent>
         </Popover>
 
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-          <Puzzle className="size-4 text-muted-foreground" />
-          <span>Modules</span>
-        </button>
       </div>
     </aside>
   );

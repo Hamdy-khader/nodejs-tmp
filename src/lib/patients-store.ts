@@ -317,19 +317,19 @@ function serializeTreatmentRows(treatments: TreatmentRow[]) {
     items:
       row.kind === "visit"
         ? row.items.map((item, itemIndex) => ({
-          id: item.id,
-          catalog_section_key: item.catalogSectionKey ?? null,
-          catalog_group_key: item.catalogGroupKey ?? null,
-          catalog_item_id: item.catalogItemId ?? null,
-          catalog_item_key: item.catalogItemKey ?? null,
-          name: item.name,
-          tooth_number: item.toothNumber ?? null,
-          amount: item.amount,
-          unit_price: item.unitPrice,
-          price_source: item.priceSource ?? (item.catalogItemId ? "catalog" : null),
-          manual_price_override: item.manualPriceOverride ?? false,
-          sort_order: itemIndex + 1,
-        }))
+            id: item.id,
+            catalog_section_key: item.catalogSectionKey ?? null,
+            catalog_group_key: item.catalogGroupKey ?? null,
+            catalog_item_id: item.catalogItemId ?? null,
+            catalog_item_key: item.catalogItemKey ?? null,
+            name: item.name,
+            tooth_number: item.toothNumber ?? null,
+            amount: item.amount,
+            unit_price: item.unitPrice,
+            price_source: item.priceSource ?? (item.catalogItemId ? "catalog" : null),
+            manual_price_override: item.manualPriceOverride ?? false,
+            sort_order: itemIndex + 1,
+          }))
         : [],
   }));
 }
@@ -370,7 +370,9 @@ async function loadPlansFor(patientId: string, force = false) {
       const plans = rows.map((item) => toPlan(item, patientId));
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
       // preserve any plans already fetched via the detail endpoint (they have full data)
-      const merged = plans.map((p) => (planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p));
+      const merged = plans.map((p) =>
+        planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p,
+      );
       state = { ...state, plans: [...merged, ...rest] };
       plansLoadedFor.add(patientId);
       emit();
@@ -650,6 +652,20 @@ export const patientsStore = {
       updateLocalPlan(planId, { treatments: rows });
       void clinicApi.plans
         .createRow(planId, { kind: "visit", sort_order: rows.length })
+        .then((createdRow) =>
+          clinicApi.plans.createItem(planId, String(createdRow.id), {
+            catalog_section_key: newItem.catalogSectionKey ?? null,
+            catalog_group_key: newItem.catalogGroupKey ?? null,
+            catalog_item_id: newItem.catalogItemId ?? null,
+            catalog_item_key: newItem.catalogItemKey ?? null,
+            name: newItem.name,
+            tooth_number: newItem.toothNumber ?? null,
+            amount: newItem.amount,
+            unit_price: newItem.unitPrice,
+            manual_price_override: newItem.manualPriceOverride ?? false,
+            sort_order: 1,
+          }),
+        )
         .then(() => loadPlan(plan.patientId, planId, true))
         .catch(() => null);
       return;
@@ -664,8 +680,11 @@ export const patientsStore = {
         catalog_group_key: newItem.catalogGroupKey ?? null,
         catalog_item_id: newItem.catalogItemId ?? null,
         catalog_item_key: newItem.catalogItemKey ?? null,
+        name: newItem.name,
         tooth_number: newItem.toothNumber ?? null,
         amount: newItem.amount,
+        unit_price: newItem.unitPrice,
+        manual_price_override: newItem.manualPriceOverride ?? false,
         sort_order: row.items.length + 1,
       })
       .catch(() => null);
@@ -693,9 +712,7 @@ export const patientsStore = {
     const plan = getPlanById(planId);
     if (!plan) return;
     const nextPatch =
-      patch.unitPrice !== undefined
-        ? { ...patch, manualPriceOverride: true }
-        : patch;
+      patch.unitPrice !== undefined ? { ...patch, manualPriceOverride: true } : patch;
     const treatments = (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
         ? {
@@ -711,6 +728,7 @@ export const patientsStore = {
     const item = row?.items.find((entry) => entry.id === itemId);
     if (!item) return;
     void clinicApi.plans.updateItem(planId, rowId, itemId, {
+      name: item.name,
       tooth_number: item.toothNumber ?? null,
       amount: item.amount,
       unit_price: item.unitPrice,
@@ -778,13 +796,16 @@ export const patientsStore = {
   },
 };
 
-export const STATUS_META: Record<ToothStatus, { label: string; color: string; ring: string; bg: string }> = {
-  intact:        { label: "Intact",       color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
-  missing:       { label: "Missing",      color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
-  caries:        { label: "Caries",       color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
-  filled:        { label: "Filled",       color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
-  crown:         { label: "Crown",        color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
-  "root-treated":{ label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
-  implant:       { label: "Implant",      color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
-  bridge:        { label: "Bridge",       color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
+export const STATUS_META: Record<
+  ToothStatus,
+  { label: string; color: string; ring: string; bg: string }
+> = {
+  intact: { label: "Intact", color: "#C8B89A", ring: "#A09070", bg: "#F8F4ED" },
+  missing: { label: "Missing", color: "#B0776A", ring: "#8A4A40", bg: "#F5E8E5" },
+  caries: { label: "Caries", color: "#D4700C", ring: "#9A4408", bg: "#FEF0E4" },
+  filled: { label: "Filled", color: "#4A78B8", ring: "#1E4890", bg: "#EBF1FB" },
+  crown: { label: "Crown", color: "#C89020", ring: "#8A5E00", bg: "#FDF6DC" },
+  "root-treated": { label: "Root treated", color: "#CC4A38", ring: "#942A1C", bg: "#FDECEA" },
+  implant: { label: "Implant", color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
+  bridge: { label: "Bridge", color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
 };

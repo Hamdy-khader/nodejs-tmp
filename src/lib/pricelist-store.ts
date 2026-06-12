@@ -8,6 +8,12 @@ export type PriceItem = {
   name: string;
   price: number;
   note?: string;
+  usageCount?: number;
+  isUsed?: boolean;
+  canEditName?: boolean;
+  canEditNote?: boolean;
+  canDelete?: boolean;
+  canEditPrice?: boolean;
 };
 export type PriceSubGroup = {
   id: string;
@@ -39,7 +45,9 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["sections"]): PriceSection[] {
+export function toPriceSections(
+  raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["sections"],
+): PriceSection[] {
   const normalized = normalizePricelistData({
     settings: {
       language: "en",
@@ -67,6 +75,12 @@ function toSections(raw: Awaited<ReturnType<typeof clinicApi.pricelist.get>>["se
         name: item.name,
         price: item.price,
         note: item.note || undefined,
+        usageCount: item.usage_count,
+        isUsed: item.is_used,
+        canEditName: item.can_edit_name,
+        canEditNote: item.can_edit_note,
+        canDelete: item.can_delete,
+        canEditPrice: item.can_edit_price,
       })),
     })),
   }));
@@ -78,7 +92,7 @@ async function loadPricelist(force = false) {
   inflight = (async () => {
     try {
       const res = await clinicApi.pricelist.get();
-      state = toSections(res.sections);
+      state = toPriceSections(res.sections);
       loaded = true;
       emit();
     } finally {
@@ -92,7 +106,11 @@ export function usePricelist() {
   useEffect(() => {
     void loadPricelist();
   }, []);
-  return useSyncExternalStore(subscribe, () => state, () => state);
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  );
 }
 
 function norm(s: string) {

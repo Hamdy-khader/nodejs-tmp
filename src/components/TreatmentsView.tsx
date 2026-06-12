@@ -29,6 +29,7 @@ interface TreatmentMenuItem {
   sectionKey?: string;
   groupKey?: string;
   unitPrice?: number;
+  priceDisplay?: string;
 }
 
 interface TreatmentGroup {
@@ -212,6 +213,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           sectionKey: section.key,
           groupKey: group.key,
           unitPrice: item.price,
+          priceDisplay: item.price > 0 ? `$ ${item.price.toFixed(0)}` : "$ 0",
         });
       });
     });
@@ -228,9 +230,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     ?.items.find((item) => item.itemId);
 
   const toggleBridgeTooth = (n: number) => {
-    setBridgeSel((prev) =>
-      prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n],
-    );
+    setBridgeSel((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
   };
 
   const handlePick = (group: TreatmentGroup, item: TreatmentMenuItem) => {
@@ -373,7 +373,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Treatments
+              Clinic treatments
             </h3>
             <span
               className={cn(
@@ -385,11 +385,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                     : "bg-muted text-muted-foreground",
               )}
             >
-              {bridgeMode
-                ? "Bridge mode"
-                : selected
-                  ? `Tooth ${selected}`
-                  : "Any tooth"}
+              {bridgeMode ? "Bridge mode" : selected ? `Tooth ${selected}` : "Any tooth"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
@@ -407,17 +403,29 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                       )}
                     >
                       <span className="truncate">{group.label}</span>
-                      {isActive ? <Check className="h-3.5 w-3.5 shrink-0 opacity-90" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />}
+                      {isActive ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-[320px] min-w-[240px] overflow-y-auto">
+                  <DropdownMenuContent
+                    align="start"
+                    className="max-h-[320px] min-w-[240px] overflow-y-auto"
+                  >
                     {group.items?.map((item) => (
                       <DropdownMenuItem
                         key={`${group.id}-${item.value}-${item.label}`}
                         onSelect={() => handlePick(group, item)}
-                        className="text-xs font-medium"
+                        className="flex items-center justify-between gap-3 text-xs font-medium"
                       >
                         <span className="truncate">{item.label}</span>
+                        {item.priceDisplay && (
+                          <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                            {item.priceDisplay}
+                          </span>
+                        )}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -480,12 +488,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             </p>
           ) : (
             rows.map((row, idx) => (
-              <RowRenderer
-                key={row.id}
-                row={row}
-                index={idx}
-                planId={plan.id}
-              />
+              <RowRenderer key={row.id} row={row} index={idx} planId={plan.id} />
             ))
           )}
         </div>
@@ -510,58 +513,61 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               <span>Total</span>
               <span className="text-foreground tabular-nums">$ {totals.total.toFixed(0)}</span>
             </div>
-            {billingMode === "insurance" && plan.insurance && (() => {
-              const coverage = Math.max(
-                0,
-                Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
-              );
-              const oop = Math.max(0, totals.total - coverage);
-              return (
-                <>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Insurance coverage (estimated)</span>
-                    <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Out of pocket costs (estimated)</span>
-                    <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
-                  </div>
-                </>
-              );
-            })()}
-            {billingMode === "payment" && plan.paymentPlan && (() => {
-              const { amount, term, interest } = plan.paymentPlan;
-              const safeTerm = Math.max(1, term);
-              const monthly =
-                interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
-              const totalPaid = monthly * safeTerm;
-              const totalInterest = Math.max(0, totalPaid - amount);
-              return (
-                <>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Monthly payments</span>
-                    <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Total interest</span>
-                    <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-foreground">Total ({safeTerm} months)</span>
-                    <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
-                  </div>
-                </>
-              );
-            })()}
+            {billingMode === "insurance" &&
+              plan.insurance &&
+              (() => {
+                const coverage = Math.max(
+                  0,
+                  Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
+                );
+                const oop = Math.max(0, totals.total - coverage);
+                return (
+                  <>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Insurance coverage (estimated)</span>
+                      <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Out of pocket costs (estimated)</span>
+                      <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            {billingMode === "payment" &&
+              plan.paymentPlan &&
+              (() => {
+                const { amount, term, interest } = plan.paymentPlan;
+                const safeTerm = Math.max(1, term);
+                const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+                const totalPaid = monthly * safeTerm;
+                const totalInterest = Math.max(0, totalPaid - amount);
+                return (
+                  <>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Monthly payments</span>
+                      <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Total interest</span>
+                      <span className="font-semibold tabular-nums">
+                        $ {totalInterest.toFixed(0)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-foreground">Total ({safeTerm} months)</span>
+                      <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+                    </div>
+                  </>
+                );
+              })()}
           </div>
           <div>
             <Textarea
               placeholder="Note:"
               rows={3}
               value={plan.treatmentNote ?? ""}
-              onChange={(e) =>
-                patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })
-              }
+              onChange={(e) => patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })}
               className="bg-muted/30"
             />
           </div>
@@ -599,15 +605,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   );
 }
 
-function RowRenderer({
-  row,
-  index,
-  planId,
-}: {
-  row: TreatmentRow;
-  index: number;
-  planId: string;
-}) {
+function RowRenderer({ row, index, planId }: { row: TreatmentRow; index: number; planId: string }) {
   if (row.kind === "visit") {
     return <VisitRow row={row} index={index} planId={planId} />;
   }
@@ -675,13 +673,7 @@ function RowShell({
   );
 }
 
-function NoteInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function NoteInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <div className="ml-7 mt-1 flex items-center gap-2 rounded-md border border-dashed border-border/60 bg-background px-2 py-1.5">
       <StickyNote className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -747,15 +739,7 @@ function VisitRow({
   );
 }
 
-function ItemRow({
-  planId,
-  rowId,
-  item,
-}: {
-  planId: string;
-  rowId: string;
-  item: TreatmentItem;
-}) {
+function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item: TreatmentItem }) {
   const price = item.amount * item.unitPrice;
   return (
     <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md bg-background px-2 py-1.5">
@@ -768,7 +752,14 @@ function ItemRow({
             {item.toothNumber}
           </span>
         )}
-        <span className="truncate">{item.name}</span>
+        <div className="min-w-0">
+          <div className="truncate">{item.name}</div>
+          {item.manualPriceOverride && (
+            <div className="text-[10px] font-medium uppercase tracking-wide text-amber-700">
+              Plan price override
+            </div>
+          )}
+        </div>
       </div>
       <Input
         type="number"
@@ -957,10 +948,7 @@ function ModalShell({
   width?: string;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
       <div
         className={cn("w-full rounded-2xl bg-background shadow-xl", width)}
         onClick={(e) => e.stopPropagation()}

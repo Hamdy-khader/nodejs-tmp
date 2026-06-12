@@ -182,6 +182,12 @@ export interface PricelistItem {
   name: string;
   price: number;
   note: string;
+  usage_count?: number;
+  is_used?: boolean;
+  can_edit_name?: boolean;
+  can_edit_note?: boolean;
+  can_delete?: boolean;
+  can_edit_price?: boolean;
 }
 
 export interface PricelistGroup {
