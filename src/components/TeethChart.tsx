@@ -378,6 +378,24 @@ function ToothSVG({
   );
 }
 
+export function ToothIllustration({
+  number,
+  status,
+  note,
+  className,
+}: {
+  number: number;
+  status: ToothStatus;
+  note?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("aspect-[1/2] w-full max-w-[44px]", className)}>
+      <ToothSVG number={number} status={status} note={note} />
+    </div>
+  );
+}
+
 // ─── Bridge run detection ────────────────────────────────────────────────────
 function bridgeRuns(numbers: number[], teeth: Record<number, ToothState>) {
   const runs: { start: number; end: number }[] = [];
