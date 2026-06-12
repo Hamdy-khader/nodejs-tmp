@@ -97,7 +97,10 @@ function colorToRgb(color: string): string | null {
 }
 
 function sanitizeColorValue(value: string): string {
+  // MODERN_COLOR_RE is global, so reset lastIndex to keep test()/replace() stateless.
+  MODERN_COLOR_RE.lastIndex = 0;
   if (!MODERN_COLOR_RE.test(value)) return value;
+  MODERN_COLOR_RE.lastIndex = 0;
   return value.replace(MODERN_COLOR_RE, (match) => colorToRgb(match) ?? "rgb(0, 0, 0)");
 }
 
@@ -113,10 +116,23 @@ function inlineComputedStyles(source: Element, target: Element) {
   target.removeAttribute("data-slot");
   target.removeAttribute("style");
 
+  // Inline the curated structural/visual props so the declassed clone keeps its layout.
   for (const prop of STYLE_PROPS) {
     const value = computed.getPropertyValue(prop);
     if (!value) continue;
     targetStyle.setProperty(prop, sanitizeColorValue(value));
+  }
+
+  // Scan EVERY computed property (including --tw-* custom properties, accent-color,
+  // caret-color, text-decoration-color, etc.). Any value still carrying a modern
+  // color function would crash html2canvas, so override it with the rgb equivalent.
+  for (let i = 0; i < computed.length; i += 1) {
+    const prop = computed.item(i);
+    if (!prop) continue;
+    const value = computed.getPropertyValue(prop);
+    if (!value) continue;
+    const sanitized = sanitizeColorValue(value);
+    if (sanitized !== value) targetStyle.setProperty(prop, sanitized);
   }
 }
 
