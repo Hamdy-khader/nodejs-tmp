@@ -98,7 +98,7 @@ function TemplatesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[oklch(0.96_0.005_160)] px-6 py-8">
+    <div className="min-h-screen bg-[#eff3f1] px-6 py-8">
       <div className="mx-auto flex max-w-[1400px] gap-6">
         {/* Main panel */}
         <section className="flex-1 rounded-2xl border border-border/60 bg-card shadow-sm">

@@ -27,6 +27,7 @@ import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
 import { saveTreatmentPlanPdf, type TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
 import {
   STATUS_META,
+  getStatusMeta,
   type TreatmentItem,
   type TreatmentPlan,
   type TreatmentRow,
@@ -168,7 +169,7 @@ function getTotals(rows: TreatmentRow[]) {
 }
 
 function getBaseLabel(tooth: ToothState) {
-  return tooth.note || (tooth.status !== "intact" ? STATUS_META[tooth.status].label : "");
+  return tooth.note || (tooth.status !== "intact" ? getStatusMeta(tooth.status).label : "");
 }
 
 function getAffectedTeeth(plan: TreatmentPlan) {
@@ -325,12 +326,12 @@ function sectionHeader(page: TreatmentPlanPdfPage) {
 function CoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
   const { frontCover } = settings.pageDesign;
   return (
-    <div className="flex h-full flex-col items-center justify-between bg-[oklch(0.18_0.04_60)] text-white">
-      <div className="w-full bg-[oklch(0.15_0.04_60)] px-6 py-4 text-center">
-        <p className="font-serif text-2xl italic text-[oklch(0.85_0.08_85)]">{frontCover.clinicName}</p>
+    <div className="flex h-full flex-col items-center justify-between bg-[#1e0d01] text-white">
+      <div className="w-full bg-[#170600] px-6 py-4 text-center">
+        <p className="font-serif text-2xl italic text-[#e6ca91]">{frontCover.clinicName}</p>
       </div>
-      <div className="grid w-full flex-1 place-items-center bg-[oklch(0.85_0.02_60)]">
-        <div className="text-center text-[oklch(0.3_0.04_60)]">
+      <div className="grid w-full flex-1 place-items-center bg-[#d8cbc1]">
+        <div className="text-center text-[#3d2919]">
           <p className="text-[10px] tracking-[0.3em]">{frontCover.title}</p>
           <p className="mt-1 font-serif text-base italic">{frontCover.subtitle}</p>
         </div>
@@ -361,7 +362,7 @@ function StatusContent({ plan }: { plan: TreatmentPlan }) {
         ) : (
           <div className="grid grid-cols-4 gap-2">
             {affected.slice(0, 8).map((tooth) => {
-              const meta = STATUS_META[tooth.status];
+              const meta = getStatusMeta(tooth.status);
               return (
                 <div key={tooth.number} className="rounded-lg border border-border/60 bg-white p-1.5 text-center">
                   <ToothIllustration number={tooth.number} status={tooth.status} note={tooth.note} className="mx-auto max-w-[26px]" />
@@ -413,7 +414,7 @@ function SuggestedContent({
             {treatedTeeth.map((tooth) => (
               <span
                 key={tooth.number}
-                className="rounded-full bg-[oklch(0.62_0.18_150)]/15 px-2 py-0.5 text-[7px] font-semibold text-[oklch(0.35_0.12_150)]"
+                className="rounded-full bg-[#00a245]/15 px-2 py-0.5 text-[7px] font-semibold text-[#004a12]"
               >
                 Tooth {tooth.number} · Tx x{treatmentCounts[tooth.number]}
               </span>
@@ -467,7 +468,7 @@ function CompactJawGrid({
       {[teeth.slice(0, 16), teeth.slice(16)].map((group, groupIndex) => (
         <div key={groupIndex} className="space-y-1.5">
           {group.map((tooth) => {
-            const meta = STATUS_META[tooth.status];
+            const meta = getStatusMeta(tooth.status);
             const hasStatus = tooth.status !== "intact" || Boolean(tooth.note) || (tooth.diagnosis?.length ?? 0) > 0;
             const label = getBaseLabel(tooth);
             const txCount = treatmentCounts[tooth.number] ?? 0;
@@ -681,7 +682,7 @@ function RightSidebar({
       <button
         onClick={() => void onDownload()}
         disabled={downloading}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.23_0.06_240)] py-3 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-[#002036] py-3 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Download className="size-4" />
         {downloading ? "Downloading..." : "Download"}

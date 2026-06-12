@@ -95,7 +95,7 @@ export function DocumentsPanel() {
 
 function PdfPreviewPanel({ documents }: { documents: DocRow[] }) {
   return (
-    <aside className="self-start rounded-2xl border border-border/60 bg-[oklch(0.93_0.005_240)] p-3 shadow-inner" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <aside className="self-start rounded-2xl border border-border/60 bg-[#e5e8eb] p-3 shadow-inner" style={{ maxHeight: "calc(100vh - 200px)" }}>
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">PDF Preview</span>
         <span className="text-[11px] text-muted-foreground">{documents.length} pages</span>
@@ -106,7 +106,7 @@ function PdfPreviewPanel({ documents }: { documents: DocRow[] }) {
         )}
         {documents.map((d, i) => (
           <div key={d.id} className="group relative rounded-md border border-border bg-white shadow-sm" style={{ aspectRatio: "1 / 1.35" }}>
-            <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-[oklch(0.55_0.18_245)] px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
+            <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-[#0076d2] px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
               <span className="max-w-[120px] truncate">{d.title}</span>
               <Pencil className="size-2.5 opacity-80" />
             </div>

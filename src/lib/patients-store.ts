@@ -91,6 +91,31 @@ const FDI_NUMBERS = [
 export const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 export const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
+const TOOTH_STATUS_SET = new Set<ToothStatus>([
+  "intact",
+  "missing",
+  "caries",
+  "filled",
+  "crown",
+  "root-treated",
+  "implant",
+  "bridge",
+]);
+
+function normalizeToothStatus(value: unknown): ToothStatus {
+  const raw = String(value ?? "intact").trim().toLowerCase();
+  if (TOOTH_STATUS_SET.has(raw as ToothStatus)) return raw as ToothStatus;
+
+  switch (raw) {
+    case "root_treated":
+    case "root treated":
+    case "roottreated":
+      return "root-treated";
+    default:
+      return "intact";
+  }
+}
+
 export function defaultTeeth(): Record<number, ToothState> {
   const out: Record<number, ToothState> = {};
   for (const n of FDI_NUMBERS) out[n] = { number: n, status: "intact" };
@@ -139,7 +164,7 @@ function toPatient(raw: Record<string, unknown>): Patient {
 function toTooth(raw: Record<string, unknown>): ToothState {
   return {
     number: Number(raw.tooth_number ?? raw.number ?? 0),
-    status: String(raw.status ?? "intact") as ToothStatus,
+    status: normalizeToothStatus(raw.status),
     note: raw.note ? String(raw.note) : undefined,
     diagnosis: Array.isArray(raw.diagnosis) ? raw.diagnosis.map(String) : undefined,
   };
@@ -809,3 +834,7 @@ export const STATUS_META: Record<
   implant: { label: "Implant", color: "#4A6A98", ring: "#243A62", bg: "#EBF0F8" },
   bridge: { label: "Bridge", color: "#8040C8", ring: "#501888", bg: "#F2EAFA" },
 };
+
+export function getStatusMeta(status: unknown) {
+  return STATUS_META[normalizeToothStatus(status)];
+}

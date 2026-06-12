@@ -143,9 +143,9 @@ function DocumentsPage() {
   }, [sections, selectedSet]);
 
   return (
-    <div className="min-h-screen bg-[oklch(0.96_0.005_160)]">
+    <div className="min-h-screen bg-[#eff3f1]">
       {/* Top navbar */}
-      <header className="bg-[oklch(0.23_0.06_240)] px-6 py-3">
+      <header className="bg-[#002036] px-6 py-3">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-4 text-white">
             <Link to="/clinic" className="text-lg font-semibold tracking-tight">
@@ -253,7 +253,7 @@ const LINE_WIDTHS = [92, 78, 88, 70, 95, 82, 65, 90, 74, 86];
 function PdfPreviewPanel({ documents }: { documents: DocRow[] }) {
   return (
     <aside
-      className="self-start rounded-2xl border border-border/60 bg-[oklch(0.93_0.005_240)] p-4 shadow-inner"
+      className="self-start rounded-2xl border border-border/60 bg-[#e5e8eb] p-4 shadow-inner"
       style={{ maxHeight: "calc(100vh - 180px)" }}
     >
       <div className="mb-3 flex items-center justify-between">
@@ -275,7 +275,7 @@ function PdfPreviewPanel({ documents }: { documents: DocRow[] }) {
             style={{ aspectRatio: "1 / 1.35" }}
           >
             {/* Page title chip */}
-            <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-[oklch(0.55_0.18_245)] px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
+            <div className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-md bg-[#0076d2] px-2 py-0.5 text-[9px] font-medium text-white shadow-sm">
               <span className="max-w-[140px] truncate">{d.title}</span>
               <Pencil className="size-2.5 opacity-80" />
             </div>

@@ -1,4 +1,4 @@
-import { UPPER_TEETH, LOWER_TEETH, STATUS_META, type ToothState, type ToothStatus } from "@/lib/patients-store";
+import { UPPER_TEETH, LOWER_TEETH, STATUS_META, getStatusMeta, type ToothState, type ToothStatus } from "@/lib/patients-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -373,7 +373,7 @@ function ToothSVG({
             cx={cat === "molar" ? 31 : cat === "premolar" ? 28 : 27}
             cy={GUM_Y - 6}
             r="3.2"
-            fill={STATUS_META[status].color}
+            fill={getStatusMeta(status).color}
             stroke="white"
             strokeWidth="0.8"
           />
@@ -511,9 +511,9 @@ function Row({
                     key={annotation.id}
                     className="max-w-[4.25rem] rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] shadow-sm backdrop-blur-sm"
                     style={{
-                      color: annotation.color,
-                      background: annotation.background,
-                      borderColor: annotation.border,
+                      color: annotation.color || "#475467",
+                      background: annotation.background || "rgba(71, 84, 103, 0.10)",
+                      borderColor: annotation.border || "rgba(71, 84, 103, 0.26)",
                     }}
                     title={annotation.label}
                   >

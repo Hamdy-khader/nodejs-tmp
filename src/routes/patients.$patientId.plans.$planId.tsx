@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   patientsStore, usePatient, usePlan, usePlansFor, defaultTeeth,
-  STATUS_META, UPPER_TEETH, LOWER_TEETH, type ToothStatus, type TreatmentPlan,
+  STATUS_META, UPPER_TEETH, LOWER_TEETH, getStatusMeta, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -232,7 +232,7 @@ function PlanPage() {
                 className={cn(
                   "relative flex flex-1 min-w-0 items-center justify-center gap-2 px-3 py-3 text-[11px] font-semibold uppercase tracking-wide transition-all sm:px-5 sm:py-4 sm:text-sm",
                   active
-                    ? "bg-[oklch(0.96_0.12_95)] text-foreground"
+                    ? "bg-[#fff191] text-foreground"
                     : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
                 )}
               >
@@ -365,8 +365,8 @@ function PlanPage() {
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : disabled
-                          ? "cursor-not-allowed bg-[oklch(0.78_0.01_240)] text-white/95"
-                          : "bg-[oklch(0.62_0.02_240)] text-white hover:bg-[oklch(0.55_0.04_240)]",
+                          ? "cursor-not-allowed bg-[#b2b8bd] text-white/95"
+                          : "bg-[#7c8891] text-white hover:bg-[#5d7587]",
                       );
                       const triggerInner = (
                         <>
@@ -839,7 +839,7 @@ function JawGrid({
             const isSel = selected === n;
             const status = t?.status ?? "intact";
             const hasStatus = status !== "intact";
-            const meta = STATUS_META[status];
+            const meta = getStatusMeta(status);
             const baseLabel = t?.note || (hasStatus ? meta.label : "");
             const dx = (t?.diagnosis ?? []).filter(Boolean);
             const txCount = treatmentCounts[n] ?? 0;

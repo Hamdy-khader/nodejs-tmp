@@ -189,8 +189,8 @@ function OverviewPage() {
   const allPages = buildPdfPages(selectedDocs);
 
   return (
-    <div className="min-h-screen bg-[oklch(0.93_0.005_240)]">
-      <header className="bg-[oklch(0.23_0.06_240)] px-6 py-3">
+    <div className="min-h-screen bg-[#e5e8eb]">
+      <header className="bg-[#002036] px-6 py-3">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-4 text-white">
             <Link to="/clinic" className="text-lg font-semibold tracking-tight">Treatly</Link>
@@ -363,12 +363,12 @@ function sectionHeader(page: TreatmentPlanPdfPage) {
 function CoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
   const { frontCover } = settings.pageDesign;
   return (
-    <div className="flex h-full flex-col items-center justify-between bg-[oklch(0.18_0.04_60)] text-white">
-      <div className="w-full bg-[oklch(0.15_0.04_60)] px-6 py-4 text-center">
-        <p className="font-serif text-2xl italic text-[oklch(0.85_0.08_85)]">{frontCover.clinicName}</p>
+    <div className="flex h-full flex-col items-center justify-between bg-[#1e0d01] text-white">
+      <div className="w-full bg-[#170600] px-6 py-4 text-center">
+        <p className="font-serif text-2xl italic text-[#e6ca91]">{frontCover.clinicName}</p>
       </div>
-      <div className="grid w-full flex-1 place-items-center bg-[oklch(0.85_0.02_60)]">
-        <div className="text-center text-[oklch(0.3_0.04_60)]">
+      <div className="grid w-full flex-1 place-items-center bg-[#d8cbc1]">
+        <div className="text-center text-[#3d2919]">
           <p className="text-[10px] tracking-[0.3em]">{frontCover.title}</p>
           <p className="mt-1 font-serif text-base italic">{frontCover.subtitle}</p>
         </div>
@@ -608,7 +608,7 @@ function RightSidebar({
       <button
         onClick={() => void handleDownload()}
         disabled={downloading}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.23_0.06_240)] py-3 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-[#002036] py-3 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Download className="size-4" />
         {downloading ? "Downloading..." : "Download"}
