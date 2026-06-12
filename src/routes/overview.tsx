@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { createRef, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Globe,
@@ -186,7 +186,8 @@ function OverviewPage() {
     return out;
   }, [templates, order, selectedSet]);
 
-  const allPages = buildPdfPages(selectedDocs);
+  const allPages = useMemo(() => buildPdfPages(selectedDocs), [selectedDocs]);
+  const pageRefs = useMemo(() => allPages.map(() => createRef<HTMLDivElement>()), [allPages]);
 
   return (
     <div className="min-h-screen bg-[#e5e8eb]">
@@ -247,6 +248,7 @@ function OverviewPage() {
             {allPages.map((page, index) => (
               <PageCard
                 key={`${page.kind}-${page.title}-${index}`}
+                pageRef={pageRefs[index]}
                 page={page}
                 index={index + 1}
                 total={allPages.length}
@@ -304,11 +306,13 @@ function StepProgress({ active }: { active: string }) {
 }
 
 function PageCard({
+  pageRef,
   page,
   index,
   total,
   settings,
 }: {
+  pageRef: React.RefObject<HTMLDivElement | null>;
   page: TreatmentPlanPdfPage;
   index: number;
   total: number;
@@ -316,6 +320,8 @@ function PageCard({
 }) {
   return (
     <article
+      ref={pageRef}
+      data-overview-export-page="true"
       className="relative flex flex-col rounded-lg border border-border bg-white shadow-sm transition hover:shadow-md"
       style={{ aspectRatio: "1 / 1.414" }}
     >
@@ -549,9 +555,12 @@ function RightSidebar({
     setDownloading(true);
     try {
       const safePlanName = (activePlanTab?.planName || "treatment-plan").replace(/[\\/:*?\"<>|]+/g, "-");
-      saveTreatmentPlanPdf({
+      const pageElements = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-overview-export-page='true']"),
+      );
+      await saveTreatmentPlanPdf({
         fileName: `${safePlanName}.pdf`,
-        pages: buildPdfPages(selectedDocs),
+        pageElements,
         settings,
       });
       toast.success("Treatment plan downloaded.");

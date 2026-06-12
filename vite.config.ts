@@ -11,4 +11,10 @@ export default defineConfig({
     tailwindcss(),
     tsconfigPaths(),
   ],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
+    globals: true,
+    clearMocks: true,
+  },
 });
