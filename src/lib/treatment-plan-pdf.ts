@@ -163,9 +163,45 @@ function inlineTreeStyles(source: Node, target: Node) {
   }
 }
 
+function removeUnsupportedExportNodes(root: HTMLElement) {
+  const unsupportedSelectors = [
+    "svg",
+    "symbol",
+    "defs",
+    "clipPath",
+    "mask",
+    "pattern",
+    "marker",
+    "filter",
+    "foreignObject",
+  ].join(", ");
+
+  root.querySelectorAll(unsupportedSelectors).forEach((node) => {
+    node.remove();
+  });
+}
+
+function forceLegacyColorStyles(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    const style = element.style;
+    for (let index = 0; index < style.length; index += 1) {
+      const prop = style.item(index);
+      if (!prop) continue;
+      const value = style.getPropertyValue(prop);
+      if (!value) continue;
+      const sanitized = sanitizeColorValue(value);
+      if (sanitized !== value) {
+        style.setProperty(prop, sanitized, style.getPropertyPriority(prop));
+      }
+    }
+  });
+}
+
 function createExportClone(page: HTMLElement) {
   const clone = page.cloneNode(true) as HTMLElement;
   inlineTreeStyles(page, clone);
+  removeUnsupportedExportNodes(clone);
+  forceLegacyColorStyles(clone);
 
   clone.style.position = "fixed";
   clone.style.left = "-20000px";
