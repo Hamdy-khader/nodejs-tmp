@@ -111,14 +111,6 @@ const tickets: TicketRow[] = [
   },
 ];
 
-const reports = [
-  "Clinics Report",
-  "Subscription Report",
-  "Revenue Report",
-  "Payment Report",
-  "Branch Statistics Report",
-];
-
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -590,37 +582,6 @@ export function SystemSettings() {
           />
         </Field>
         <Btn variant="primary">Save Settings</Btn>
-      </div>
-    </>
-  );
-}
-
-export function BusinessReports() {
-  return (
-    <>
-      <PageHeader
-        title="Reports"
-        subtitle="Business reports only: clinics, subscriptions, revenue, payments, and branch statistics."
-      />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {reports.map((report) => (
-          <div className="adm-card" key={report}>
-            <div className="adm-section-title">{report}</div>
-            <p style={{ color: "var(--adm-muted)", fontSize: 13, lineHeight: 1.6 }}>
-              Export and review business data for this report category.
-            </p>
-            <div className="adm-actions">
-              <Btn variant="primary">View</Btn>
-              <Btn>Download</Btn>
-            </div>
-          </div>
-        ))}
       </div>
     </>
   );
