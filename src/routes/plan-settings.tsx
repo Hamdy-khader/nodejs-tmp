@@ -31,6 +31,7 @@ import {
   usePlanSettings,
   type PageDesign,
 } from "@/lib/plan-settings-store";
+import { DEFAULT_COVER_IMAGE } from "@/lib/pdf-export-context";
 
 export const Route = createFileRoute("/plan-settings")({
   head: () => ({
@@ -180,6 +181,7 @@ function PlanSettingsPage() {
                   clinicName={settings.pageDesign.frontCover.clinicName}
                   title={settings.pageDesign.frontCover.title}
                   subtitle={settings.pageDesign.frontCover.subtitle}
+                  coverImage={settings.pageDesign.frontCover.coverImage}
                 />
               }
             />
@@ -285,17 +287,25 @@ function FrontCoverPreview({
   clinicName,
   title,
   subtitle,
+  coverImage,
 }: {
   clinicName: string;
   title: string;
   subtitle?: string;
+  coverImage?: string;
 }) {
   return (
-    <div className="flex h-full w-full flex-col justify-between bg-[#1b0e04] p-3 text-center text-white">
-      <div className="font-serif text-sm italic tracking-wide text-amber-200">{clinicName}</div>
-      <div className="space-y-1 pb-2">
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-[#1b0e04] p-3 text-center text-white">
+      <img
+        src={coverImage || DEFAULT_COVER_IMAGE}
+        alt="Cover preview"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-black/55" />
+      <div className="relative font-serif text-sm italic tracking-wide text-amber-200">{clinicName}</div>
+      <div className="relative space-y-1 pb-2">
         <div className="text-[10px] tracking-[0.3em] text-amber-200/80">{title}</div>
-        {subtitle && <div className="text-[9px] tracking-[0.25em] text-amber-100/70">{subtitle}</div>}
+        {subtitle && <div className="text-[9px] tracking-[0.25em] text-amber-100/85">{subtitle}</div>}
       </div>
     </div>
   );
@@ -322,9 +332,9 @@ function InnerPagesPreview({
         ))}
       </div>
       <div className="flex items-center justify-between border-t border-border pt-1.5 text-[7px] text-muted-foreground">
-        <span>{footerLeft}</span>
+        <span>{footerLeft || "{{clinic_name}} | {{patient_name}} | {{treatment_number}}"}</span>
         <span>1 / 1</span>
-        <span>{footerRight}</span>
+        <span>{footerRight || "PDF Export"}</span>
       </div>
     </div>
   );
@@ -373,7 +383,7 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
         <Field label="Cover image URL">
           <Input
             defaultValue={settings.pageDesign.frontCover.coverImage ?? ""}
-            placeholder="https://..."
+            placeholder="https://... or leave empty for default cover"
             onChange={(e) => planSettingsStore.updatePageDesign("frontCover", { coverImage: e.target.value })}
           />
         </Field>
@@ -392,12 +402,14 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
         <Field label="Footer left">
           <Input
             defaultValue={settings.pageDesign.innerPages.footerLeft}
+            placeholder="{{clinic_name}} | {{patient_name}} | {{treatment_number}}"
             onChange={(e) => planSettingsStore.updatePageDesign("innerPages", { footerLeft: e.target.value })}
           />
         </Field>
         <Field label="Footer right">
           <Input
             defaultValue={settings.pageDesign.innerPages.footerRight}
+            placeholder="PDF Export"
             onChange={(e) => planSettingsStore.updatePageDesign("innerPages", { footerRight: e.target.value })}
           />
         </Field>

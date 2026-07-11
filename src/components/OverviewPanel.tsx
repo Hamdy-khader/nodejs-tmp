@@ -32,9 +32,17 @@ import {
   type TreatmentPlan,
   type TreatmentRow,
   type ToothState,
+  usePatient,
 } from "@/lib/patients-store";
 import { TeethChart, ToothIllustration } from "@/components/TeethChart";
 import { toast } from "sonner";
+import { useClinicSession } from "@/lib/clinic-session-store";
+import {
+  buildFooterSegments,
+  buildPdfExportContext,
+  resolveCoverImage,
+  resolveTemplate,
+} from "@/lib/pdf-export-context";
 
 interface DocRow {
   id: string;
@@ -184,9 +192,21 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
   const order = useSectionOrder();
   const { canUndo, canRedo } = useDocsHistoryState();
   const settings = usePlanSettings();
+  const { clinic } = useClinicSession();
+  const patient = usePatient(plan.patientId);
   const [layout, setLayout] = useState<"grid" | "single">("grid");
   const [downloading, setDownloading] = useState(false);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const exportContext = useMemo(
+    () =>
+      buildPdfExportContext({
+        clinic,
+        patientName: patient?.name,
+        plan,
+        settings,
+      }),
+    [clinic, patient?.name, plan, settings],
+  );
 
   const selectedDocs = useMemo(() => {
     const out: DocRow[] = [];
@@ -204,9 +224,10 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const safePlanName = (plan.name || "treatment-plan").replace(/[\\/:*?"<>|]+/g, "-");
+      const safePatientName = (exportContext.patientName || "patient").replace(/[\\/:*?"<>|]+/g, "-");
+      const safeTreatmentNumber = (exportContext.treatmentNumber || "plan").replace(/[\\/:*?"<>|]+/g, "-");
       await saveTreatmentPlanPdf({
-        fileName: `${safePlanName}.pdf`,
+        fileName: `${safePatientName}-${safeTreatmentNumber}.pdf`,
         pageElements: pageRefs.map((ref) => ref.current),
         settings,
       });
@@ -248,6 +269,7 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
               total={allPages.length}
               settings={settings}
               plan={plan}
+              exportContext={exportContext}
             />
           ))}
         </div>
@@ -272,6 +294,7 @@ const PageCard = ({
   settings,
   plan,
   pageRef,
+  exportContext,
 }: {
   page: TreatmentPlanPdfPage;
   index: number;
@@ -279,10 +302,15 @@ const PageCard = ({
   settings: ReturnType<typeof usePlanSettings>;
   plan: TreatmentPlan;
   pageRef: React.RefObject<HTMLDivElement | null>;
+  exportContext: ReturnType<typeof buildPdfExportContext>;
 }) => {
+  const resolvedFooterLeft = resolveTemplate(settings.pageDesign.innerPages.footerLeft, exportContext);
+  const footerSegments = resolvedFooterLeft || buildFooterSegments(exportContext).join(" | ");
+
   return (
     <article
       ref={pageRef}
+      data-overview-export-page="true"
       className="relative flex flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm"
       style={{ aspectRatio: "1 / 1.414" }}
     >
@@ -293,7 +321,7 @@ const PageCard = ({
         </header>
       )}
       <div className="flex-1 overflow-hidden px-4 py-3">
-        {page.kind === "cover" && <CoverContent settings={settings} />}
+        {page.kind === "cover" && <CoverContent settings={settings} exportContext={exportContext} />}
         {page.kind === "status" && <StatusContent plan={plan} />}
         {page.kind === "suggested" && <SuggestedContent plan={plan} settings={settings} />}
         {page.kind === "document" && <DocumentContent title={page.title} body={page.body} />}
@@ -301,9 +329,9 @@ const PageCard = ({
       </div>
       {page.kind !== "cover" && page.kind !== "back" && settings.pageDesign.innerPages.showFooter && (
         <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
-          <span>{settings.pageDesign.innerPages.footerLeft}</span>
+          <span>{footerSegments}</span>
           <span>{index} / {total}</span>
-          <span>{settings.pageDesign.innerPages.footerRight}</span>
+          <span>{resolveTemplate(settings.pageDesign.innerPages.footerRight, exportContext)}</span>
         </footer>
       )}
     </article>
@@ -323,17 +351,33 @@ function sectionHeader(page: TreatmentPlanPdfPage) {
   }
 }
 
-function CoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
+function CoverContent({
+  settings,
+  exportContext,
+}: {
+  settings: ReturnType<typeof usePlanSettings>;
+  exportContext: ReturnType<typeof buildPdfExportContext>;
+}) {
   const { frontCover } = settings.pageDesign;
+  const coverImage = resolveCoverImage(frontCover.coverImage);
+  const subtitle = resolveTemplate(frontCover.subtitle, exportContext);
+
   return (
-    <div className="flex h-full flex-col items-center justify-between bg-[#1e0d01] text-white">
-      <div className="w-full bg-[#170600] px-6 py-4 text-center">
-        <p className="font-serif text-2xl italic text-[#e6ca91]">{frontCover.clinicName}</p>
+    <div className="relative flex h-full flex-col items-center justify-between overflow-hidden bg-[#1e0d01] text-white">
+      <img
+        src={coverImage}
+        alt="Treatment plan cover"
+        className="absolute inset-0 h-full w-full object-cover"
+        crossOrigin="anonymous"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#1b0f08]/80 via-[#472a18]/30 to-[#100804]/78" />
+      <div className="relative z-10 w-full bg-[#170600]/72 px-6 py-4 text-center backdrop-blur-[1px]">
+        <p className="font-serif text-2xl italic text-[#e6ca91]">{exportContext.clinicName}</p>
       </div>
-      <div className="grid w-full flex-1 place-items-center bg-[#d8cbc1]">
+      <div className="relative z-10 grid w-full flex-1 place-items-center px-10">
         <div className="text-center text-[#3d2919]">
-          <p className="text-[10px] tracking-[0.3em]">{frontCover.title}</p>
-          <p className="mt-1 font-serif text-base italic">{frontCover.subtitle}</p>
+          <p className="text-[10px] tracking-[0.3em] text-[#f6dfbb]">{frontCover.title}</p>
+          <p className="mt-1 font-serif text-base italic text-white">{subtitle}</p>
         </div>
       </div>
     </div>
@@ -661,13 +705,14 @@ function RightSidebar({
   return (
     <aside className="self-start space-y-3">
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-          <Globe className="size-4 text-muted-foreground" /><span>English</span>
-        </button>
-        <button className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
+        <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+          <Globe className="size-4 text-muted-foreground" />
+          <span>{settings.language}</span>
+        </div>
+        <div className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm">
           <DollarSign className="mt-0.5 size-4 text-muted-foreground" />
-          <span className="text-left leading-tight">USD<br /><span className="text-[11px] text-muted-foreground">United States</span></span>
-        </button>
+          <span className="text-left leading-tight">{settings.pricePage.currency}</span>
+        </div>
         <div className="my-2 h-px bg-border/60" />
         <button disabled={!canUndo} onClick={() => documentsStore.undo()} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40">
           <Undo2 className="size-4 text-muted-foreground" /><span>Undo</span>
@@ -728,3 +773,5 @@ function CheckRow({ label, checked, disabled, onChange }: {
     </label>
   );
 }
+
+

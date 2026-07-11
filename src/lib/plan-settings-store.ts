@@ -59,8 +59,8 @@ const defaults: PlanSettings = {
     },
     innerPages: {
       headerText: "Inner pages",
-      footerLeft: "Footer (left)",
-      footerRight: "Footer (right)",
+      footerLeft: "{{clinic_name}} | {{patient_name}} | {{treatment_number}}",
+      footerRight: "PDF Export",
       showFooter: true,
     },
     backCover: { title: "Back cover", note: "" },

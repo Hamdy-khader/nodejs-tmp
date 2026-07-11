@@ -574,18 +574,14 @@ function RightSidebar({
   return (
     <aside className="self-start space-y-3">
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
+        <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
           <Globe className="size-4 text-muted-foreground" />
-          <span>English</span>
-        </button>
-        <button className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
+          <span>{settings.language}</span>
+        </div>
+        <div className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm">
           <DollarSign className="mt-0.5 size-4 text-muted-foreground" />
-          <span className="text-left leading-tight">
-            USD
-            <br />
-            <span className="text-[11px] text-muted-foreground">United States doâ€¦</span>
-          </span>
-        </button>
+          <span className="text-left leading-tight">{settings.pricePage.currency}</span>
+        </div>
         <div className="my-2 h-px bg-border/60" />
         <button
           disabled={!canUndo}
@@ -673,3 +669,5 @@ function CheckRow({
     </label>
   );
 }
+
+

@@ -11,7 +11,6 @@ import {
   ClipboardList,
   UserRound,
   MoreHorizontal,
-  Youtube,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -43,6 +42,7 @@ import {
   type ClinicTemplate,
   type TemplateCategory,
 } from "@/lib/templates-store";
+import { usePlanSettings } from "@/lib/plan-settings-store";
 
 export const Route = createFileRoute("/templates")({
   head: () => ({
@@ -63,6 +63,7 @@ const SIDE_ITEMS: { id: TemplateCategory; label: string; icon: typeof FileText }
 
 function TemplatesPage() {
   const all = useTemplates();
+  const settings = usePlanSettings();
   const [active, setActive] = useState<TemplateCategory>("treatments");
   const [editing, setEditing] = useState<ClinicTemplate | null>(null);
   const [open, setOpen] = useState(false);
@@ -106,14 +107,6 @@ function TemplatesPage() {
             <h1 className="text-xl font-semibold uppercase tracking-[0.18em] text-primary">
               Templates
             </h1>
-            <button className="flex items-center gap-2 rounded-full bg-primary-deep px-4 py-2 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary-deep/90">
-              <span className="grid size-7 place-items-center rounded-full bg-destructive">
-                <Youtube className="size-4 text-white" />
-              </span>
-              <span className="leading-tight text-left">
-                Tutorial<br />Templates
-              </span>
-            </button>
           </header>
 
           <ul className="divide-y divide-border/50">
@@ -174,10 +167,10 @@ function TemplatesPage() {
 
         {/* Right rail */}
         <aside className="w-64 shrink-0 self-start rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
+          <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
             <Globe className="size-4 text-muted-foreground" />
-            <span>English</span>
-          </button>
+            <span>{settings.language}</span>
+          </div>
           <div className="my-2 h-px bg-border/60" />
           {SIDE_ITEMS.map((it) => {
             const isActive = active === it.id;

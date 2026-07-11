@@ -1,0 +1,21 @@
+<svg width="794" height="1123" viewBox="0 0 794 1123" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="794" height="1123" fill="#F3E7D7"/>
+  <rect x="44" y="44" width="706" height="1035" rx="28" fill="url(#paint0_linear_1_2)"/>
+  <circle cx="655" cy="188" r="155" fill="#E8C9A2" fill-opacity="0.52"/>
+  <circle cx="183" cy="901" r="214" fill="#A96C46" fill-opacity="0.15"/>
+  <path d="M103 856C210.159 752.855 345.456 701.5 508.5 701.5C602.358 701.5 682.191 718.159 748 751.477V1036C748 1051.46 735.464 1064 720 1064H74C58.536 1064 46 1051.46 46 1036V915.797C61.7813 898.332 80.7813 878.399 103 856Z" fill="#FFF7EF" fill-opacity="0.8"/>
+  <path d="M126 845C234.239 757.53 360.905 713.795 506 713.795C607.56 713.795 688.227 734.092 748 774.686" stroke="#7F4F31" stroke-opacity="0.3" stroke-width="2"/>
+  <path d="M272 371C272 305.83 324.83 253 390 253H397C462.17 253 515 305.83 515 371V449H272V371Z" fill="#FAF2E8"/>
+  <rect x="246" y="449" width="296" height="189" rx="44" fill="#FFFDF9"/>
+  <rect x="298" y="324" width="48" height="78" rx="24" fill="#C68458"/>
+  <rect x="441" y="324" width="48" height="78" rx="24" fill="#C68458"/>
+  <rect x="286" y="482" width="215" height="26" rx="13" fill="#D7B796"/>
+  <rect x="286" y="528" width="177" height="18" rx="9" fill="#ECD8C1"/>
+  <rect x="286" y="562" width="145" height="18" rx="9" fill="#ECD8C1"/>
+  <defs>
+    <linearGradient id="paint0_linear_1_2" x1="103" y1="103" x2="675" y2="1047" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7EF"/>
+      <stop offset="1" stop-color="#E4C5A0"/>
+    </linearGradient>
+  </defs>
+</svg>
