@@ -14,7 +14,6 @@ const NAV = [
   { label: "Branch Statistics", icon: "B", to: "/admin/branch-statistics" },
   { label: "Backups", icon: "BK", to: "/admin/backups" },
   { label: "Settings", icon: "*", to: "/admin/settings" },
-  { label: "Reports", icon: "R", to: "/admin/reports" },
 ];
 
 interface AdminLayoutProps {
