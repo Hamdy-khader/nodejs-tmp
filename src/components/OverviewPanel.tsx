@@ -34,7 +34,8 @@ import {
   type ToothState,
   usePatient,
 } from "@/lib/patients-store";
-import { TeethChart, ToothIllustration } from "@/components/TeethChart";
+import { ToothIllustration } from "@/components/TeethChart";
+import { ToothNumberTable } from "@/components/ToothNumberTable";
 import { toast } from "sonner";
 import { useClinicSession } from "@/lib/clinic-session-store";
 import {
@@ -91,16 +92,32 @@ function getDocumentBody(id: string, templates: ClinicTemplate[]) {
   return FIXED_DOCUMENT_BODIES[id] ?? "No content available for this document yet.";
 }
 
-function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], order: string[]): DocRow[] {
+function buildSection(
+  sectionId: DocSectionId,
+  templates: ClinicTemplate[],
+  order: string[],
+): DocRow[] {
   let rows: DocRow[] = [];
   if (sectionId === "clinic") {
     rows = [
-      { id: "fixed:clinic:demo", title: "Demo Dentist", body: getDocumentBody("fixed:clinic:demo", templates) },
-      { id: "fixed:clinic:note", title: "Custom note", body: getDocumentBody("fixed:clinic:note", templates) },
+      {
+        id: "fixed:clinic:demo",
+        title: "Demo Dentist",
+        body: getDocumentBody("fixed:clinic:demo", templates),
+      },
+      {
+        id: "fixed:clinic:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:clinic:note", templates),
+      },
     ];
   } else if (sectionId === "diagnosis") {
     rows = [
-      { id: "fixed:diagnosis:note", title: "Custom note", body: getDocumentBody("fixed:diagnosis:note", templates) },
+      {
+        id: "fixed:diagnosis:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:diagnosis:note", templates),
+      },
       ...templates
         .filter((t) => t.category === "diagnosis")
         .sort((a, b) => a.order - b.order)
@@ -108,7 +125,11 @@ function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], orde
     ];
   } else if (sectionId === "treatments") {
     rows = [
-      { id: "fixed:treatments:note", title: "Custom note", body: getDocumentBody("fixed:treatments:note", templates) },
+      {
+        id: "fixed:treatments:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:treatments:note", templates),
+      },
       ...templates
         .filter((t) => t.category === "treatments")
         .sort((a, b) => a.order - b.order)
@@ -116,13 +137,25 @@ function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], orde
     ];
   } else if (sectionId === "other") {
     rows = [
-      { id: "fixed:other:guarantee", title: "Guarantee and Brief Info", body: getDocumentBody("fixed:other:guarantee", templates) },
-      { id: "fixed:other:ourclinic", title: "Our Clinic", body: getDocumentBody("fixed:other:ourclinic", templates) },
+      {
+        id: "fixed:other:guarantee",
+        title: "Guarantee and Brief Info",
+        body: getDocumentBody("fixed:other:guarantee", templates),
+      },
+      {
+        id: "fixed:other:ourclinic",
+        title: "Our Clinic",
+        body: getDocumentBody("fixed:other:ourclinic", templates),
+      },
       ...templates
         .filter((t) => t.category === "other" || t.category === "dentists")
         .sort((a, b) => a.order - b.order)
         .map((t) => ({ id: t.id, title: t.title, body: getDocumentBody(t.id, templates) })),
-      { id: "fixed:other:note", title: "Custom note", body: getDocumentBody("fixed:other:note", templates) },
+      {
+        id: "fixed:other:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:other:note", templates),
+      },
     ];
   }
 
@@ -182,7 +215,9 @@ function getBaseLabel(tooth: ToothState) {
 
 function getAffectedTeeth(plan: TreatmentPlan) {
   return Object.values(plan.teeth)
-    .filter((tooth) => tooth.status !== "intact" || (tooth.diagnosis?.length ?? 0) > 0 || tooth.note)
+    .filter(
+      (tooth) => tooth.status !== "intact" || (tooth.diagnosis?.length ?? 0) > 0 || tooth.note,
+    )
     .sort((a, b) => a.number - b.number);
 }
 
@@ -224,8 +259,14 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const safePatientName = (exportContext.patientName || "patient").replace(/[\\/:*?"<>|]+/g, "-");
-      const safeTreatmentNumber = (exportContext.treatmentNumber || "plan").replace(/[\\/:*?"<>|]+/g, "-");
+      const safePatientName = (exportContext.patientName || "patient").replace(
+        /[\\/:*?"<>|]+/g,
+        "-",
+      );
+      const safeTreatmentNumber = (exportContext.treatmentNumber || "plan").replace(
+        /[\\/:*?"<>|]+/g,
+        "-",
+      );
       await saveTreatmentPlanPdf({
         fileName: `${safePatientName}-${safeTreatmentNumber}.pdf`,
         pageElements: pageRefs.map((ref) => ref.current),
@@ -246,20 +287,37 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
           <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <button
               onClick={() => setLayout("grid")}
-              className={cn("grid size-9 place-items-center", layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50")}
+              className={cn(
+                "grid size-9 place-items-center",
+                layout === "grid"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50",
+              )}
             >
               <LayoutGrid className="size-4" />
             </button>
             <button
               onClick={() => setLayout("single")}
-              className={cn("grid size-9 place-items-center border-l border-border", layout === "single" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50")}
+              className={cn(
+                "grid size-9 place-items-center border-l border-border",
+                layout === "single"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50",
+              )}
             >
               <Square className="size-4" />
             </button>
           </div>
         </div>
 
-        <div className={cn("grid gap-4", layout === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "mx-auto max-w-xl grid-cols-1")}>
+        <div
+          className={cn(
+            "grid gap-4",
+            layout === "grid"
+              ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+              : "mx-auto max-w-xl grid-cols-1",
+          )}
+        >
           {allPages.map((page, index) => (
             <PageCard
               key={`${page.kind}-${page.title}-${index}`}
@@ -304,7 +362,10 @@ const PageCard = ({
   pageRef: React.RefObject<HTMLDivElement | null>;
   exportContext: ReturnType<typeof buildPdfExportContext>;
 }) => {
-  const resolvedFooterLeft = resolveTemplate(settings.pageDesign.innerPages.footerLeft, exportContext);
+  const resolvedFooterLeft = resolveTemplate(
+    settings.pageDesign.innerPages.footerLeft,
+    exportContext,
+  );
   const footerSegments = resolvedFooterLeft || buildFooterSegments(exportContext).join(" | ");
 
   return (
@@ -316,24 +377,34 @@ const PageCard = ({
     >
       {page.kind !== "cover" && (
         <header className="flex items-center justify-between border-b border-border/70 px-4 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/70">{sectionHeader(page)}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/70">
+            {sectionHeader(page)}
+          </span>
           <Pencil className="size-3 text-muted-foreground" />
         </header>
       )}
       <div className="flex-1 overflow-hidden px-4 py-3">
-        {page.kind === "cover" && <CoverContent settings={settings} exportContext={exportContext} />}
+        {page.kind === "cover" && (
+          <CoverContent settings={settings} exportContext={exportContext} />
+        )}
         {page.kind === "status" && <StatusContent plan={plan} />}
         {page.kind === "suggested" && <SuggestedContent plan={plan} settings={settings} />}
         {page.kind === "document" && <DocumentContent title={page.title} body={page.body} />}
         {page.kind === "back" && <BackCoverContent settings={settings} />}
       </div>
-      {page.kind !== "cover" && page.kind !== "back" && settings.pageDesign.innerPages.showFooter && (
-        <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
-          <span>{footerSegments}</span>
-          <span>{index} / {total}</span>
-          <span>{resolveTemplate(settings.pageDesign.innerPages.footerRight, exportContext)}</span>
-        </footer>
-      )}
+      {page.kind !== "cover" &&
+        page.kind !== "back" &&
+        settings.pageDesign.innerPages.showFooter && (
+          <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
+            <span>{footerSegments}</span>
+            <span>
+              {index} / {total}
+            </span>
+            <span>
+              {resolveTemplate(settings.pageDesign.innerPages.footerRight, exportContext)}
+            </span>
+          </footer>
+        )}
     </article>
   );
 };
@@ -390,13 +461,13 @@ function StatusContent({ plan }: { plan: TreatmentPlan }) {
 
   return (
     <div className="space-y-3 text-[8px]">
-      <div className="rounded-xl border border-border/60 bg-slate-50 p-2">
-        <TeethChart teeth={plan.teeth} />
-      </div>
+      <ToothNumberTable teeth={plan.teeth} />
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">Problem teeth</p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">
+            Problem teeth
+          </p>
           <span className="text-[8px] text-muted-foreground">{affected.length} teeth</span>
         </div>
         {affected.length === 0 ? (
@@ -408,10 +479,20 @@ function StatusContent({ plan }: { plan: TreatmentPlan }) {
             {affected.slice(0, 8).map((tooth) => {
               const meta = getStatusMeta(tooth.status);
               return (
-                <div key={tooth.number} className="rounded-lg border border-border/60 bg-white p-1.5 text-center">
-                  <ToothIllustration number={tooth.number} status={tooth.status} note={tooth.note} className="mx-auto max-w-[26px]" />
+                <div
+                  key={tooth.number}
+                  className="rounded-lg border border-border/60 bg-white p-1.5 text-center"
+                >
+                  <ToothIllustration
+                    number={tooth.number}
+                    status={tooth.status}
+                    note={tooth.note}
+                    className="mx-auto max-w-[26px]"
+                  />
                   <p className="mt-1 text-[8px] font-bold">{tooth.number}</p>
-                  <p className="truncate text-[7px]" style={{ color: meta.ring }}>{getBaseLabel(tooth)}</p>
+                  <p className="truncate text-[7px]" style={{ color: meta.ring }}>
+                    {getBaseLabel(tooth)}
+                  </p>
                 </div>
               );
             })}
@@ -442,13 +523,13 @@ function SuggestedContent({
 
   return (
     <div className="space-y-3 text-[8px]">
-      <div className="rounded-xl border border-border/60 bg-slate-50 p-2">
-        <TeethChart teeth={plan.teeth} />
-      </div>
+      <ToothNumberTable teeth={plan.teeth} treatmentCounts={treatmentCounts} />
 
       <div className="rounded-lg border border-border/60 bg-white p-2">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">Teeth with treatment</p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">
+            Teeth with treatment
+          </p>
           <span className="text-[8px] text-muted-foreground">{treatedTeeth.length} teeth</span>
         </div>
         {treatedTeeth.length === 0 ? (
@@ -474,19 +555,25 @@ function SuggestedContent({
           {showSubtotal && (
             <div className="flex items-center justify-between">
               <span>Subtotal</span>
-              <span>{sym} {totals.subtotal.toFixed(0)}</span>
+              <span>
+                {sym} {totals.subtotal.toFixed(0)}
+              </span>
             </div>
           )}
           {totals.discount > 0 && (
             <div className="mt-1 flex items-center justify-between">
               <span>Discount</span>
-              <span>- {sym} {totals.discount.toFixed(0)}</span>
+              <span>
+                - {sym} {totals.discount.toFixed(0)}
+              </span>
             </div>
           )}
           {showTotal && (
             <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1 text-[9px] font-bold">
               <span>Total</span>
-              <span>{sym} {totals.total.toFixed(0)}</span>
+              <span>
+                {sym} {totals.total.toFixed(0)}
+              </span>
             </div>
           )}
           {showInsurance && plan.billingMode === "insurance" && plan.insurance && (
@@ -513,7 +600,10 @@ function CompactJawGrid({
         <div key={groupIndex} className="space-y-1.5">
           {group.map((tooth) => {
             const meta = getStatusMeta(tooth.status);
-            const hasStatus = tooth.status !== "intact" || Boolean(tooth.note) || (tooth.diagnosis?.length ?? 0) > 0;
+            const hasStatus =
+              tooth.status !== "intact" ||
+              Boolean(tooth.note) ||
+              (tooth.diagnosis?.length ?? 0) > 0;
             const label = getBaseLabel(tooth);
             const txCount = treatmentCounts[tooth.number] ?? 0;
             return (
@@ -531,7 +621,12 @@ function CompactJawGrid({
                   {tooth.number}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-[8px] font-semibold", !hasStatus && "text-muted-foreground")}>
+                  <p
+                    className={cn(
+                      "truncate text-[8px] font-semibold",
+                      !hasStatus && "text-muted-foreground",
+                    )}
+                  >
                     {label || "Intact - no diagnosis"}
                   </p>
                   {(tooth.diagnosis?.length ?? 0) > 0 && (
@@ -584,9 +679,11 @@ function CompactTreatmentRows({
           No treatments added yet.
         </div>
       ) : (
-        rows.slice(0, 8).map((row) => (
-          <CompactTreatmentRow key={row.id} row={row} sym={sym} showPrices={showPrices} />
-        ))
+        rows
+          .slice(0, 8)
+          .map((row) => (
+            <CompactTreatmentRow key={row.id} row={row} sym={sym} showPrices={showPrices} />
+          ))
       )}
     </div>
   );
@@ -649,7 +746,9 @@ function CompactItemRow({
       </div>
       <span className="text-right">{item.amount}</span>
       <span className="text-right">{showPrices ? `${sym} ${item.unitPrice.toFixed(0)}` : "-"}</span>
-      <span className="text-right font-semibold">{showPrices ? `${sym} ${price.toFixed(0)}` : "-"}</span>
+      <span className="text-right font-semibold">
+        {showPrices ? `${sym} ${price.toFixed(0)}` : "-"}
+      </span>
     </div>
   );
 }
@@ -658,8 +757,12 @@ function BackCoverContent({ settings }: { settings: ReturnType<typeof usePlanSet
   const { backCover } = settings.pageDesign;
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">{backCover.title}</p>
-      <p className="max-w-[80%] text-[9px] leading-relaxed text-muted-foreground">{backCover.note || "Back cover"}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
+        {backCover.title}
+      </p>
+      <p className="max-w-[80%] text-[9px] leading-relaxed text-muted-foreground">
+        {backCover.note || "Back cover"}
+      </p>
     </div>
   );
 }
@@ -676,7 +779,9 @@ function DocumentContent({ title, body }: { title: string; body?: string }) {
       <p className="text-[10px] font-semibold text-foreground">{title}</p>
       <div className="space-y-1 text-[7px] leading-relaxed text-foreground/75">
         {previewLines.map((line, i) => (
-          <p key={`${title}-${i}`} className="line-clamp-2">{line}</p>
+          <p key={`${title}-${i}`} className="line-clamp-2">
+            {line}
+          </p>
         ))}
       </div>
     </div>
@@ -714,14 +819,30 @@ function RightSidebar({
           <span className="text-left leading-tight">{settings.pricePage.currency}</span>
         </div>
         <div className="my-2 h-px bg-border/60" />
-        <button disabled={!canUndo} onClick={() => documentsStore.undo()} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40">
-          <Undo2 className="size-4 text-muted-foreground" /><span>Undo</span>
+        <button
+          disabled={!canUndo}
+          onClick={() => documentsStore.undo()}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40"
+        >
+          <Undo2 className="size-4 text-muted-foreground" />
+          <span>Undo</span>
         </button>
-        <button disabled={!canRedo} onClick={() => documentsStore.redo()} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40">
-          <Redo2 className="size-4 text-muted-foreground" /><span>Redo</span>
+        <button
+          disabled={!canRedo}
+          onClick={() => documentsStore.redo()}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40"
+        >
+          <Redo2 className="size-4 text-muted-foreground" />
+          <span>Redo</span>
         </button>
-        <button onClick={() => { if (confirm("Reset?")) documentsStore.reset(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-          <RotateCcw className="size-4 text-muted-foreground" /><span>Reset</span>
+        <button
+          onClick={() => {
+            if (confirm("Reset?")) documentsStore.reset();
+          }}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60"
+        >
+          <RotateCcw className="size-4 text-muted-foreground" />
+          <span>Reset</span>
         </button>
       </div>
       <button
@@ -733,27 +854,60 @@ function RightSidebar({
         {downloading ? "Downloading..." : "Download"}
       </button>
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <div className="mb-3 text-xs text-muted-foreground">{selectedDocs.length} document pages selected</div>
+        <div className="mb-3 text-xs text-muted-foreground">
+          {selectedDocs.length} document pages selected
+        </div>
         <Popover>
           <PopoverTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-              <TableIcon className="size-4 text-muted-foreground" /><span>Price table</span>
+              <TableIcon className="size-4 text-muted-foreground" />
+              <span>Price table</span>
             </button>
           </PopoverTrigger>
           <PopoverContent side="left" align="start" className="w-72 p-4">
             <h4 className="mb-3 text-sm font-semibold">Price table options</h4>
             <div className="space-y-3">
               <label className="flex cursor-pointer items-center gap-3 text-sm">
-                <Checkbox checked={price.showPrices} onCheckedChange={(v) => setPrice({ showPrices: !!v })} />
+                <Checkbox
+                  checked={price.showPrices}
+                  onCheckedChange={(v) => setPrice({ showPrices: !!v })}
+                />
                 <span className="font-medium">Show prices in PDF</span>
               </label>
               <div className="space-y-2 border-t border-border/60 pt-3 pl-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Line items</p>
-                <CheckRow label="Subtotal" checked={price.showSubtotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showSubtotal: v })} />
-                <CheckRow label="Discount" checked={price.showDiscount} disabled={!price.showPrices} onChange={(v) => setPrice({ showDiscount: v })} />
-                <CheckRow label="Tax" checked={price.showTax} disabled={!price.showPrices} onChange={(v) => setPrice({ showTax: v })} />
-                <CheckRow label="Total" checked={price.showTotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showTotal: v })} />
-                <CheckRow label="Insurance coverage" checked={price.showInsurance} disabled={!price.showPrices} onChange={(v) => setPrice({ showInsurance: v })} />
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Line items
+                </p>
+                <CheckRow
+                  label="Subtotal"
+                  checked={price.showSubtotal}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showSubtotal: v })}
+                />
+                <CheckRow
+                  label="Discount"
+                  checked={price.showDiscount}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showDiscount: v })}
+                />
+                <CheckRow
+                  label="Tax"
+                  checked={price.showTax}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showTax: v })}
+                />
+                <CheckRow
+                  label="Total"
+                  checked={price.showTotal}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showTotal: v })}
+                />
+                <CheckRow
+                  label="Insurance coverage"
+                  checked={price.showInsurance}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showInsurance: v })}
+                />
               </div>
             </div>
           </PopoverContent>
@@ -763,8 +917,16 @@ function RightSidebar({
   );
 }
 
-function CheckRow({ label, checked, disabled, onChange }: {
-  label: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void;
+function CheckRow({
+  label,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
     <label className={cn("flex items-center gap-3 text-sm", disabled && "opacity-40")}>
@@ -773,5 +935,3 @@ function CheckRow({ label, checked, disabled, onChange }: {
     </label>
   );
 }
-
-

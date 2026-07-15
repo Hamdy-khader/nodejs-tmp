@@ -33,6 +33,7 @@ import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
 import { useTabs } from "@/lib/tabs-store";
 import { saveTreatmentPlanPdf, type TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
+import { ToothNumberTable } from "@/components/ToothNumberTable";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/overview")({
@@ -100,16 +101,32 @@ function getDocumentBody(id: string, templates: ClinicTemplate[]) {
   return FIXED_DOCUMENT_BODIES[id] ?? "No content available for this document yet.";
 }
 
-function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], order: string[]): DocRow[] {
+function buildSection(
+  sectionId: DocSectionId,
+  templates: ClinicTemplate[],
+  order: string[],
+): DocRow[] {
   let rows: DocRow[] = [];
   if (sectionId === "clinic") {
     rows = [
-      { id: "fixed:clinic:demo", title: "Demo Dentist", body: getDocumentBody("fixed:clinic:demo", templates) },
-      { id: "fixed:clinic:note", title: "Custom note", body: getDocumentBody("fixed:clinic:note", templates) },
+      {
+        id: "fixed:clinic:demo",
+        title: "Demo Dentist",
+        body: getDocumentBody("fixed:clinic:demo", templates),
+      },
+      {
+        id: "fixed:clinic:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:clinic:note", templates),
+      },
     ];
   } else if (sectionId === "diagnosis") {
     rows = [
-      { id: "fixed:diagnosis:note", title: "Custom note", body: getDocumentBody("fixed:diagnosis:note", templates) },
+      {
+        id: "fixed:diagnosis:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:diagnosis:note", templates),
+      },
       ...templates
         .filter((t) => t.category === "diagnosis")
         .sort((a, b) => a.order - b.order)
@@ -117,7 +134,11 @@ function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], orde
     ];
   } else if (sectionId === "treatments") {
     rows = [
-      { id: "fixed:treatments:note", title: "Custom note", body: getDocumentBody("fixed:treatments:note", templates) },
+      {
+        id: "fixed:treatments:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:treatments:note", templates),
+      },
       ...templates
         .filter((t) => t.category === "treatments")
         .sort((a, b) => a.order - b.order)
@@ -125,13 +146,25 @@ function buildSection(sectionId: DocSectionId, templates: ClinicTemplate[], orde
     ];
   } else if (sectionId === "other") {
     rows = [
-      { id: "fixed:other:guarantee", title: "Guarantee and Brief Info", body: getDocumentBody("fixed:other:guarantee", templates) },
-      { id: "fixed:other:ourclinic", title: "Our Clinic", body: getDocumentBody("fixed:other:ourclinic", templates) },
+      {
+        id: "fixed:other:guarantee",
+        title: "Guarantee and Brief Info",
+        body: getDocumentBody("fixed:other:guarantee", templates),
+      },
+      {
+        id: "fixed:other:ourclinic",
+        title: "Our Clinic",
+        body: getDocumentBody("fixed:other:ourclinic", templates),
+      },
       ...templates
         .filter((t) => t.category === "other" || t.category === "dentists")
         .sort((a, b) => a.order - b.order)
         .map((t) => ({ id: t.id, title: t.title, body: getDocumentBody(t.id, templates) })),
-      { id: "fixed:other:note", title: "Custom note", body: getDocumentBody("fixed:other:note", templates) },
+      {
+        id: "fixed:other:note",
+        title: "Custom note",
+        body: getDocumentBody("fixed:other:note", templates),
+      },
     ];
   }
 
@@ -194,14 +227,18 @@ function OverviewPage() {
       <header className="bg-[#002036] px-6 py-3">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between">
           <div className="flex items-center gap-4 text-white">
-            <Link to="/clinic" className="text-lg font-semibold tracking-tight">Treatly</Link>
+            <Link to="/clinic" className="text-lg font-semibold tracking-tight">
+              Treatly
+            </Link>
             <span className="text-sm text-white/80">Elene</span>
             <div className="ml-4 flex items-center gap-1">
               <span className="flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs">
                 Your suggested treatâ€¦
                 <button className="opacity-70 hover:opacity-100">أ—</button>
               </span>
-              <button className="grid size-6 place-items-center rounded text-white/80 hover:bg-white/10">+</button>
+              <button className="grid size-6 place-items-center rounded text-white/80 hover:bg-white/10">
+                +
+              </button>
             </div>
           </div>
           <button className="grid size-9 place-items-center rounded-md text-white/90 hover:bg-white/10">
@@ -220,7 +257,9 @@ function OverviewPage() {
                 onClick={() => setLayout("grid")}
                 className={cn(
                   "grid size-9 place-items-center",
-                  layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50",
+                  layout === "grid"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50",
                 )}
                 title="Grid"
               >
@@ -230,7 +269,9 @@ function OverviewPage() {
                 onClick={() => setLayout("single")}
                 className={cn(
                   "grid size-9 place-items-center border-l border-border",
-                  layout === "single" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50",
+                  layout === "single"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50",
                 )}
                 title="Single"
               >
@@ -242,7 +283,9 @@ function OverviewPage() {
           <div
             className={cn(
               "grid gap-5",
-              layout === "grid" ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "mx-auto max-w-xl grid-cols-1",
+              layout === "grid"
+                ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                : "mx-auto max-w-xl grid-cols-1",
             )}
           >
             {allPages.map((page, index) => (
@@ -275,14 +318,21 @@ function StepProgress({ active }: { active: string }) {
       <div className="mx-auto flex max-w-[1600px] items-stretch">
         {STEPS.map((step, index) => {
           const isActive = step.id === active;
-          const target = step.id === "documents" ? "/documents" : step.id === "overview" ? "/overview" : "/documents";
+          const target =
+            step.id === "documents"
+              ? "/documents"
+              : step.id === "overview"
+                ? "/overview"
+                : "/documents";
           return (
             <div key={step.id} className="flex flex-1 items-center">
               <Link
-                to={target as any}
+                to={target}
                 className={cn(
                   "flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition",
-                  isActive ? "bg-amber-300 text-foreground" : "text-muted-foreground hover:text-foreground",
+                  isActive
+                    ? "bg-amber-300 text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <span
@@ -342,13 +392,17 @@ function PageCard({
         {page.kind === "back" && <BackCoverContent settings={settings} />}
       </div>
 
-      {page.kind !== "cover" && page.kind !== "back" && settings.pageDesign.innerPages.showFooter && (
-        <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
-          <span>{settings.pageDesign.innerPages.footerLeft}</span>
-          <span>{index} / {total}</span>
-          <span>{settings.pageDesign.innerPages.footerRight}</span>
-        </footer>
-      )}
+      {page.kind !== "cover" &&
+        page.kind !== "back" &&
+        settings.pageDesign.innerPages.showFooter && (
+          <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
+            <span>{settings.pageDesign.innerPages.footerLeft}</span>
+            <span>
+              {index} / {total}
+            </span>
+            <span>{settings.pageDesign.innerPages.footerRight}</span>
+          </footer>
+        )}
     </article>
   );
 }
@@ -386,22 +440,7 @@ function CoverContent({ settings }: { settings: ReturnType<typeof usePlanSetting
 function StatusContent() {
   return (
     <div className="space-y-2 text-[8px]">
-      <div className="flex items-end justify-center gap-0.5">
-        {Array.from({ length: 16 }).map((_, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <div className="h-6 w-2.5 rounded-sm border border-sky-300/70 bg-white" />
-            <span className="mt-0.5 text-[6px] text-muted-foreground">{i + 11}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-start justify-center gap-0.5">
-        {Array.from({ length: 16 }).map((_, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <span className="mb-0.5 text-[6px] text-muted-foreground">{i + 41}</span>
-            <div className="h-6 w-2.5 rounded-sm border border-sky-300/70 bg-white" />
-          </div>
-        ))}
-      </div>
+      <ToothNumberTable />
       <div className="mt-2 space-y-0.5">
         <p className="text-[8px] font-semibold text-foreground/80">Diagnosis â€“ Upper jaw</p>
         {Array.from({ length: 5 }).map((_, i) => (
@@ -420,60 +459,50 @@ function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSet
 
   return (
     <div className="space-y-2 text-[8px]">
-      <div className="flex items-end justify-center gap-0.5">
-        {Array.from({ length: 16 }).map((_, i) => {
-          const isTreated = i >= 4 && i <= 8;
-          return (
-            <div key={i} className="flex flex-col items-center">
-              <div
-                className={cn(
-                  "h-6 w-2.5 rounded-sm border",
-                  isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
-                )}
-              />
-              <span className="mt-0.5 text-[6px] text-muted-foreground">{i + 11}</span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-start justify-center gap-0.5">
-        {Array.from({ length: 16 }).map((_, i) => {
-          const isTreated = i >= 5 && i <= 10;
-          return (
-            <div key={i} className="flex flex-col items-center">
-              <span className="mb-0.5 text-[6px] text-muted-foreground">{i + 41}</span>
-              <div
-                className={cn(
-                  "h-6 w-2.5 rounded-sm border",
-                  isTreated ? "border-emerald-500 bg-emerald-400" : "border-sky-300/70 bg-white",
-                )}
-              />
-            </div>
-          );
-        })}
-      </div>
+      <ToothNumberTable highlighted={[14, 15, 16, 17, 18, 43, 44, 45, 46, 47, 48]} />
 
       {showPrices ? (
         <div className="mt-2 space-y-1 rounded border border-border/60 p-2">
           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-b border-border/50 pb-1 text-[7px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <span>Treatment</span><span>Amount</span><span>Unit</span><span>Price</span>
+            <span>Treatment</span>
+            <span>Amount</span>
+            <span>Unit</span>
+            <span>Price</span>
           </div>
-          <Row label="Bridge â€“ Metal-ceramic (22-24)" amt="3" unit={`${currency === "USD" ? "$" : ""} 350`} price={`${currency === "USD" ? "$" : ""} 1,050`} />
-          <Row label="Bridge â€“ Metal-ceramic (42-47)" amt="6" unit={`${currency === "USD" ? "$" : ""} 400`} price={`${currency === "USD" ? "$" : ""} 2,400`} />
+          <Row
+            label="Bridge â€“ Metal-ceramic (22-24)"
+            amt="3"
+            unit={`${currency === "USD" ? "$" : ""} 350`}
+            price={`${currency === "USD" ? "$" : ""} 1,050`}
+          />
+          <Row
+            label="Bridge â€“ Metal-ceramic (42-47)"
+            amt="6"
+            unit={`${currency === "USD" ? "$" : ""} 400`}
+            price={`${currency === "USD" ? "$" : ""} 2,400`}
+          />
           {showSubtotal && (
             <div className="flex justify-between border-t border-border/50 pt-1 text-[8px] text-foreground/70">
-              <span>Subtotal</span><span>$ 3,450</span>
+              <span>Subtotal</span>
+              <span>$ 3,450</span>
             </div>
           )}
           {showTotal && (
             <div className="flex justify-between border-t border-border/50 pt-1 text-[9px] font-bold">
-              <span>Total</span><span>$ 3,450</span>
+              <span>Total</span>
+              <span>$ 3,450</span>
             </div>
           )}
           {showInsurance && (
             <div className="mt-1 space-y-0.5 border-t border-border/50 pt-1 text-[7px] text-muted-foreground">
-              <div className="flex justify-between"><span>Insurance coverage</span><span>$ 100</span></div>
-              <div className="flex justify-between"><span>Out of pocket costs</span><span>$ 3,350</span></div>
+              <div className="flex justify-between">
+                <span>Insurance coverage</span>
+                <span>$ 100</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Out of pocket costs</span>
+                <span>$ 3,350</span>
+              </div>
             </div>
           )}
         </div>
@@ -486,7 +515,17 @@ function SuggestedContent({ settings }: { settings: ReturnType<typeof usePlanSet
   );
 }
 
-function Row({ label, amt, unit, price }: { label: string; amt: string; unit: string; price: string }) {
+function Row({
+  label,
+  amt,
+  unit,
+  price,
+}: {
+  label: string;
+  amt: string;
+  unit: string;
+  price: string;
+}) {
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[7px] text-foreground/80">
       <span className="truncate">{label}</span>
@@ -554,7 +593,10 @@ function RightSidebar({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const safePlanName = (activePlanTab?.planName || "treatment-plan").replace(/[\\/:*?\"<>|]+/g, "-");
+      const safePlanName = (activePlanTab?.planName || "treatment-plan").replace(
+        /[\\/:*?"<>|]+/g,
+        "-",
+      );
       const pageElements = Array.from(
         document.querySelectorAll<HTMLElement>("[data-overview-export-page='true']"),
       );
@@ -631,21 +673,50 @@ function RightSidebar({
             <h4 className="mb-3 text-sm font-semibold">Price table options</h4>
             <div className="space-y-3">
               <label className="flex cursor-pointer items-center gap-3 text-sm">
-                <Checkbox checked={price.showPrices} onCheckedChange={(v) => setPrice({ showPrices: !!v })} />
+                <Checkbox
+                  checked={price.showPrices}
+                  onCheckedChange={(v) => setPrice({ showPrices: !!v })}
+                />
                 <span className="font-medium">Show prices in PDF</span>
               </label>
               <div className="space-y-2 border-t border-border/60 pt-3 pl-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Line items</p>
-                <CheckRow label="Subtotal" checked={price.showSubtotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showSubtotal: v })} />
-                <CheckRow label="Discount" checked={price.showDiscount} disabled={!price.showPrices} onChange={(v) => setPrice({ showDiscount: v })} />
-                <CheckRow label="Tax" checked={price.showTax} disabled={!price.showPrices} onChange={(v) => setPrice({ showTax: v })} />
-                <CheckRow label="Total" checked={price.showTotal} disabled={!price.showPrices} onChange={(v) => setPrice({ showTotal: v })} />
-                <CheckRow label="Insurance coverage" checked={price.showInsurance} disabled={!price.showPrices} onChange={(v) => setPrice({ showInsurance: v })} />
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Line items
+                </p>
+                <CheckRow
+                  label="Subtotal"
+                  checked={price.showSubtotal}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showSubtotal: v })}
+                />
+                <CheckRow
+                  label="Discount"
+                  checked={price.showDiscount}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showDiscount: v })}
+                />
+                <CheckRow
+                  label="Tax"
+                  checked={price.showTax}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showTax: v })}
+                />
+                <CheckRow
+                  label="Total"
+                  checked={price.showTotal}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showTotal: v })}
+                />
+                <CheckRow
+                  label="Insurance coverage"
+                  checked={price.showInsurance}
+                  disabled={!price.showPrices}
+                  onChange={(v) => setPrice({ showInsurance: v })}
+                />
               </div>
             </div>
           </PopoverContent>
         </Popover>
-
       </div>
     </aside>
   );
@@ -669,5 +740,3 @@ function CheckRow({
     </label>
   );
 }
-
-
