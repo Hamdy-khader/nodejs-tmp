@@ -1,4 +1,4 @@
-import html2canvas from "html2canvas";
+import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 import type { PlanSettings } from "@/lib/plan-settings-store";
 
@@ -77,44 +77,76 @@ const STYLE_PROPS = [
 // html2canvas cannot parse some newer CSS color functions.
 // Chrome can return them verbatim from getComputedStyle, so we convert each
 // occurrence to rgb() using the browser's own Canvas color parser.
-const MODERN_COLOR_FN_NAMES = [
-  ["ok", "lab"],
-  ["ok", "lch"],
-  ["lab"],
-  ["lch"],
-  ["color"],
-]
+const MODERN_COLOR_FN_NAMES = [["ok", "lab"], ["ok", "lch"], ["lab"], ["lch"], ["color"]]
   .map((parts) => parts.join(""))
   .join("|");
 
-const MODERN_COLOR_RE = new RegExp(
-  String.raw`\b(?:${MODERN_COLOR_FN_NAMES})\((?:[^()]+|\([^()]*\))*\)`,
-  "gi",
-);
+const MODERN_COLOR_START_RE = new RegExp(String.raw`\b(?:${MODERN_COLOR_FN_NAMES})\s*\(`, "gi");
 
 let colorParseCtx: CanvasRenderingContext2D | null = null;
 
 function colorToRgb(color: string): string | null {
   if (!colorParseCtx) {
-    colorParseCtx = document.createElement("canvas").getContext("2d");
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    colorParseCtx = canvas.getContext("2d", { willReadFrequently: true });
   }
   if (!colorParseCtx) return null;
-  // Use a sentinel so we can detect when the canvas fails to parse the color.
-  colorParseCtx.fillStyle = "#000000";
+
+  // Reading fillStyle is not enough: modern Chrome can serialize an accepted
+  // color back to oklab()/oklch(), which leaves html2canvas with the same
+  // unsupported value. Paint one pixel instead so the browser performs the
+  // color-space conversion and we always return legacy rgb()/rgba().
+  if (
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    !CSS.supports("color", color)
+  ) {
+    return null;
+  }
+
+  colorParseCtx.clearRect(0, 0, 1, 1);
   colorParseCtx.fillStyle = color;
-  const parsed = colorParseCtx.fillStyle;
-  colorParseCtx.fillStyle = "#ffffff";
-  colorParseCtx.fillStyle = color;
-  // If parsing fails, fillStyle keeps the previous value, so the two probes differ.
-  return parsed === colorParseCtx.fillStyle ? parsed : null;
+  colorParseCtx.fillRect(0, 0, 1, 1);
+
+  const [red, green, blue, alpha] = colorParseCtx.getImageData(0, 0, 1, 1).data;
+  if (alpha === 255) return `rgb(${red}, ${green}, ${blue})`;
+
+  const normalizedAlpha = Number((alpha / 255).toFixed(4));
+  return `rgba(${red}, ${green}, ${blue}, ${normalizedAlpha})`;
 }
 
-function sanitizeColorValue(value: string): string {
-  // MODERN_COLOR_RE is global, so reset lastIndex to keep test()/replace() stateless.
-  MODERN_COLOR_RE.lastIndex = 0;
-  if (!MODERN_COLOR_RE.test(value)) return value;
-  MODERN_COLOR_RE.lastIndex = 0;
-  return value.replace(MODERN_COLOR_RE, (match) => colorToRgb(match) ?? "rgb(0, 0, 0)");
+function closingParenthesisIndex(value: string, openingIndex: number): number {
+  let depth = 0;
+  for (let index = openingIndex; index < value.length; index += 1) {
+    if (value[index] === "(") depth += 1;
+    if (value[index] !== ")") continue;
+    depth -= 1;
+    if (depth === 0) return index;
+  }
+  return -1;
+}
+
+export function sanitizeColorValue(value: string): string {
+  MODERN_COLOR_START_RE.lastIndex = 0;
+  let cursor = 0;
+  let sanitized = "";
+  let match: RegExpExecArray | null;
+
+  while ((match = MODERN_COLOR_START_RE.exec(value)) !== null) {
+    const openingIndex = value.indexOf("(", match.index);
+    const closingIndex = closingParenthesisIndex(value, openingIndex);
+    if (closingIndex < 0) break;
+
+    const color = value.slice(match.index, closingIndex + 1);
+    sanitized += value.slice(cursor, match.index);
+    sanitized += colorToRgb(color) ?? "rgb(0, 0, 0)";
+    cursor = closingIndex + 1;
+    MODERN_COLOR_START_RE.lastIndex = cursor;
+  }
+
+  return cursor === 0 ? value : sanitized + value.slice(cursor);
 }
 
 function inlineComputedStyles(source: Element, target: Element) {
