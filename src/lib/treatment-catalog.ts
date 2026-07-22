@@ -173,45 +173,24 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
     n: 7,
     label: "Crown",
     icon: "crown",
-    aliases: ["crown"],
+    aliases: ["crown", "veneer"],
     groups: [
       {
         key: "crown",
         title: "Crown",
         items: [
-          { key: "metal-ceramic-crown", name: "Metal-Ceramic Crown", price: 400 },
-          { key: "zirconium-crown", name: "Zirconium Crown", price: 700 },
-          { key: "emax-crown", name: "Emax Crown", price: 0 },
-          { key: "gold-ceramic-crown", name: "Gold-Ceramic Crown", price: 0 },
-        ],
-      },
-    ],
-  },
-  {
-    key: "veneer",
-    n: 8,
-    label: "Veneer",
-    icon: "sparkles",
-    aliases: ["veneer"],
-    groups: [
-      {
-        key: "veneer",
-        title: "Veneer",
-        items: [{ key: "veneer", name: "Veneer", price: 500 }],
-      },
-      {
-        key: "other",
-        title: OTHER_TREATMENTS,
-        items: [
-          { key: "telescopic-crown", name: "Telescopic crown", price: 0 },
-          { key: "filling-other", name: "Filling", price: 0 },
+          { key: "crown", name: "Crown", price: 0 },
+          { key: "veneer", name: "Veneer", price: 500 },
+          { key: "veneer-preparation", name: "Veneer Preparation", price: 0 },
+          { key: "telescopic-crown", name: "Telescopic Crown", price: 0 },
+          { key: "filling", name: "Filling", price: 0 },
         ],
       },
     ],
   },
   {
     key: "bridge",
-    n: 9,
+    n: 8,
     label: "Bridge",
     icon: "wrench",
     aliases: ["bridge"],
@@ -230,7 +209,7 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
   },
   {
     key: "general",
-    n: 10,
+    n: 9,
     label: "General",
     icon: "package",
     aliases: ["general"],
@@ -285,7 +264,7 @@ const TREATMENT_CATALOG: CatalogSectionTemplate[] = [
   },
   {
     key: "other",
-    n: 11,
+    n: 10,
     label: "Other",
     icon: "more",
     aliases: ["other"],
@@ -379,7 +358,7 @@ function toSectionFromTemplate(
 
   return {
     id: sourceSection?.id ?? template.key,
-    key: sourceSection?.key ?? template.key,
+    key: template.key,
     n: template.n,
     label: template.label,
     icon: template.icon,
@@ -390,9 +369,21 @@ function toSectionFromTemplate(
 export function normalizePricelistData(data: PricelistData): PricelistData {
   const sectionLookup = buildSectionLookup(data.sections);
   const sections = TREATMENT_CATALOG.map((template) => {
-    const sourceSection =
+    let sourceSection =
       sectionLookup.get(norm(template.key)) ??
       template.aliases.map((alias) => sectionLookup.get(norm(alias))).find(Boolean);
+
+    if (template.key === "crown") {
+      const crownSection = sectionLookup.get("crown");
+      const veneerSection = sectionLookup.get("veneer");
+      if (crownSection || veneerSection) {
+        sourceSection = {
+          ...(crownSection ?? veneerSection!),
+          groups: [...(crownSection?.groups ?? []), ...(veneerSection?.groups ?? [])],
+        };
+      }
+    }
+
     return toSectionFromTemplate(template, sourceSection);
   });
 

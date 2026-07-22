@@ -206,7 +206,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     section.groups.forEach((group) => {
       group.items.forEach((item) => {
         items.push({
-          label: `${group.title}: ${item.name}`,
+          label: item.name,
           value: item.name,
           itemId: item.id,
           itemKey: item.key,
