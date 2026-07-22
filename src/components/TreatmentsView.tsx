@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
+import { calculatePaymentPlan } from "@/lib/payment-plan";
 import { cn } from "@/lib/utils";
 
 interface TreatmentMenuItem {
@@ -538,10 +539,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               plan.paymentPlan &&
               (() => {
                 const { amount, term, interest } = plan.paymentPlan;
-                const safeTerm = Math.max(1, term);
-                const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
-                const totalPaid = monthly * safeTerm;
-                const totalInterest = Math.max(0, totalPaid - amount);
+                const { monthly, totalPaid, totalInterest, term: safeTerm } =
+                  calculatePaymentPlan(amount, term, interest);
                 return (
                   <>
                     <div className="mt-2 flex items-center justify-between text-sm">
@@ -1034,10 +1033,7 @@ function PaymentPlanDialog({
   const [amount, setAmount] = useState(initial.amount);
   const [term, setTerm] = useState(initial.term);
   const [interest, setInterest] = useState(initial.interest);
-  const safeTerm = Math.max(1, term);
-  const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
-  const totalPaid = monthly * safeTerm;
-  const totalInterest = Math.max(0, totalPaid - amount);
+  const { monthly, totalPaid, totalInterest } = calculatePaymentPlan(amount, term, interest);
   return (
     <ModalShell title="Payment plan" onClose={onClose} width="max-w-2xl">
       <div className="space-y-5">
