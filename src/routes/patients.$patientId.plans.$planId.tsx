@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  patientsStore, usePatient, usePlan, usePlansFor, defaultTeeth,
+  patientsStore, usePatient, usePlan, usePlansFor,
   STATUS_META, UPPER_TEETH, LOWER_TEETH, getStatusMeta, type ToothStatus, type TreatmentPlan,
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
@@ -36,6 +36,7 @@ import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { OverviewPanel } from "@/components/OverviewPanel";
 import { X } from "lucide-react";
 import { usePlanSettings } from "@/lib/plan-settings-store";
+import { diagnosisResetPatch, treatmentResetPatch } from "@/lib/plan-reset";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -211,6 +212,23 @@ function PlanPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetCurrentStep = () => {
+    closeAllPanels();
+    setSelected(null);
+
+    if (step === "diagnosis") {
+      patientsStore.updatePlan(plan.id, diagnosisResetPatch());
+      toast.success("Diagnosis reset");
+    } else if (step === "treatments") {
+      const patch = treatmentResetPatch();
+      patientsStore.setTreatments(plan.id, patch.treatments ?? []);
+      patientsStore.updatePlan(plan.id, patch);
+      toast.success("Treatments reset");
+    }
+
+    setResetOpen(false);
   };
 
   const summary = (Object.keys(STATUS_META) as ToothStatus[])
@@ -728,16 +746,18 @@ function PlanPage() {
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset all teeth?</AlertDialogTitle>
-            <AlertDialogDescription>This will mark every tooth as intact.</AlertDialogDescription>
+            <AlertDialogTitle>
+              Reset {step === "diagnosis" ? "diagnosis" : "treatments"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {step === "diagnosis"
+                ? "This clears tooth diagnoses and general diagnosis notes only."
+                : "This clears treatment rows, the suggested-treatment note, insurance, and payment-plan details only."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              patientsStore.updatePlan(plan.id, { teeth: defaultTeeth() });
-              toast.success("Teeth reset");
-              setResetOpen(false);
-            }}>Reset</AlertDialogAction>
+            <AlertDialogAction onClick={resetCurrentStep}>Reset</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -934,7 +954,7 @@ function JawGrid({
                       style={{ background: "#EBF1FB", color: "#1E4890" }}
                       title={`${txCount} treatment item${txCount > 1 ? "s" : ""}`}
                     >
-                      Tx×{txCount}
+                      Tx × {txCount}
                     </span>
                   )}
 
