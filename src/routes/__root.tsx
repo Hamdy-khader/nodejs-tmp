@@ -6,6 +6,7 @@ import {
   useRouter,
   useRouterState,
   useNavigate,
+  Navigate,
 } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { adminApi, adminTokenStore, clinicApi, clinicTokenStore } from "@/lib/admin/api";
@@ -225,6 +226,21 @@ function RootComponent() {
 
   const waitingForAdminSession = hasAdminToken && adminSessionValid === null;
   const waitingForClinicSession = hasClinicToken && clinicSessionValid === null;
+
+  // Redirect in render so protected child routes can never mount while the
+  // navigation effect is still being scheduled.
+  if (isAdminRoute && !isAdminLogin && (!hasAdminToken || adminSessionValid === false)) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  if (
+    !isAdminRoute &&
+    !isClinicLogin &&
+    !isPublicHome &&
+    (!hasClinicToken || clinicSessionValid === false)
+  ) {
+    return <Navigate to="/clinic/login" replace />;
+  }
 
   // Auth pages (login screens) — bare layout
   if ((isAdminLogin && waitingForAdminSession) || (isClinicLogin && waitingForClinicSession)) {
