@@ -213,6 +213,19 @@ function PlanPage() {
     }
   };
 
+  const handleResetPlan = () => {
+    closeAllPanels();
+    setSelected(null);
+    patientsStore.updatePlan(plan.id, {
+      teeth: defaultTeeth(),
+      generalStatuses: [],
+      treatmentNote: undefined,
+    });
+    patientsStore.setTreatments(plan.id, []);
+    toast.success("Treatment plan reset");
+    setResetOpen(false);
+  };
+
   const summary = (Object.keys(STATUS_META) as ToothStatus[])
     .filter((s) => s !== "intact")
     .map((s) => ({ s, count: Object.values(plan.teeth).filter((t) => t.status === s).length }))
@@ -728,16 +741,14 @@ function PlanPage() {
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset all teeth?</AlertDialogTitle>
-            <AlertDialogDescription>This will mark every tooth as intact.</AlertDialogDescription>
+            <AlertDialogTitle>Reset treatment plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark every tooth as intact and remove all treatments, statuses, and notes.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              patientsStore.updatePlan(plan.id, { teeth: defaultTeeth() });
-              toast.success("Teeth reset");
-              setResetOpen(false);
-            }}>Reset</AlertDialogAction>
+            <AlertDialogAction onClick={handleResetPlan}>Reset</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

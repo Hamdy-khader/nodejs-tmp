@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
 import { cn } from "@/lib/utils";
+import { toggleToothSelection } from "@/lib/tooth-selection";
 
 interface TreatmentMenuItem {
   label: string;
@@ -187,7 +188,7 @@ function buildToothAnnotations(
 export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
   const pricelistSections = usePricelist();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const [bridgeMode, setBridgeMode] = useState(false);
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
   const [insOpen, setInsOpen] = useState(false);
@@ -233,29 +234,34 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     setBridgeSel((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
   };
 
+  const toggleTreatmentTooth = (n: number) => {
+    setSelectedTeeth((prev) => toggleToothSelection(prev, n));
+  };
+
   const handlePick = (group: TreatmentGroup, item: TreatmentMenuItem) => {
     if (item.value === "__bridge_span__") {
       startBridge();
       return;
     }
-    patientsStore.addTreatmentItemToLastVisit(plan.id, {
-      name: item.value,
-      toothNumber: selected ?? undefined,
-      amount: 1,
-      unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
-      catalogSectionKey: item.sectionKey,
-      catalogGroupKey: item.groupKey,
-      catalogItemId: item.itemId,
-      catalogItemKey: item.itemKey,
-      priceSource: item.itemId ? "catalog" : undefined,
-      manualPriceOverride: false,
-    });
-    if (selected != null) {
-      const nextStatus = getToothStatusForTreatment(item.sectionKey ?? group.id, item.value);
-      if (nextStatus) {
-        const tooth = plan.teeth[selected];
+    const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
+    const nextStatus = getToothStatusForTreatment(item.sectionKey ?? group.id, item.value);
+    for (const toothNumber of targets) {
+      patientsStore.addTreatmentItemToLastVisit(plan.id, {
+        name: item.value,
+        toothNumber,
+        amount: 1,
+        unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
+        catalogSectionKey: item.sectionKey,
+        catalogGroupKey: item.groupKey,
+        catalogItemId: item.itemId,
+        catalogItemKey: item.itemKey,
+        priceSource: item.itemId ? "catalog" : undefined,
+        manualPriceOverride: false,
+      });
+      if (toothNumber != null && nextStatus) {
+        const tooth = plan.teeth[toothNumber];
         patientsStore.setTooth(plan.id, {
-          ...(tooth ?? { number: selected, status: "intact" }),
+          ...(tooth ?? { number: toothNumber, status: "intact" }),
           status: nextStatus,
         });
       }
@@ -265,7 +271,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const startBridge = () => {
     setBridgeMode(true);
     setBridgeSel([]);
-    setSelected(null);
+    setSelectedTeeth([]);
   };
 
   const cancelBridge = () => {
@@ -336,9 +342,9 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         <div className="space-y-2">
           <TeethChart
             teeth={plan.teeth}
-            selected={bridgeMode ? null : selected}
-            onSelect={bridgeMode ? toggleBridgeTooth : setSelected}
-            highlighted={bridgeMode ? bridgeSel : undefined}
+            selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
+            onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
+            highlighted={bridgeMode ? bridgeSel : selectedTeeth}
             annotations={toothAnnotations}
           />
           {bridgeMode && (
@@ -380,12 +386,16 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",
                 bridgeMode
                   ? "bg-violet-500/15 text-violet-700"
-                  : selected
+                  : selectedTeeth.length > 0
                     ? "bg-primary/15 text-primary"
                     : "bg-muted text-muted-foreground",
               )}
             >
-              {bridgeMode ? "Bridge mode" : selected ? `Tooth ${selected}` : "Any tooth"}
+              {bridgeMode
+                ? "Bridge mode"
+                : selectedTeeth.length > 0
+                  ? `${selectedTeeth.length} ${selectedTeeth.length === 1 ? "tooth" : "teeth"}`
+                  : "Any tooth"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
