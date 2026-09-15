@@ -1,3 +1,4 @@
+import { ClinicUsersPanel } from "@/components/admin/ClinicUsersPanel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ClinicForm } from "@/components/admin/ClinicForm";
@@ -25,6 +26,7 @@ function AdminClinicEditPage() {
         onSuccess={() => navigate({ to: "/admin/clinics/$id", params: { id } })}
         onCancel={() => navigate({ to: "/admin/clinics/$id", params: { id } })}
       />
+      <ClinicUsersPanel key={id} clinicId={clinicId} />
     </AdminLayout>
   );
 }

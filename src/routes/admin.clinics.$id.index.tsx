@@ -1,3 +1,4 @@
+import { ClinicUsersPanel } from "@/components/admin/ClinicUsersPanel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
@@ -109,7 +110,7 @@ function AdminClinicDetailPage() {
               <StatusBadge status={clinic.status} />
             </div>
             <div className="adm-page-sub">
-              Business profile only. Patient records and clinic internal data are not shown.
+              Clinic information and login accounts.
             </div>
           </div>
         </div>
@@ -181,6 +182,8 @@ function AdminClinicDetailPage() {
           )}
         </div>
       </div>
+
+      <ClinicUsersPanel key={id} clinicId={clinicId} />
 
       <ConfirmDialog
         open={confirm === "delete"}

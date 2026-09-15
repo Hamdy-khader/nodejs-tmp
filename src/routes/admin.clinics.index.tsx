@@ -205,6 +205,7 @@ function AdminClinicsPage() {
                         >
                           Edit
                         </Btn>
+                        <a href={`/admin/clinics/${clinic.id}/users`} className="adm-btn ghost sm">Users</a>
                         {clinic.status === "active" ? (
                           <Btn variant="danger" size="sm" onClick={() => setSuspendTarget(clinic)}>
                             Suspend
