@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-r
 import { useEffect, useState } from "react";
 import {
   ArrowLeft, Save, Trash2, RotateCcw, Pencil, Undo2, Redo2,
-  Globe, DollarSign, ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus,
+  ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/patients-store";
 import { tabsStore } from "@/lib/tabs-store";
 import { useHydrated } from "@/lib/use-hydrated";
+import { toggleToothSelection } from "@/lib/tooth-selection";
 import { TeethChart } from "@/components/TeethChart";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -35,7 +36,6 @@ import { TreatmentsView } from "@/components/TreatmentsView";
 import { DocumentsPanel } from "@/components/DocumentsPanel";
 import { OverviewPanel } from "@/components/OverviewPanel";
 import { X } from "lucide-react";
-import { usePlanSettings } from "@/lib/plan-settings-store";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -125,10 +125,25 @@ function PlanPage() {
   const patient = usePatient(patientId);
   usePlansFor(patientId);
   const plan = usePlan(planId, patientId);
-  const accountSettings = usePlanSettings();
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>("diagnosis");
   const [selected, setSelected] = useState<number | null>(null);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
+  const selectTooth = (number: number) => {
+    const next = multiSelect ? toggleToothSelection(selectedTeeth, number) : [number];
+    setSelectedTeeth(next);
+    setSelected(next.at(-1) ?? null);
+  };
+  useEffect(() => {
+    const clear = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || event.target.closest('[data-diagnosis-selection], [data-tooth-number], [role="menu"], [role="dialog"]')) return;
+      setSelectedTeeth([]);
+      setSelected(null);
+    };
+    if (step === "diagnosis") document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, [step]);
   const [editName, setEditName] = useState(false);
   const [name, setName] = useState(plan?.name ?? "");
   const [resetOpen, setResetOpen] = useState(false);
@@ -158,6 +173,7 @@ function PlanPage() {
   const openDiagnosisPanelForTooth = (n: number) => {
     const t = plan?.teeth[n];
     if (!t || !t.note) return;
+    setSelectedTeeth([n]);
     setSelected(n);
     closeAllPanels();
     if (t.status === "filled" && FILLED_VARIANTS.includes(t.note)) setFilledPanelOpen(true);
@@ -216,6 +232,7 @@ function PlanPage() {
   const handleResetPlan = () => {
     closeAllPanels();
     setSelected(null);
+    setSelectedTeeth([]);
     patientsStore.updatePlan(plan.id, {
       teeth: defaultTeeth(),
       generalStatuses: [],
@@ -326,7 +343,13 @@ function PlanPage() {
               {/* Teeth chart + status grid (no heavy card chrome) */}
               <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div>
-                  <TeethChart teeth={plan.teeth} selected={selected} onSelect={setSelected} />
+                  <div>
+                    <Button data-diagnosis-selection size="sm" variant={multiSelect ? "default" : "outline"} aria-pressed={multiSelect}
+                      onClick={() => { setMultiSelect(!multiSelect); setSelectedTeeth([]); setSelected(null); }}>
+                      Multiple selection {selectedTeeth.length > 0 && '(' + selectedTeeth.length + ')'}
+                    </Button>
+                    <TeethChart teeth={plan.teeth} selected={selected} highlighted={selectedTeeth} onSelect={selectTooth} />
+                  </div>
                   <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
                     <button
                       type="button"
@@ -340,7 +363,7 @@ function PlanPage() {
                 </div>
 
                 {/* Status pseudo-dropdown grid */}
-                <div>
+                <div data-diagnosis-selection>
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Tooth status
@@ -404,11 +427,14 @@ function PlanPage() {
                         closeAllPanels();
                         if (isToothStatus) {
                           if (!selectedTooth) return;
-                          patientsStore.setTooth(plan.id, {
-                            ...selectedTooth,
-                            status: group.id as ToothStatus,
-                            note: item,
-                          });
+                          const targets = selectedTeeth.length ? selectedTeeth : [selectedTooth.number];
+                          const teeth = { ...plan.teeth };
+                          for (const number of targets) {
+                            if (group.id === "bridge" && teeth[number].status === "missing") continue;
+                            teeth[number] = { ...teeth[number], status: group.id as ToothStatus, note: item, diagnosis: [] };
+                          }
+                          patientsStore.updatePlan(plan.id, { teeth });
+                          if (targets.length > 1) return;
                           if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
                             setFilledPanelOpen(true);
                           }
@@ -430,10 +456,11 @@ function PlanPage() {
                             setGeneralDialogOpen(true);
                           } else if (selectedTooth) {
                             // Tooth selected — attach as note on that tooth (shows in jaw row)
-                            patientsStore.setTooth(plan.id, {
-                              ...selectedTooth,
-                              note: item,
-                            });
+                            const targets = selectedTeeth.length ? selectedTeeth : [selectedTooth.number];
+                            const teeth = { ...plan.teeth };
+                            for (const number of targets) teeth[number] = { ...teeth[number], note: item, diagnosis: [] };
+                            patientsStore.updatePlan(plan.id, { teeth });
+                            if (targets.length > 1) return;
                             if (MALOCCLUSION_VARIANTS.includes(item)) setMalocclusionPanelOpen(true);
                             else if (FACIAL_VARIANTS.includes(item)) setFacialPanelOpen(true);
                             else if (GENERAL_SEVERITY_VARIANTS.includes(item)) setSeverityPanelOpen(true);
@@ -552,7 +579,7 @@ function PlanPage() {
                 open={open.upper}
                 onToggle={() => setOpen((o) => ({ ...o, upper: !o.upper }))}
               >
-                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
+                <JawGrid numbers={UPPER_TEETH} plan={plan} selected={selected} onSelect={(n) => { setSelectedTeeth([n]); setSelected(n); }} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
 
               {/* Lower jaw */}
@@ -561,7 +588,7 @@ function PlanPage() {
                 open={open.lower}
                 onToggle={() => setOpen((o) => ({ ...o, lower: !o.lower }))}
               >
-                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={setSelected} onEditDiagnosis={openDiagnosisPanelForTooth} />
+                <JawGrid numbers={LOWER_TEETH} plan={plan} selected={selected} onSelect={(n) => { setSelectedTeeth([n]); setSelected(n); }} onEditDiagnosis={openDiagnosisPanelForTooth} />
               </Section>
             </>
           )}
@@ -570,6 +597,7 @@ function PlanPage() {
         {/* Right rail */}
          {showRightRail && (
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+          <div data-diagnosis-selection>
           {filledPanelOpen &&
             selectedTooth &&
             selectedTooth.status === "filled" &&
@@ -652,10 +680,8 @@ function PlanPage() {
               />
             )}
 
+          </div>
           <div className="rounded-2xl border border-border/60 bg-card p-2 shadow-[var(--shadow-soft)]">
-            <RailRow icon={<Globe className="h-4 w-4" />} label={accountSettings.language} sub="Account default" />
-            <RailRow icon={<DollarSign className="h-4 w-4" />} label={accountSettings.pricePage.currency} sub="Account default" />
-            <div className="my-2 h-px bg-border" />
             <RailButton
               icon={<Save className="h-4 w-4" />}
               label={saving ? "Saving..." : "Save"}

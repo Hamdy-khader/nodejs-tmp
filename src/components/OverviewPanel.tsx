@@ -1,7 +1,7 @@
+import { TreatmentReportPage as PageCard } from "./TreatmentReportPage";
+import { buildTreatmentReportPages } from "@/lib/treatment-report-layout";
 import { createRef, useMemo, useState } from "react";
 import {
-  Globe,
-  DollarSign,
   Undo2,
   Redo2,
   RotateCcw,
@@ -10,7 +10,6 @@ import {
   Puzzle,
   LayoutGrid,
   Square,
-  Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,23 +25,13 @@ import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 import { planSettingsStore, usePlanSettings } from "@/lib/plan-settings-store";
 import { saveTreatmentPlanPdf, type TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
 import {
-  STATUS_META,
-  getStatusMeta,
-  type TreatmentItem,
   type TreatmentPlan,
-  type TreatmentRow,
-  type ToothState,
   usePatient,
 } from "@/lib/patients-store";
-import { ToothIllustration } from "@/components/TeethChart";
-import { ToothNumberTable } from "@/components/ToothNumberTable";
 import { toast } from "sonner";
 import { useClinicSession } from "@/lib/clinic-session-store";
 import {
-  buildFooterSegments,
   buildPdfExportContext,
-  resolveCoverImage,
-  resolveTemplate,
 } from "@/lib/pdf-export-context";
 
 interface DocRow {
@@ -167,58 +156,21 @@ function buildSection(
   return ordered;
 }
 
-function buildPdfPages(selectedDocs: DocRow[]): TreatmentPlanPdfPage[] {
+function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan): TreatmentPlanPdfPage[] {
   return [
     { kind: "cover", title: "Cover" },
     { kind: "status", title: "Your current dental status" },
-    { kind: "suggested", title: "Your suggested treatment" },
+    ...[...(plan.xrays ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((xray) => ({
+      kind: "xray" as const, title: "X-ray", imageUrl: xray.url,
+    })),
+    ...buildTreatmentReportPages(plan),
     ...selectedDocs.map((doc) => ({
       kind: "document" as const,
       title: doc.title,
       body: doc.body,
     })),
-    { kind: "back", title: "Back cover" },
+
   ];
-}
-
-function getTreatmentCounts(plan: TreatmentPlan) {
-  const counts: Record<number, number> = {};
-  for (const row of plan.treatments ?? []) {
-    if (row.kind !== "visit") continue;
-    for (const item of row.items) {
-      if (item.toothNumber == null) continue;
-      counts[item.toothNumber] = (counts[item.toothNumber] ?? 0) + 1;
-    }
-  }
-  return counts;
-}
-
-function getTotals(rows: TreatmentRow[]) {
-  let subtotal = 0;
-  for (const row of rows) {
-    if (row.kind === "visit") {
-      for (const item of row.items) subtotal += item.amount * item.unitPrice;
-    }
-  }
-  let discount = 0;
-  for (const row of rows) {
-    if (row.kind === "discount") {
-      discount += row.mode === "percent" ? (subtotal * row.value) / 100 : row.value;
-    }
-  }
-  return { subtotal, discount, total: Math.max(0, subtotal - discount) };
-}
-
-function getBaseLabel(tooth: ToothState) {
-  return tooth.note || (tooth.status !== "intact" ? getStatusMeta(tooth.status).label : "");
-}
-
-function getAffectedTeeth(plan: TreatmentPlan) {
-  return Object.values(plan.teeth)
-    .filter(
-      (tooth) => tooth.status !== "intact" || (tooth.diagnosis?.length ?? 0) > 0 || tooth.note,
-    )
-    .sort((a, b) => a.number - b.number);
 }
 
 export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
@@ -253,7 +205,7 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
     return out;
   }, [templates, order, selectedSet]);
 
-  const allPages = useMemo(() => buildPdfPages(selectedDocs), [selectedDocs]);
+  const allPages = useMemo(() => buildPdfPages(selectedDocs, plan), [selectedDocs, plan]);
   const pageRefs = useMemo(() => allPages.map(() => createRef<HTMLDivElement>()), [allPages]);
 
   const handleDownload = async () => {
@@ -345,449 +297,6 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
   );
 }
 
-const PageCard = ({
-  page,
-  index,
-  total,
-  settings,
-  plan,
-  pageRef,
-  exportContext,
-}: {
-  page: TreatmentPlanPdfPage;
-  index: number;
-  total: number;
-  settings: ReturnType<typeof usePlanSettings>;
-  plan: TreatmentPlan;
-  pageRef: React.RefObject<HTMLDivElement | null>;
-  exportContext: ReturnType<typeof buildPdfExportContext>;
-}) => {
-  const resolvedFooterLeft = resolveTemplate(
-    settings.pageDesign.innerPages.footerLeft,
-    exportContext,
-  );
-  const footerSegments = resolvedFooterLeft || buildFooterSegments(exportContext).join(" | ");
-
-  return (
-    <article
-      ref={pageRef}
-      data-overview-export-page="true"
-      className="relative flex flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm"
-      style={{ aspectRatio: "1 / 1.414" }}
-    >
-      {page.kind !== "cover" && (
-        <header className="flex items-center justify-between border-b border-border/70 px-4 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/70">
-            {sectionHeader(page)}
-          </span>
-          <Pencil className="size-3 text-muted-foreground" />
-        </header>
-      )}
-      <div className="flex-1 overflow-hidden px-4 py-3">
-        {page.kind === "cover" && (
-          <CoverContent settings={settings} exportContext={exportContext} />
-        )}
-        {page.kind === "status" && <StatusContent plan={plan} />}
-        {page.kind === "suggested" && <SuggestedContent plan={plan} settings={settings} />}
-        {page.kind === "document" && <DocumentContent title={page.title} body={page.body} />}
-        {page.kind === "back" && <BackCoverContent settings={settings} />}
-      </div>
-      {page.kind !== "cover" &&
-        page.kind !== "back" &&
-        settings.pageDesign.innerPages.showFooter && (
-          <footer className="flex items-center justify-between border-t border-border/50 px-4 py-1.5 text-[9px] text-muted-foreground">
-            <span>{footerSegments}</span>
-            <span>
-              {index} / {total}
-            </span>
-            <span>
-              {resolveTemplate(settings.pageDesign.innerPages.footerRight, exportContext)}
-            </span>
-          </footer>
-        )}
-    </article>
-  );
-};
-
-function sectionHeader(page: TreatmentPlanPdfPage) {
-  switch (page.kind) {
-    case "status":
-      return "Your current dental status";
-    case "suggested":
-      return "Your suggested treatment";
-    case "document":
-      return "Descriptions and Declarations";
-    default:
-      return page.title;
-  }
-}
-
-function CoverContent({
-  settings,
-  exportContext,
-}: {
-  settings: ReturnType<typeof usePlanSettings>;
-  exportContext: ReturnType<typeof buildPdfExportContext>;
-}) {
-  const { frontCover } = settings.pageDesign;
-  const coverImage = resolveCoverImage(frontCover.coverImage);
-  const subtitle = resolveTemplate(frontCover.subtitle, exportContext);
-
-  return (
-    <div className="relative flex h-full flex-col items-center justify-between overflow-hidden bg-[#1e0d01] text-white">
-      <img
-        src={coverImage}
-        alt="Treatment plan cover"
-        className="absolute inset-0 h-full w-full object-cover"
-        crossOrigin="anonymous"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#1b0f08]/80 via-[#472a18]/30 to-[#100804]/78" />
-      <div className="relative z-10 w-full bg-[#170600]/72 px-6 py-4 text-center backdrop-blur-[1px]">
-        <p className="font-serif text-2xl italic text-[#e6ca91]">{exportContext.clinicName}</p>
-      </div>
-      <div className="relative z-10 grid w-full flex-1 place-items-center px-10">
-        <div className="text-center text-[#3d2919]">
-          <p className="text-[10px] tracking-[0.3em] text-[#f6dfbb]">{frontCover.title}</p>
-          <p className="mt-1 font-serif text-base italic text-white">{subtitle}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusContent({ plan }: { plan: TreatmentPlan }) {
-  const affected = getAffectedTeeth(plan);
-  const treatmentCounts = getTreatmentCounts(plan);
-
-  return (
-    <div className="space-y-3 text-[8px]">
-      <ToothNumberTable teeth={plan.teeth} />
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">
-            Problem teeth
-          </p>
-          <span className="text-[8px] text-muted-foreground">{affected.length} teeth</span>
-        </div>
-        {affected.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/60 px-3 py-3 text-center italic text-muted-foreground">
-            No diagnosis added yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-4 gap-2">
-            {affected.slice(0, 8).map((tooth) => {
-              const meta = getStatusMeta(tooth.status);
-              return (
-                <div
-                  key={tooth.number}
-                  className="rounded-lg border border-border/60 bg-white p-1.5 text-center"
-                >
-                  <ToothIllustration
-                    number={tooth.number}
-                    status={tooth.status}
-                    note={tooth.note}
-                    className="mx-auto max-w-[26px]"
-                  />
-                  <p className="mt-1 text-[8px] font-bold">{tooth.number}</p>
-                  <p className="truncate text-[7px]" style={{ color: meta.ring }}>
-                    {getBaseLabel(tooth)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <CompactJawGrid teeth={Object.values(plan.teeth)} treatmentCounts={treatmentCounts} />
-    </div>
-  );
-}
-
-function SuggestedContent({
-  plan,
-  settings,
-}: {
-  plan: TreatmentPlan;
-  settings: ReturnType<typeof usePlanSettings>;
-}) {
-  const rows = plan.treatments ?? [];
-  const totals = getTotals(rows);
-  const treatmentCounts = getTreatmentCounts(plan);
-  const treatedTeeth = Object.values(plan.teeth)
-    .filter((tooth) => (treatmentCounts[tooth.number] ?? 0) > 0)
-    .sort((a, b) => a.number - b.number);
-  const { showPrices, showSubtotal, showTotal, showInsurance, currency } = settings.pricePage;
-  const sym = currency === "USD" ? "$" : currency;
-
-  return (
-    <div className="space-y-3 text-[8px]">
-      <ToothNumberTable teeth={plan.teeth} treatmentCounts={treatmentCounts} />
-
-      <div className="rounded-lg border border-border/60 bg-white p-2">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-foreground/80">
-            Teeth with treatment
-          </p>
-          <span className="text-[8px] text-muted-foreground">{treatedTeeth.length} teeth</span>
-        </div>
-        {treatedTeeth.length === 0 ? (
-          <p className="text-center italic text-muted-foreground">No treatments added yet.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1">
-            {treatedTeeth.map((tooth) => (
-              <span
-                key={tooth.number}
-                className="rounded-full bg-[#00a245]/15 px-2 py-0.5 text-[7px] font-semibold text-[#004a12]"
-              >
-                Tooth {tooth.number} · Tx x{treatmentCounts[tooth.number]}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <CompactTreatmentRows rows={rows} sym={sym} showPrices={showPrices} />
-
-      {showPrices && (
-        <div className="rounded-lg border border-border/60 bg-slate-50 p-2 text-[8px]">
-          {showSubtotal && (
-            <div className="flex items-center justify-between">
-              <span>Subtotal</span>
-              <span>
-                {sym} {totals.subtotal.toFixed(0)}
-              </span>
-            </div>
-          )}
-          {totals.discount > 0 && (
-            <div className="mt-1 flex items-center justify-between">
-              <span>Discount</span>
-              <span>
-                - {sym} {totals.discount.toFixed(0)}
-              </span>
-            </div>
-          )}
-          {showTotal && (
-            <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1 text-[9px] font-bold">
-              <span>Total</span>
-              <span>
-                {sym} {totals.total.toFixed(0)}
-              </span>
-            </div>
-          )}
-          {showInsurance && plan.billingMode === "insurance" && plan.insurance && (
-            <div className="mt-1 border-t border-border/60 pt-1 text-[7px] text-muted-foreground">
-              Estimated insurance view enabled
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CompactJawGrid({
-  teeth,
-  treatmentCounts,
-}: {
-  teeth: ToothState[];
-  treatmentCounts: Record<number, number>;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {[teeth.slice(0, 16), teeth.slice(16)].map((group, groupIndex) => (
-        <div key={groupIndex} className="space-y-1.5">
-          {group.map((tooth) => {
-            const meta = getStatusMeta(tooth.status);
-            const hasStatus =
-              tooth.status !== "intact" ||
-              Boolean(tooth.note) ||
-              (tooth.diagnosis?.length ?? 0) > 0;
-            const label = getBaseLabel(tooth);
-            const txCount = treatmentCounts[tooth.number] ?? 0;
-            return (
-              <div
-                key={tooth.number}
-                className={cn(
-                  "flex items-start gap-2 rounded-xl border px-2 py-1.5",
-                  hasStatus ? "border-border/60 bg-card" : "border-border/40 bg-muted/25",
-                )}
-              >
-                <div
-                  className="mt-0.5 h-6 w-6 shrink-0 rounded-lg text-center text-[10px] font-bold leading-6"
-                  style={hasStatus ? { background: meta.bg, color: meta.ring } : undefined}
-                >
-                  {tooth.number}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      "truncate text-[8px] font-semibold",
-                      !hasStatus && "text-muted-foreground",
-                    )}
-                  >
-                    {label || "Intact - no diagnosis"}
-                  </p>
-                  {(tooth.diagnosis?.length ?? 0) > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {tooth.diagnosis!.slice(0, 3).map((item) => (
-                        <span
-                          key={item}
-                          className="rounded-full px-1.5 py-0.5 text-[7px] font-medium"
-                          style={{ background: meta.bg, color: meta.ring }}
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {txCount > 0 && (
-                  <span className="rounded-full bg-[#EBF1FB] px-1.5 py-0.5 text-[7px] font-bold text-[#1E4890]">
-                    Tx {txCount}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CompactTreatmentRows({
-  rows,
-  sym,
-  showPrices,
-}: {
-  rows: TreatmentRow[];
-  sym: string;
-  showPrices: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="grid grid-cols-[1fr_40px_54px_54px] gap-2 px-1 text-[7px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span>Treatment</span>
-        <span className="text-right">Amt</span>
-        <span className="text-right">Unit</span>
-        <span className="text-right">Price</span>
-      </div>
-      {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border/60 px-3 py-3 text-center italic text-muted-foreground">
-          No treatments added yet.
-        </div>
-      ) : (
-        rows
-          .slice(0, 8)
-          .map((row) => (
-            <CompactTreatmentRow key={row.id} row={row} sym={sym} showPrices={showPrices} />
-          ))
-      )}
-    </div>
-  );
-}
-
-function CompactTreatmentRow({
-  row,
-  sym,
-  showPrices,
-}: {
-  row: TreatmentRow;
-  sym: string;
-  showPrices: boolean;
-}) {
-  if (row.kind === "healing") {
-    return (
-      <div className="rounded-lg border border-border/60 bg-muted/30 px-2 py-2 text-[8px]">
-        Healing period: {row.days ?? 0} days
-      </div>
-    );
-  }
-
-  if (row.kind === "discount") {
-    return (
-      <div className="rounded-lg border border-border/60 bg-muted/30 px-2 py-2 text-[8px]">
-        Discount: {row.mode === "percent" ? `${row.value}%` : `${sym} ${row.value.toFixed(0)}`}
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-border/60 bg-white p-2">
-      <div className="mb-1 text-[8px] font-bold text-primary">Visit</div>
-      <div className="space-y-1">
-        {row.items.slice(0, 4).map((item) => (
-          <CompactItemRow key={item.id} item={item} sym={sym} showPrices={showPrices} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CompactItemRow({
-  item,
-  sym,
-  showPrices,
-}: {
-  item: TreatmentItem;
-  sym: string;
-  showPrices: boolean;
-}) {
-  const price = item.amount * item.unitPrice;
-  return (
-    <div className="grid grid-cols-[1fr_40px_54px_54px] gap-2 text-[7px]">
-      <div className="min-w-0">
-        <span className="truncate font-medium">
-          {item.toothNumber != null ? `#${item.toothNumber} ` : ""}
-          {item.name}
-        </span>
-      </div>
-      <span className="text-right">{item.amount}</span>
-      <span className="text-right">{showPrices ? `${sym} ${item.unitPrice.toFixed(0)}` : "-"}</span>
-      <span className="text-right font-semibold">
-        {showPrices ? `${sym} ${price.toFixed(0)}` : "-"}
-      </span>
-    </div>
-  );
-}
-
-function BackCoverContent({ settings }: { settings: ReturnType<typeof usePlanSettings> }) {
-  const { backCover } = settings.pageDesign;
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-foreground/70">
-        {backCover.title}
-      </p>
-      <p className="max-w-[80%] text-[9px] leading-relaxed text-muted-foreground">
-        {backCover.note || "Back cover"}
-      </p>
-    </div>
-  );
-}
-
-function DocumentContent({ title, body }: { title: string; body?: string }) {
-  const previewLines = (body || "No content available for preview.")
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 14);
-
-  return (
-    <div className="space-y-2">
-      <p className="text-[10px] font-semibold text-foreground">{title}</p>
-      <div className="space-y-1 text-[7px] leading-relaxed text-foreground/75">
-        {previewLines.map((line, i) => (
-          <p key={`${title}-${i}`} className="line-clamp-2">
-            {line}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function RightSidebar({
   canUndo,
   canRedo,
@@ -810,15 +319,6 @@ function RightSidebar({
   return (
     <aside className="self-start space-y-3">
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-          <Globe className="size-4 text-muted-foreground" />
-          <span>{settings.language}</span>
-        </div>
-        <div className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm">
-          <DollarSign className="mt-0.5 size-4 text-muted-foreground" />
-          <span className="text-left leading-tight">{settings.pricePage.currency}</span>
-        </div>
-        <div className="my-2 h-px bg-border/60" />
         <button
           disabled={!canUndo}
           onClick={() => documentsStore.undo()}

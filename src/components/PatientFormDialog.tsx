@@ -79,7 +79,7 @@ export function PatientFormDialog({ open, onOpenChange, patient, onCreated }: Pr
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Language and currency are managed from the account defaults.
+              Language and currency are managed from Clinic Fees.
             </p>
           </div>
 

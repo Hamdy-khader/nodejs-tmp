@@ -6,7 +6,6 @@ import {
   X,
   Pencil,
   Plus,
-  Globe,
   Stethoscope,
   ClipboardList,
   UserRound,
@@ -42,7 +41,6 @@ import {
   type ClinicTemplate,
   type TemplateCategory,
 } from "@/lib/templates-store";
-import { usePlanSettings } from "@/lib/plan-settings-store";
 
 export const Route = createFileRoute("/templates")({
   head: () => ({
@@ -63,7 +61,6 @@ const SIDE_ITEMS: { id: TemplateCategory; label: string; icon: typeof FileText }
 
 function TemplatesPage() {
   const all = useTemplates();
-  const settings = usePlanSettings();
   const [active, setActive] = useState<TemplateCategory>("treatments");
   const [editing, setEditing] = useState<ClinicTemplate | null>(null);
   const [open, setOpen] = useState(false);
@@ -167,11 +164,6 @@ function TemplatesPage() {
 
         {/* Right rail */}
         <aside className="w-64 shrink-0 self-start rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-          <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-            <Globe className="size-4 text-muted-foreground" />
-            <span>{settings.language}</span>
-          </div>
-          <div className="my-2 h-px bg-border/60" />
           {SIDE_ITEMS.map((it) => {
             const isActive = active === it.id;
             return (

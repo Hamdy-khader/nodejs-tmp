@@ -3,8 +3,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   GripVertical,
   Youtube,
-  Globe,
-  DollarSign,
   Undo2,
   Redo2,
   RotateCcw,
@@ -25,7 +23,6 @@ import {
   useDocsHistoryState,
   type DocSectionId,
 } from "@/lib/documents-store";
-import { usePlanSettings } from "@/lib/plan-settings-store";
 import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 
 export const Route = createFileRoute("/documents")({
@@ -424,19 +421,8 @@ function DocumentRow({
 /* ---------- RightActionSidebar ---------- */
 
 function RightActionSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean }) {
-  const settings = usePlanSettings();
-
   return (
     <aside className="self-start rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-      <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-        <Globe className="size-4 text-muted-foreground" />
-        <span>{settings.language}</span>
-      </div>
-      <div className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm">
-        <DollarSign className="size-4 text-muted-foreground mt-0.5" />
-        <span className="leading-tight text-left">{settings.pricePage.currency}</span>
-      </div>
-      <div className="my-2 h-px bg-border/60" />
       <button
         disabled={!canUndo}
         onClick={() => documentsStore.undo()}

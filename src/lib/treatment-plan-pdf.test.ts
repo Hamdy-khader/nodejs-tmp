@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanSettings } from "@/lib/plan-settings-store";
 
 const mocks = vi.hoisted(() => ({
@@ -21,9 +21,39 @@ vi.mock("jspdf", () => ({
 import { saveTreatmentPlanPdf } from "@/lib/treatment-plan-pdf";
 
 describe("treatment plan PDF export", () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.html2canvas.mockResolvedValue({ toDataURL: () => "data:image/png;base64,page" });
+    mocks.html2canvas.mockResolvedValue({
+      width: 595,
+      height: 842,
+      toDataURL: () => "data:image/png;base64,page",
+    });
+  });
+
+  it("exports every part of long treatment content at its original aspect ratio", async () => {
+    mocks.html2canvas.mockResolvedValueOnce({ width: 595, height: 1900 });
+    const drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue(
+      "data:image/png;base64,slice",
+    );
+    const page = document.createElement("article");
+    await saveTreatmentPlanPdf({
+      fileName: "long.pdf",
+      pageElements: [page],
+      settings: { pageSize: "A4" } as PlanSettings,
+    });
+    expect(mocks.addImage).toHaveBeenCalledTimes(3);
+    expect(mocks.addPage).toHaveBeenCalledTimes(2);
+    expect(drawImage.mock.calls.map((call) => [call[2], call[4]])).toEqual([
+      [0, 842],
+      [842, 842],
+      [1684, 216],
+    ]);
+    expect(mocks.addImage.mock.calls[2][5]).toBe(216);
   });
 
   it("captures the original styled page without stripping its classes, content, or SVG", async () => {

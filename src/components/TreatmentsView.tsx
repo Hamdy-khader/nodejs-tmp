@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, GripVertical, StickyNote, X } from "lucide-react";
+import { Check, ArrowUp, ArrowDown, ChevronDown, GripVertical, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
   type TreatmentPlan,
@@ -498,7 +498,20 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
             </p>
           ) : (
             rows.map((row, idx) => (
-              <RowRenderer key={row.id} row={row} index={idx} planId={plan.id} />
+              <div key={row.id} className="flex items-start gap-1">
+                <div className="flex flex-col">
+                  {[-1, 1].map((direction) => <button key={direction} type="button"
+                    aria-label={direction < 0 ? "Move row up" : "Move row down"}
+                    disabled={idx + direction < 0 || idx + direction >= rows.length}
+                    className="rounded p-1 hover:bg-muted disabled:opacity-25"
+                    onClick={() => {
+                      const next = [...rows];
+                      [next[idx], next[idx + direction]] = [next[idx + direction], next[idx]];
+                      patientsStore.setTreatments(plan.id, next);
+                    }}>{direction < 0 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}</button>)}
+                </div>
+                <div className="min-w-0 flex-1"><RowRenderer row={row} index={idx} planId={plan.id} /></div>
+              </div>
             ))
           )}
         </div>
@@ -723,6 +736,9 @@ function VisitRow({
             {index + 1}
           </span>
           <span className="text-sm font-bold text-primary">Visit:</span>
+          <Input aria-label="Visit description" placeholder="Stage / visit details" value={row.label ?? ""}
+            onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
+            className="h-7 min-w-0 flex-1 text-xs" />
         </div>
         <div className="text-right text-xs text-muted-foreground">
           Total: <span className="font-semibold text-primary">$ {total.toFixed(0)}</span>
@@ -742,8 +758,21 @@ function VisitRow({
         />
       )}
 
-      {row.items.map((it) => (
-        <ItemRow key={it.id} planId={planId} rowId={row.id} item={it} />
+      {row.items.map((it, itemIndex) => (
+        <div key={it.id} className="flex items-center gap-1">
+          <div className="flex flex-col">
+            {[-1, 1].map((direction) => <button key={direction} type="button"
+              aria-label={direction < 0 ? "Move treatment up" : "Move treatment down"}
+              disabled={itemIndex + direction < 0 || itemIndex + direction >= row.items.length}
+              className="rounded p-1 hover:bg-muted disabled:opacity-25"
+              onClick={() => {
+                const items = [...row.items];
+                [items[itemIndex], items[itemIndex + direction]] = [items[itemIndex + direction], items[itemIndex]];
+                patientsStore.updateTreatmentRow(planId, row.id, { items });
+              }}>{direction < 0 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}</button>)}
+          </div>
+          <div className="min-w-0 flex-1"><ItemRow planId={planId} rowId={row.id} item={it} /></div>
+        </div>
       ))}
     </div>
   );
@@ -829,6 +858,9 @@ function HealingRow({
       >
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold italic text-foreground/80">Healing period:</span>
+          <Input aria-label="Healing period description" placeholder="Period details" value={row.label ?? ""}
+            onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
+            className="h-7 min-w-0 flex-1 text-xs" />
           <Input
             type="number"
             min={0}

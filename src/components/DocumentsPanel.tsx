@@ -1,12 +1,11 @@
 import { useMemo, useRef } from "react";
 import {
-  GripVertical, Youtube, Globe, DollarSign, Undo2, Redo2, RotateCcw, Check, Pencil,
+  GripVertical, Youtube, Undo2, Redo2, RotateCcw, Check, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   documentsStore, useSelectedIds, useSectionOrder, useDocsHistoryState, type DocSectionId,
 } from "@/lib/documents-store";
-import { usePlanSettings } from "@/lib/plan-settings-store";
 import { useTemplates, type ClinicTemplate } from "@/lib/templates-store";
 
 interface DocRow {
@@ -154,8 +153,12 @@ function DocumentSection({ section, items, selectedSet }: {
       <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{section.label}</h3>
       {section.subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>}
       <ul className="mt-3 divide-y divide-border/50 rounded-lg border border-border/60">
-        {items.map((it) => (
-          <DocumentRow key={it.id} item={it} selected={selectedSet.has(it.id)} onDragStart={() => (dragId.current = it.id)} onDrop={() => onDrop(it.id)} />
+        {items.map((it, index) => (
+          <DocumentRow key={it.id} item={it} selected={selectedSet.has(it.id)} onDragStart={() => (dragId.current = it.id)} onDrop={() => onDrop(it.id)} first={index === 0} last={index === items.length - 1} onMove={(direction) => {
+            const ids = items.map(item => item.id);
+            [ids[index], ids[index + direction]] = [ids[index + direction], ids[index]];
+            documentsStore.reorder(section.id, ids);
+          }} />
         ))}
         {items.length === 0 && <li className="px-4 py-6 text-center text-xs text-muted-foreground">No items.</li>}
       </ul>
@@ -163,13 +166,17 @@ function DocumentSection({ section, items, selectedSet }: {
   );
 }
 
-function DocumentRow({ item, selected, onDragStart, onDrop }: {
+function DocumentRow({ item, selected, onDragStart, onDrop, onMove, first, last }: {
+  onMove: (direction: number) => void; first: boolean; last: boolean;
   item: DocRow; selected: boolean; onDragStart: () => void; onDrop: () => void;
 }) {
   return (
     <li draggable onDragStart={onDragStart} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}
         className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40">
-      <GripVertical className="size-4 cursor-grab text-muted-foreground/60" />
+      <div className="flex flex-col">
+        <button type="button" aria-label="Move document up" disabled={first} onClick={() => onMove(-1)} className="px-1 disabled:opacity-25">↑</button>
+        <button type="button" aria-label="Move document down" disabled={last} onClick={() => onMove(1)} className="px-1 disabled:opacity-25">↓</button>
+      </div>
       <button onClick={() => documentsStore.toggle(item.id)} aria-pressed={selected}
         className={cn("grid size-5 place-items-center rounded border transition",
           selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white hover:border-primary")}>
@@ -188,19 +195,8 @@ function DocumentRow({ item, selected, onDragStart, onDrop }: {
 }
 
 function RightActionSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean }) {
-  const settings = usePlanSettings();
-
   return (
     <aside className="self-start rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-      <div className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-        <Globe className="size-4 text-muted-foreground" />
-        <span>{settings.language}</span>
-      </div>
-      <div className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-sm">
-        <DollarSign className="size-4 text-muted-foreground mt-0.5" />
-        <span className="leading-tight text-left">{settings.pricePage.currency}</span>
-      </div>
-      <div className="my-2 h-px bg-border/60" />
       <button disabled={!canUndo} onClick={() => documentsStore.undo()}
         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60 disabled:opacity-40">
         <Undo2 className="size-4 text-muted-foreground" /><span>Undo</span>

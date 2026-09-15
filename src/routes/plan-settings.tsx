@@ -6,7 +6,6 @@ import {
   ArrowUpDown,
   FileText,
   Check,
-  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,20 +44,10 @@ export const Route = createFileRoute("/plan-settings")({
 
 type EditorKey = keyof PageDesign | "pageSize" | "priceList" | "pricePage" | "planSections" | null;
 
-const ACCOUNT_LANGUAGES = [
-  "English (EN)",
-  "العربية (AR)",
-  "Français (FR)",
-  "Deutsch (DE)",
-  "Español (ES)",
-];
-const ACCOUNT_CURRENCIES = ["USD", "EUR", "GBP", "SAR", "AED", "TRY", "EGP"];
-
 function PlanSettingsPage() {
   const settings = usePlanSettings();
   const [saved, setSaved] = useState(false);
   const [editor, setEditor] = useState<EditorKey>(null);
-  const [accountSaved, setAccountSaved] = useState(false);
 
   const save = () => {
     planSettingsStore.update({});
@@ -66,11 +55,6 @@ function PlanSettingsPage() {
     setTimeout(() => setSaved(false), 1500);
   };
 
-  const saveAccount = () => {
-    planSettingsStore.update({});
-    setAccountSaved(true);
-    setTimeout(() => setAccountSaved(false), 1500);
-  };
 
   return (
     <div className="min-h-screen bg-[#eff3f1] px-6 py-8">
@@ -93,76 +77,6 @@ function PlanSettingsPage() {
               </button>
             </div>
           </header>
-        </section>
-
-        {/* Account Defaults */}
-        <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Globe className="size-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                Account Defaults
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Shared language and currency used across diagnosis and patient flows.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Language
-              </label>
-              <Select
-                value={settings.language}
-                onValueChange={(v) => planSettingsStore.update({ language: v })}
-              >
-                <SelectTrigger className="h-10 w-[220px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_LANGUAGES.map((l) => (
-                    <SelectItem key={l} value={l}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Currency
-              </label>
-              <Select
-                value={settings.pricePage.currency}
-                onValueChange={(v) =>
-                  planSettingsStore.update({
-                    pricePage: { ...settings.pricePage, currency: v },
-                  })
-                }
-              >
-                <SelectTrigger className="h-10 w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <button
-              onClick={saveAccount}
-              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90"
-            >
-              <Save className="size-4" />
-              {accountSaved ? "Saved ✓" : "Save defaults"}
-            </button>
-          </div>
         </section>
 
         {/* Page Design */}
@@ -487,9 +401,6 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
         <ToggleRow label="Show discount" checked={p.showDiscount} onChange={(v) => planSettingsStore.update({ pricePage: { ...p, showDiscount: v } })} />
         <ToggleRow label="Show tax" checked={p.showTax} onChange={(v) => planSettingsStore.update({ pricePage: { ...p, showTax: v } })} />
         <ToggleRow label="Show total" checked={p.showTotal} onChange={(v) => planSettingsStore.update({ pricePage: { ...p, showTotal: v } })} />
-        <Field label="Currency">
-          <Input defaultValue={p.currency} onChange={(e) => planSettingsStore.update({ pricePage: { ...p, currency: e.target.value } })} />
-        </Field>
       </div>
     );
   } else if (editor === "planSections") {

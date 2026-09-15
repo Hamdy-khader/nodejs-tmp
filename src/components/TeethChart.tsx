@@ -1,7 +1,9 @@
+import { useId } from "react";
 import { UPPER_TEETH, LOWER_TEETH, STATUS_META, getStatusMeta, type ToothState, type ToothStatus } from "@/lib/patients-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
+  report?: boolean;
   teeth: Record<number, ToothState>;
   selected?: number | null;
   onSelect?: (n: number) => void;
@@ -65,18 +67,25 @@ function ToothSVG({
   status,
   note,
   bridgePosition,
+  pontic = false,
+  treatment = false,
 }: {
   number: number;
   status: ToothStatus;
   note?: string;
+  pontic?: boolean;
+  treatment?: boolean;
   bridgePosition?: "single" | "left" | "middle" | "right";
 }) {
   const cat = categoryOf(number);
   const isUpper = number < 30;
   const shape = SHAPES[cat];
-  const id = `tk${number}`; // unique per tooth (FDI numbers are globally unique)
+  const id = `tk${number}-${useId().replace(/:/g, "")}`;
 
-  const transform = isUpper ? undefined : "rotate(180,20,40)";
+  const transform = isUpper ? "translate(0,80) scale(1,-1)" : undefined;
+  const crownShape = note === "Fractured"
+    ? "M8 37 L8 23 L14 27 L18 16 L23 25 L29 19 L32 37 Z"
+    : note === "Worn" ? "M10 37 L10 22 Q20 19 30 22 L30 37 Z" : shape.crown;
 
   // ── Missing tooth ────────────────────────────────────────────────────────
   if (status === "missing") {
@@ -99,8 +108,8 @@ function ToothSVG({
         />
         {/* Stylized X on crown area */}
         <g transform={transform}>
-          <line x1="14" y1="14" x2="26" y2="28" stroke="#C0776A" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-          <line x1="26" y1="14" x2="14" y2="28" stroke="#C0776A" strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+          <line x1="14" y1="14" x2="26" y2="28" stroke={treatment ? "#4aa44e" : "#C0776A"} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+          <line x1="26" y1="14" x2="14" y2="28" stroke={treatment ? "#4aa44e" : "#C0776A"} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
         </g>
       </svg>
     );
@@ -114,14 +123,14 @@ function ToothSVG({
       <svg viewBox="0 0 40 80" className="h-full w-full">
         <defs>
           <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#5C7FA0" />
-            <stop offset="40%" stopColor="#7AA8CC" />
-            <stop offset="70%" stopColor="#4A6E8E" />
-            <stop offset="100%" stopColor="#3A5878" />
+            <stop offset="0%" stopColor={treatment ? "#8ed987" : "#5C7FA0"} />
+            <stop offset="40%" stopColor={treatment ? "#abe5a6" : "#7AA8CC"} />
+            <stop offset="70%" stopColor={treatment ? "#6eb969" : "#4A6E8E"} />
+            <stop offset="100%" stopColor={treatment ? "#5b9758" : "#3A5878"} />
           </linearGradient>
           <linearGradient id={`${id}-abutment`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#8BB4D0" />
-            <stop offset="100%" stopColor="#4A6E8E" />
+            <stop offset="0%" stopColor={treatment ? "#8ed987" : "#8BB4D0"} />
+            <stop offset="100%" stopColor={treatment ? "#6eb969" : "#4A6E8E"} />
           </linearGradient>
         </defs>
         <g transform={transform}>
@@ -143,8 +152,8 @@ function ToothSVG({
 
   // ── Bridge geometry ──────────────────────────────────────────────────────
   const isBridge = status === "bridge" && bridgePosition !== undefined;
-  const barLeft  = bridgePosition === "left"  || bridgePosition === "single" ? 4 : -6;
-  const barRight = bridgePosition === "right" || bridgePosition === "single" ? 36 : 46;
+  const barLeft  = bridgePosition === "left"  || bridgePosition === "single" ? 4 : -20;
+  const barRight = bridgePosition === "right" || bridgePosition === "single" ? 36 : 60;
   const BRIDGE_COLOR_1 = "#9B6FDB";
   const BRIDGE_COLOR_2 = "#7C4AC9";
 
@@ -156,12 +165,16 @@ function ToothSVG({
   const gumColor     = "rgba(230,160,140,0.28)";
 
   const crownFill = (() => {
+    if (treatment) return "#8ed987";
+    if (note === "Discolored") return "#b9a56d";
+    if (note === "Necrosis") return "#72717c";
+    if (note === "Veneer") return "#fff9dc";
     if (status === "crown")  return `url(#${id}-gold)`;
     if (status === "bridge") return `url(#${id}-bridge-c)`;
     return `url(#${id}-enamel)`;
   })();
 
-  const strokeColor = status === "crown"  ? "#8A6820"
+  const strokeColor = treatment ? "#5b9758" : status === "crown"  ? "#8A6820"
                     : status === "bridge" ? "#5E2FA0"
                     : "#B0A090";
 
@@ -208,7 +221,7 @@ function ToothSVG({
         </radialGradient>
       </defs>
 
-      <g transform={transform}>
+      <g transform={transform} data-tooth-visual={note || status} data-pontic={pontic || undefined}>
         {/* ── Bridge bar behind tooth ── */}
         {isBridge && (
           <>
@@ -230,8 +243,10 @@ function ToothSVG({
           </>
         )}
 
+        <defs><clipPath id={id + "-root-clip"}><rect x="0" y="37" width="40" height={note === "Root resorption" ? 23 : 43} /></clipPath></defs>
+        <g clipPath={"url(#" + id + "-root-clip)"}>
         {/* ── Roots ── */}
-        {shape.roots.map((d, i) => (
+        {!pontic && shape.roots.map((d, i) => (
           <path
             key={i}
             d={d}
@@ -246,6 +261,8 @@ function ToothSVG({
           />
         ))}
 
+        </g>
+        {note === "Fractured root" && <path d="M9 51 L17 55 L23 50 L30 54" fill="none" stroke="#a94a38" strokeWidth="2.5" />}
         {/* ── Root-treated: gutta-percha dots ── */}
         {status === "root-treated" && (() => {
           const dots: { cx: number; cy: number }[] =
@@ -278,7 +295,7 @@ function ToothSVG({
 
         {/* ── Crown ── */}
         <path
-          d={shape.crown}
+          d={note === "Radix" ? "M10 37 L12 32 L19 35 L26 31 L30 37 Z" : crownShape}
           fill={crownFill}
           stroke={strokeColor}
           strokeWidth={status === "crown" || status === "bridge" ? 1.1 : 0.9}
@@ -288,7 +305,7 @@ function ToothSVG({
         {/* ── Crown shimmer highlight ── */}
         {(status === "crown" || status === "bridge") && (
           <path
-            d={shape.crown}
+            d={crownShape}
             fill="white"
             opacity="0.18"
             style={{ clipPath: "inset(0 40% 75% 10% round 3px)" }}
@@ -298,7 +315,7 @@ function ToothSVG({
         {/* ── Intact: enamel highlight ── */}
         {(status === "intact" || status === "root-treated") && (
           <path
-            d={shape.crown}
+            d={crownShape}
             fill="white"
             opacity="0.35"
             style={{ clipPath: "inset(0 25% 72% 15% round 2px)" }}
@@ -334,7 +351,7 @@ function ToothSVG({
                 x={fx} y={fy}
                 width={fw} height={fh}
                 rx="2"
-                fill={`url(#${id}-fill-grad)`}
+                fill={note === "Filled (composite)" ? "#e8ded0" : note === "Inlay" ? "#e6bf56" : `url(#${id}-fill-grad)`}
                 stroke="#3A4A5A"
                 strokeWidth="0.6"
               />
@@ -353,7 +370,7 @@ function ToothSVG({
         {/* ── Crown: dashed margin line ── */}
         {status === "crown" && (
           <path
-            d={shape.crown}
+            d={crownShape}
             fill="none"
             stroke="#F5D060"
             strokeWidth="1.4"
@@ -364,9 +381,16 @@ function ToothSVG({
 
         {/* ── Bridge: crown outline ── */}
         {status === "bridge" && (
-          <path d={shape.crown} fill="none" stroke={BRIDGE_COLOR_2} strokeWidth="1.4" opacity="0.55" />
+          <path d={crownShape} fill="none" stroke={BRIDGE_COLOR_2} strokeWidth="1.4" opacity="0.55" />
         )}
 
+        {note === "Mobility" && <path d="M3 26 L7 22 M3 26 L7 30 M3 26 H12 M37 26 L33 22 M37 26 L33 30 M37 26 H28" fill="none" stroke="#c75c32" strokeWidth="1.5" />}
+        {(note === "Post" || note === "Parapulpal pin") && <rect x={note === "Post" ? 18 : 24} y="21" width="3" height="36" rx="1" fill="#687f91" />}
+        {note === "Veneer" && <path d={crownShape} fill="none" stroke="#83c7cb" strokeWidth="2" />}
+        {note === "Dentures" && <path d="M3 35 Q20 45 37 35 L37 43 Q20 51 3 43 Z" fill="#e7a3ae" />}
+        {(["Apical lesion", "Cyst", "Granuloma"].includes(note ?? "")) && <ellipse cx="20" cy="70" rx={note === "Cyst" ? 10 : 7} ry="7" fill="#e89d8855" stroke="#c05d48" strokeDasharray={note === "Granuloma" ? "2 1" : undefined} />}
+        {(["Gingivitis", "Periodontitis", "Gingival recession", "Gingival overgrowth", "Plaque", "Bone loss", "Gummy smile"].includes(note ?? "")) && <path d="M4 38 Q20 49 36 38" fill="none" stroke={note === "Plaque" ? "#d8bc54" : "#d76b76"} strokeWidth={note === "Periodontitis" ? 7 : 4} />}
+        {(["Drifted (front)", "Drifted (back)", "Impacted", "Malocclusion"].includes(note ?? "")) && <path d={note === "Drifted (back)" ? "M30 15 H7 L12 10 M7 15 L12 20" : "M10 15 H33 L28 10 M33 15 L28 20"} fill="none" stroke="#9a4ba6" strokeWidth="2" />}
         {/* ── Status badge dot (bottom-right of crown) ── */}
         {status !== "intact" && (
           <circle
@@ -413,7 +437,15 @@ function bridgeRuns(numbers: number[], teeth: Record<number, ToothState>) {
   while (i < numbers.length) {
     if (teeth[numbers[i]]?.status === "bridge") {
       const start = i;
-      while (i < numbers.length && teeth[numbers[i]]?.status === "bridge") i++;
+      i++;
+      while (i < numbers.length) {
+        if (teeth[numbers[i]]?.status === "bridge") { i++; continue; }
+        if (teeth[numbers[i]]?.status !== "missing") break;
+        let next = i;
+        while (next < numbers.length && teeth[numbers[next]]?.status === "missing") next++;
+        if (next >= numbers.length || teeth[numbers[next]]?.status !== "bridge") break;
+        i = next + 1;
+      }
       runs.push({ start, end: i - 1 });
     } else {
       i++;
@@ -441,6 +473,7 @@ function Row({
   onSelect,
   highlighted,
   annotations,
+  report,
 }: { numbers: number[]; isUpper: boolean } & Props) {
   const hSet = new Set(highlighted ?? []);
   const runs = bridgeRuns(numbers, teeth);
@@ -458,7 +491,7 @@ function Row({
   const N = numbers.length;
 
   return (
-    <div className="relative flex w-full items-end justify-center gap-0.5 sm:gap-1">
+    <div dir="ltr" className="relative flex w-full items-end justify-center gap-0.5 sm:gap-1">
       {/* Bridge band overlay */}
       <div className="pointer-events-none absolute inset-0 z-0">
         {runs.map((r, i) => {
@@ -498,9 +531,12 @@ function Row({
           <button
             key={n}
             type="button"
+            data-tooth-number={n}
+            aria-pressed={isSel || isHi}
             onClick={() => onSelect?.(n)}
             className={cn(
-              "group relative z-10 flex min-w-0 flex-1 flex-col items-center pt-12 transition-all",
+              "group relative z-10 flex min-w-0 flex-1 flex-col items-center transition-all",
+              report ? "pt-0" : "pt-12",
               isUpper ? "flex-col" : "flex-col-reverse",
             )}
           >
@@ -534,7 +570,7 @@ function Row({
                 "aspect-[1/2] w-full max-w-[44px] rounded-lg transition-all duration-150",
                 isSel
                   ? "scale-[1.14] drop-shadow-[0_0_6px_rgba(99,102,241,0.55)]"
-                  : isHi
+                  : isHi && !report
                     ? "scale-[1.08] drop-shadow-[0_0_5px_rgba(139,92,246,0.45)]"
                     : "hover:scale-[1.06] hover:drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)]",
               )}
@@ -543,12 +579,14 @@ function Row({
               {isSel && (
                 <div className="absolute inset-0 rounded-lg ring-2 ring-primary ring-offset-1 ring-offset-card" />
               )}
-              {isHi && !isSel && (
+              {isHi && !isSel && !report && (
                 <div className="absolute inset-0 rounded-lg ring-2 ring-violet-500 ring-offset-1 ring-offset-card" />
               )}
               <ToothSVG
                 number={n}
-                status={status}
+                status={bridgePos ? "bridge" : status}
+                pontic={status === "missing" && !!bridgePos}
+                treatment={report && isHi}
                 note={t?.note}
                 bridgePosition={bridgePos}
               />
@@ -572,7 +610,7 @@ function Row({
                 isSel
                   ? "text-primary"
                   : isHi
-                    ? "text-violet-600"
+                    ? report ? "text-green-600" : "text-violet-600"
                     : hasStatus
                       ? "text-foreground/80"
                       : "text-muted-foreground/70",
@@ -588,7 +626,8 @@ function Row({
 }
 
 // ─── Public component ─────────────────────────────────────────────────────────
-export function TeethChart({ teeth, selected, onSelect, highlighted, annotations }: Props) {
+export function TeethChart({ teeth, selected, onSelect, highlighted, annotations, report }: Props) {
+  if (report) return <div className="space-y-2 py-3" style={{ pointerEvents: "none" }}><Row numbers={UPPER_TEETH} isUpper teeth={teeth} highlighted={highlighted} report /><div className="h-px bg-gray-300" /><Row numbers={LOWER_TEETH} isUpper={false} teeth={teeth} highlighted={highlighted} report /></div>;
   return (
     <div className="space-y-4 rounded-2xl border border-border/60 bg-gradient-to-b from-card to-muted/30 p-3 shadow-inner sm:p-5">
       {/* Upper label */}
