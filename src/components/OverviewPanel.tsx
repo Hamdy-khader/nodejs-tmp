@@ -1,3 +1,4 @@
+import type { PlanSettings } from "@/lib/plan-settings-store";
 import { TreatmentReportPage as PageCard } from "./TreatmentReportPage";
 import { buildTreatmentReportPages } from "@/lib/treatment-report-layout";
 import { createRef, useMemo, useState } from "react";
@@ -156,14 +157,14 @@ function buildSection(
   return ordered;
 }
 
-function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan): TreatmentPlanPdfPage[] {
+function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan, settings: PlanSettings): TreatmentPlanPdfPage[] {
   return [
     { kind: "cover", title: "Cover" },
     { kind: "status", title: "Your current dental status" },
     ...[...(plan.xrays ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((xray) => ({
       kind: "xray" as const, title: "X-ray", imageUrl: xray.url,
     })),
-    ...buildTreatmentReportPages(plan),
+    ...buildTreatmentReportPages(plan, settings),
     ...selectedDocs.map((doc) => ({
       kind: "document" as const,
       title: doc.title,
@@ -205,7 +206,7 @@ export function OverviewPanel({ plan }: { plan: TreatmentPlan }) {
     return out;
   }, [templates, order, selectedSet]);
 
-  const allPages = useMemo(() => buildPdfPages(selectedDocs, plan), [selectedDocs, plan]);
+  const allPages = useMemo(() => buildPdfPages(selectedDocs, plan, settings), [selectedDocs, plan, settings]);
   const pageRefs = useMemo(() => allPages.map(() => createRef<HTMLDivElement>()), [allPages]);
 
   const handleDownload = async () => {

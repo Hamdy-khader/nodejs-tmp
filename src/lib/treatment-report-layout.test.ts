@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTreatmentReportPages } from "./treatment-report-layout";
 import { defaultTeeth, type TreatmentPlan } from "./patients-store";
+import type { PlanSettings } from "./plan-settings-store";
 const base: TreatmentPlan = {
   id: "test",
   patientId: "test",
@@ -11,6 +12,27 @@ const base: TreatmentPlan = {
   updatedAt: 0,
 };
 describe("treatment report pagination", () => {
+  const settings = (pageSize: PlanSettings["pageSize"], showPrices = true): PlanSettings => ({
+    language: "English", pageSize, priceListDesign: "detailed", updatedAt: 0,
+    pricePage: { showPrices, showSubtotal: true, showTotal: true, showDiscount: true, showTax: false, showInsurance: false, currency: "EUR" },
+    planSections: { showDiagnosis: true, showTreatments: true, showDocuments: true, showOverview: true },
+    pageDesign: { frontCover: { clinicName: "Clinic", title: "Plan" }, innerPages: { headerText: "", footerLeft: "Clinic", footerRight: "", showFooter: true }, backCover: { title: "" } },
+  });
+  const planWithItems = (count: number): TreatmentPlan => ({ ...base, treatments: [{ id: "visit", kind: "visit", items: Array.from({ length: count }, (_, i) => ({ id: String(i), name: "Metal-Ceramic Crown", toothNumber: 12, amount: 1, unitPrice: 200 })) }] });
+  it("keeps totals with ten short treatments when they fit on the first A4 page", () => {
+    const pages = buildTreatmentReportPages(planWithItems(10), settings("A4"));
+    expect(pages).toHaveLength(1);
+    expect(pages[0].showTotals).toBe(true);
+    expect(pages[0].treatmentRows?.[0]).toMatchObject({ items: expect.any(Array) });
+  });
+  it("uses the selected paper size rather than a fixed first-page limit", () => {
+    expect(buildTreatmentReportPages(planWithItems(10), settings("Letter"))).toHaveLength(2);
+    expect(buildTreatmentReportPages(planWithItems(10), settings("Legal"))).toHaveLength(1);
+  });
+  it("does not reserve price rows when prices are hidden", () => {
+    expect(buildTreatmentReportPages(planWithItems(12), settings("A4", false))).toHaveLength(1);
+    expect(buildTreatmentReportPages(planWithItems(12), settings("A4", true))).toHaveLength(2);
+  });
   it("preserves every treatment exactly once across continuation pages", () => {
     const items = Array.from({ length: 70 }, (_, i) => ({
       id: String(i),

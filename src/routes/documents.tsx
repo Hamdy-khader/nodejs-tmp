@@ -1,12 +1,10 @@
-import { useMemo, useRef } from "react";
+import { DocumentSection } from "@/components/DocumentSection";
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  GripVertical,
-  Youtube,
   Undo2,
   Redo2,
   RotateCcw,
-  Check,
   Stethoscope,
   Activity,
   FileText,
@@ -315,110 +313,6 @@ function OpgSection() {
 }
 
 /* ---------- DocumentSection ---------- */
-
-function DocumentSection({
-  section,
-  items,
-  selectedSet,
-}: {
-  section: { id: DocSectionId; label: string; subtitle?: string };
-  items: DocRow[];
-  selectedSet: Set<string>;
-}) {
-  const dragId = useRef<string | null>(null);
-
-  const onDrop = (targetId: string) => {
-    if (!dragId.current || dragId.current === targetId) return;
-    const ids = items.map((i) => i.id);
-    const from = ids.indexOf(dragId.current);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    documentsStore.reorder(section.id, ids);
-    dragId.current = null;
-  };
-
-  return (
-    <section>
-      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-        {section.label}
-      </h3>
-      {section.subtitle && (
-        <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>
-      )}
-      <ul className="mt-3 divide-y divide-border/50 rounded-lg border border-border/60">
-        {items.map((it) => (
-          <DocumentRow
-            key={it.id}
-            item={it}
-            selected={selectedSet.has(it.id)}
-            onDragStart={() => (dragId.current = it.id)}
-            onDrop={() => onDrop(it.id)}
-          />
-        ))}
-        {items.length === 0 && (
-          <li className="px-4 py-6 text-center text-xs text-muted-foreground">
-            No items in this section.
-          </li>
-        )}
-      </ul>
-    </section>
-  );
-}
-
-/* ---------- DocumentRow ---------- */
-
-function DocumentRow({
-  item,
-  selected,
-  onDragStart,
-  onDrop,
-}: {
-  item: DocRow;
-  selected: boolean;
-  onDragStart: () => void;
-  onDrop: () => void;
-}) {
-  return (
-    <li
-      draggable
-      onDragStart={onDragStart}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={onDrop}
-      className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40"
-    >
-      <GripVertical className="size-4 cursor-grab text-muted-foreground/60" />
-      <button
-        onClick={() => documentsStore.toggle(item.id)}
-        aria-pressed={selected}
-        className={cn(
-          "grid size-5 place-items-center rounded border transition",
-          selected
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-border bg-white hover:border-primary",
-        )}
-      >
-        {selected && <Check className="size-3.5" />}
-      </button>
-      <span
-        className={cn(
-          "flex-1 text-sm",
-          selected ? "text-foreground" : "text-muted-foreground",
-          item.isCustomNote && "italic",
-        )}
-      >
-        {item.title}
-      </span>
-      {item.hasVideo && (
-        <span className="grid size-6 place-items-center rounded bg-muted text-muted-foreground">
-          <Youtube className="size-3.5" />
-        </span>
-      )}
-    </li>
-  );
-}
-
-/* ---------- RightActionSidebar ---------- */
 
 function RightActionSidebar({ canUndo, canRedo }: { canUndo: boolean; canRedo: boolean }) {
   return (

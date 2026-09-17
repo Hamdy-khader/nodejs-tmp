@@ -8,7 +8,8 @@ import {
   resolveTemplate,
   type PdfExportContext,
 } from "@/lib/pdf-export-context";
-import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
+import { getTreatmentTeeth } from "@/lib/treatment-teeth";
+import { reportPageHeight } from "@/lib/treatment-report-layout";
 
 export function TreatmentReportPage({
   page,
@@ -29,7 +30,7 @@ export function TreatmentReportPage({
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const height = settings.pageSize === "Letter" ? 770 : settings.pageSize === "Legal" ? 980 : 842;
+  const height = reportPageHeight(settings.pageSize);
   useEffect(() => {
     if (!host.current) return;
     const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 595));
@@ -322,15 +323,7 @@ function ReportTreatment({
         : 0),
     0,
   );
-  const teeth = { ...plan.teeth };
-  for (const row of allRows)
-    if (row.kind === "visit")
-      for (const item of row.items)
-        if (item.toothNumber != null) {
-          const status = getToothStatusForTreatment(item.catalogSectionKey ?? "", item.name);
-          if (status)
-            teeth[item.toothNumber] = { ...teeth[item.toothNumber], status, note: undefined };
-        }
+  const teeth = getTreatmentTeeth(plan.teeth, allRows);
   const visits = allRows.filter((row) => row.kind === "visit");
   return (
     <>

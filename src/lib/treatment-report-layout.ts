@@ -1,11 +1,19 @@
 import type { TreatmentPlan, TreatmentRow } from "./patients-store";
 import type { TreatmentPlanPdfPage } from "./treatment-plan-pdf";
+import type { PlanSettings, PageSize } from "./plan-settings-store";
+
+export function reportPageHeight(size: PageSize = "A4") {
+  return size === "Letter" ? 770 : size === "Legal" ? 980 : 842;
+}
 
 // Reserve space for page headers, footers, and totals. Visit items remain atomic.
-export function buildTreatmentReportPages(plan: TreatmentPlan): TreatmentPlanPdfPage[] {
+export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSettings): TreatmentPlanPdfPage[] {
   const pages: TreatmentPlanPdfPage[] = [];
   let rows: TreatmentRow[] = [];
-  let available = 340;
+  // Match the report's 48px vertical padding, 46px header and 78px footer.
+  // The compact two-jaw chart needs at most 200px at the report's 527px content width.
+  const contentHeight = reportPageHeight(settings?.pageSize) - 48 - 46 - (settings?.pageDesign.innerPages.showFooter === false ? 0 : 78);
+  let available = contentHeight - 200;
   let first = true;
   const flush = () => {
     pages.push({
@@ -16,20 +24,21 @@ export function buildTreatmentReportPages(plan: TreatmentPlan): TreatmentPlanPdf
     });
     rows = [];
     first = false;
-    available = 625;
+    available = contentHeight;
   };
   const textHeight = (text: string | undefined, width = 50) =>
     Math.max(1, Math.ceil((text?.length ?? 0) / width), text?.split("\n").length ?? 0) * 13;
   for (const row of plan.treatments ?? []) {
     if (row.kind !== "visit") {
-      const height = 24 + textHeight(row.note) + ("label" in row ? textHeight(row.label) : 0);
+      const label = row.kind === "healing" ? `Healing period: ${row.label ?? ""} ${row.days ?? ""} days` : "Discount";
+      const height = 25 + textHeight(label, 95) + (row.note ? textHeight(row.note, 95) : 0);
       if (available < height) flush();
       rows.push(row);
       available -= height;
       continue;
     }
     let fragment: Extract<TreatmentRow, { kind: "visit" }> = { ...row, items: [] };
-    let headerHeight = 48 + textHeight(row.label) + (row.note ? textHeight(row.note) : 0);
+    let headerHeight = 50 + textHeight(row.label) + (row.note ? 8 + textHeight(row.note, 95) : 0);
     const addHeader = () => {
       if (available < headerHeight + 30) flush();
       rows.push(fragment);
@@ -37,18 +46,22 @@ export function buildTreatmentReportPages(plan: TreatmentPlan): TreatmentPlanPdf
     };
     addHeader();
     for (const item of row.items) {
-      const height = 12 + textHeight(item.name, 43);
+      const height = 19 + textHeight(`${item.name}${item.toothNumber == null ? "" : ` (${item.toothNumber})`}`, 55);
       if (available < height) {
         flush();
         fragment = { ...row, note: undefined, items: [] };
-        headerHeight = 48 + textHeight(row.label);
+        headerHeight = 50 + textHeight(row.label);
         addHeader();
       }
       fragment.items.push(item);
       available -= height;
     }
   }
-  const totalsHeight = 120 + (plan.treatmentNote ? textHeight(plan.treatmentNote, 80) : 0);
+  const prices = settings?.pricePage;
+  const hasDiscount = (plan.treatments ?? []).some(row => row.kind === "discount" && row.value > 0);
+  const totalLines = prices?.showPrices === false ? 0 :
+    Number(prices?.showSubtotal !== false) + Number(prices?.showTotal !== false) + Number(hasDiscount && prices?.showDiscount !== false);
+  const totalsHeight = 18 + totalLines * 30 + (plan.treatmentNote ? 12 + textHeight(plan.treatmentNote, 95) : 0);
   if (available < totalsHeight) flush();
   flush();
   pages[pages.length - 1].showTotals = true;

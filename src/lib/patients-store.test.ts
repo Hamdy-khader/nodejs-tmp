@@ -6,6 +6,7 @@ const patientsCreateMock = vi.fn();
 const plansListMock = vi.fn();
 const plansCreateMock = vi.fn();
 const updateItemMock = vi.fn();
+const setRowsMock = vi.fn();
 
 async function loadModule() {
   vi.resetModules();
@@ -29,7 +30,7 @@ async function loadModule() {
         addXray: vi.fn(),
         deleteXray: vi.fn(),
         setGeneralStatuses: vi.fn(),
-        setRows: vi.fn(),
+        setRows: setRowsMock,
         createRow: vi.fn(),
         updateRow: vi.fn(),
         deleteRow: vi.fn(),
@@ -50,6 +51,32 @@ describe("patients-store", () => {
     plansListMock.mockReset().mockResolvedValue([]);
     plansCreateMock.mockReset();
     updateItemMock.mockReset().mockResolvedValue({});
+    setRowsMock.mockReset().mockResolvedValue({});
+  });
+
+  it("serializes rapid reorder saves and preserves item ordering in the payload", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", name: "Plan", treatment_rows: [
+      { id: "v", kind: "visit", sort_order: 1, items: [
+        { id: "a", name: "Implant", amount: 1, unit_price: 400, sort_order: 1 },
+        { id: "b", name: "Crown", amount: 1, unit_price: 200, sort_order: 2 },
+      ] },
+      { id: "h", kind: "healing", days: 30, sort_order: 2 },
+    ] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    let release!: () => void;
+    setRowsMock.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+    const first = mod.patientsStore.moveTreatment("plan-1", { kind: "row", id: "h" }, { kind: "row", id: "v" }, "before");
+    const second = mod.patientsStore.moveTreatment("plan-1", { kind: "row", id: "h" }, { kind: "row", id: "v" }, "after");
+    const third = mod.patientsStore.moveTreatment("plan-1", { kind: "item", id: "b" }, { kind: "item", id: "a" }, "before");
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    expect(setRowsMock.mock.calls[0][1].map((r: { id: string }) => r.id)).toEqual(["h", "v"]);
+    release();
+    await Promise.all([first, second, third]);
+    const saved = setRowsMock.mock.calls[2][1];
+    expect(saved.map((r: { id: string }) => r.id)).toEqual(["v", "h"]);
+    expect(saved[0].items).toMatchObject([{ id: "b", sort_order: 1 }, { id: "a", sort_order: 2 }]);
+    expect(saved[1]).toMatchObject({ days: 30, sort_order: 2 });
   });
 
   it("creates a patient and exposes it through the patients hook", async () => {

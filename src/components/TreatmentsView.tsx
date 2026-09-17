@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ArrowUp, ArrowDown, ChevronDown, GripVertical, StickyNote, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, ChevronDown, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
   type TreatmentPlan,
@@ -18,8 +18,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getToothStatusForTreatment } from "@/lib/treatment-catalog";
+import { getTreatmentTeeth } from "@/lib/treatment-teeth";
 import { cn } from "@/lib/utils";
+import { TreatmentSorting, SortableTreatment, TreatmentDragHandle } from "./TreatmentSorting";
 import { toggleToothSelection } from "@/lib/tooth-selection";
 
 interface TreatmentMenuItem {
@@ -112,18 +113,6 @@ function norm(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function teethBetween(a: number, b: number): number[] {
-  for (const row of JAW_ORDER) {
-    const ia = row.indexOf(a);
-    const ib = row.indexOf(b);
-    if (ia !== -1 && ib !== -1) {
-      const [lo, hi] = ia < ib ? [ia, ib] : [ib, ia];
-      return row.slice(lo + 1, hi);
-    }
-  }
-  return [];
-}
-
 function buildTreatmentLookup(groups: TreatmentGroup[]) {
   const lookup = new Map<string, string>();
   groups.forEach((group) => {
@@ -194,6 +183,16 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [insOpen, setInsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
 
+  useEffect(() => {
+    const clear = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || event.target.closest('[data-tooth-number], [data-treatment-selection], [role="menu"], [role="dialog"]')) return;
+      setSelectedTeeth([]);
+      setBridgeSel([]);
+    };
+    document.addEventListener("pointerdown", clear);
+    return () => document.removeEventListener("pointerdown", clear);
+  }, []);
+
   const rows = plan.treatments ?? [];
   const billingMode = plan.billingMode ?? "insurance";
   const treatmentGroups: TreatmentGroup[] = pricelistSections.map((section) => {
@@ -244,27 +243,19 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       return;
     }
     const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
-    const nextStatus = getToothStatusForTreatment(item.sectionKey ?? group.id, item.value);
     for (const toothNumber of targets) {
       patientsStore.addTreatmentItemToLastVisit(plan.id, {
         name: item.value,
         toothNumber,
         amount: 1,
         unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
-        catalogSectionKey: item.sectionKey,
+        catalogSectionKey: item.sectionKey ?? group.id,
         catalogGroupKey: item.groupKey,
         catalogItemId: item.itemId,
         catalogItemKey: item.itemKey,
         priceSource: item.itemId ? "catalog" : undefined,
         manualPriceOverride: false,
       });
-      if (toothNumber != null && nextStatus) {
-        const tooth = plan.teeth[toothNumber];
-        patientsStore.setTooth(plan.id, {
-          ...(tooth ?? { number: toothNumber, status: "intact" }),
-          status: nextStatus,
-        });
-      }
     }
   };
 
@@ -294,15 +285,6 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     // Both render as "bridge" so the connector is one continuous span.
     const lo = sorted[0];
     const hi = sorted[sorted.length - 1];
-    const between = teethBetween(lo, hi);
-    const span = [...sorted, ...between];
-    for (const n of span) {
-      const t = plan.teeth[n];
-      patientsStore.setTooth(plan.id, {
-        ...(t ?? { number: n, status: "intact" }),
-        status: "bridge",
-      });
-    }
     // Add a treatment line summarizing the bridge span
     const bridgeName = `Bridge ${lo}-${hi}`;
     patientsStore.addTreatmentItemToLastVisit(plan.id, {
@@ -341,14 +323,14 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-2">
           <TeethChart
-            teeth={plan.teeth}
+            teeth={getTreatmentTeeth(plan.teeth, rows, treatmentLookup)}
             selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
             onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
             highlighted={bridgeMode ? bridgeSel : selectedTeeth}
             annotations={toothAnnotations}
           />
           {bridgeMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2">
+            <div data-treatment-selection className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2">
               <p className="text-xs font-medium text-foreground">
                 Bridge mode — pick 2+ teeth across a missing tooth
                 {bridgeSel.length > 0 && (
@@ -376,7 +358,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           )}
         </div>
 
-        <div>
+        <div data-treatment-selection>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Clinic treatments
@@ -491,30 +473,20 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           <div />
         </div>
 
-        <div className="mt-2 space-y-2">
-          {rows.length === 0 ? (
-            <p className="rounded-md bg-muted/40 px-4 py-6 text-center text-sm italic text-muted-foreground">
-              No treatments yet — add a Visit and pick a treatment from the green buttons above.
-            </p>
-          ) : (
-            rows.map((row, idx) => (
-              <div key={row.id} className="flex items-start gap-1">
-                <div className="flex flex-col">
-                  {[-1, 1].map((direction) => <button key={direction} type="button"
-                    aria-label={direction < 0 ? "Move row up" : "Move row down"}
-                    disabled={idx + direction < 0 || idx + direction >= rows.length}
-                    className="rounded p-1 hover:bg-muted disabled:opacity-25"
-                    onClick={() => {
-                      const next = [...rows];
-                      [next[idx], next[idx + direction]] = [next[idx + direction], next[idx]];
-                      patientsStore.setTreatments(plan.id, next);
-                    }}>{direction < 0 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}</button>)}
-                </div>
-                <div className="min-w-0 flex-1"><RowRenderer row={row} index={idx} planId={plan.id} /></div>
-              </div>
-            ))
-          )}
-        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Drag the grip to reorder stages or move treatments between visits. Use arrow keys when a grip is focused.</p>
+        <TreatmentSorting planId={plan.id} rows={rows}>
+          <div className="mt-2 space-y-2">
+            {rows.length === 0 ? (
+              <p className="rounded-md bg-muted/40 px-4 py-6 text-center text-sm italic text-muted-foreground">
+                No treatments yet — add a Visit and pick a treatment from the green buttons above.
+              </p>
+            ) : rows.map((row, idx) => (
+              <SortableTreatment key={row.id} position={{ kind: "row", id: row.id }}>
+                <RowRenderer row={row} index={rows.slice(0, idx).filter(r => r.kind === "visit").length} planId={plan.id} />
+              </SortableTreatment>
+            ))}
+          </div>
+        </TreatmentSorting>
 
         {/* Totals + Note */}
         <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/40 pt-4 lg:grid-cols-[1fr_320px]">
@@ -660,13 +632,7 @@ function RowShell({
         variant === "visit" ? "bg-primary/10" : "bg-muted/40 hover:bg-muted/60",
       )}
     >
-      <button
-        type="button"
-        className="cursor-grab text-muted-foreground/60 hover:text-muted-foreground"
-        aria-label="Drag"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
+      <TreatmentDragHandle />
       {children}
       <div className="flex items-center justify-end gap-1">
         <button
@@ -758,21 +724,10 @@ function VisitRow({
         />
       )}
 
-      {row.items.map((it, itemIndex) => (
-        <div key={it.id} className="flex items-center gap-1">
-          <div className="flex flex-col">
-            {[-1, 1].map((direction) => <button key={direction} type="button"
-              aria-label={direction < 0 ? "Move treatment up" : "Move treatment down"}
-              disabled={itemIndex + direction < 0 || itemIndex + direction >= row.items.length}
-              className="rounded p-1 hover:bg-muted disabled:opacity-25"
-              onClick={() => {
-                const items = [...row.items];
-                [items[itemIndex], items[itemIndex + direction]] = [items[itemIndex + direction], items[itemIndex]];
-                patientsStore.updateTreatmentRow(planId, row.id, { items });
-              }}>{direction < 0 ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}</button>)}
-          </div>
-          <div className="min-w-0 flex-1"><ItemRow planId={planId} rowId={row.id} item={it} /></div>
-        </div>
+      {row.items.map(it => (
+        <SortableTreatment key={it.id} position={{ kind: "item", id: it.id }}>
+          <ItemRow planId={planId} rowId={row.id} item={it} />
+        </SortableTreatment>
       ))}
     </div>
   );
@@ -782,9 +737,7 @@ function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item:
   const price = item.amount * item.unitPrice;
   return (
     <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md bg-background px-2 py-1.5">
-      <span className="text-muted-foreground/40">
-        <GripVertical className="h-3.5 w-3.5" />
-      </span>
+      <TreatmentDragHandle />
       <div className="flex min-w-0 items-center gap-2 text-sm">
         {item.toothNumber != null && (
           <span className="grid h-5 min-w-[26px] place-items-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold text-primary tabular-nums">

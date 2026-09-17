@@ -1,3 +1,4 @@
+import { moveTreatment, type TreatmentPosition, type Placement } from "./treatment-order";
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
 
@@ -329,6 +330,8 @@ function serializePlan(plan: TreatmentPlan) {
   };
 }
 
+const treatmentSaves = new Map<string, Promise<unknown>>();
+
 function serializeTreatmentRows(treatments: TreatmentRow[]) {
   return treatments.map((row, index) => ({
     id: row.id,
@@ -583,7 +586,7 @@ export const patientsStore = {
         plan.id,
         (plan.generalStatuses ?? []).map((label) => ({ label })),
       ),
-      clinicApi.plans.setRows(plan.id, serializeTreatmentRows(plan.treatments ?? [])),
+      patientsStore.setTreatments(plan.id, plan.treatments ?? []),
     ]);
 
     await loadPlan(plan.patientId, plan.id, true);
@@ -605,7 +608,24 @@ export const patientsStore = {
 
   setTreatments(planId: string, treatments: TreatmentRow[]) {
     updateLocalPlan(planId, { treatments });
-    void clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments));
+    // Serialize snapshots so a slower earlier reorder cannot overwrite the latest one.
+    const previous = treatmentSaves.get(planId) ?? Promise.resolve();
+    const save = previous.catch(() => undefined).then(() =>
+      clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments)),
+    );
+    treatmentSaves.set(planId, save);
+    const cleanup = () => { if (treatmentSaves.get(planId) === save) treatmentSaves.delete(planId); };
+    void save.then(cleanup, cleanup);
+    return save;
+  },
+
+  moveTreatment(planId: string, source: TreatmentPosition, target: TreatmentPosition, placement: Placement) {
+    const plan = getPlanById(planId);
+    if (!plan) return Promise.resolve();
+    const rows = plan.treatments ?? [];
+    const next = moveTreatment(rows, source, target, placement);
+    if (next === rows) return Promise.resolve();
+    return patientsStore.setTreatments(planId, next);
   },
 
   addTreatmentRow(planId: string, row: TreatmentRow) {

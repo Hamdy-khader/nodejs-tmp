@@ -1,8 +1,8 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import {
-  GripVertical, Youtube, Undo2, Redo2, RotateCcw, Check, Pencil,
+  Undo2, Redo2, RotateCcw, Pencil,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { DocumentSection } from "./DocumentSection";
 import {
   documentsStore, useSelectedIds, useSectionOrder, useDocsHistoryState, type DocSectionId,
 } from "@/lib/documents-store";
@@ -129,68 +129,6 @@ function OpgSection() {
       <h3 className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">OPG X-RAYS</h3>
       <p className="rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">Upload an OPG X-ray in the diagnosis tab</p>
     </section>
-  );
-}
-
-function DocumentSection({ section, items, selectedSet }: {
-  section: { id: DocSectionId; label: string; subtitle?: string };
-  items: DocRow[];
-  selectedSet: Set<string>;
-}) {
-  const dragId = useRef<string | null>(null);
-  const onDrop = (targetId: string) => {
-    if (!dragId.current || dragId.current === targetId) return;
-    const ids = items.map((i) => i.id);
-    const from = ids.indexOf(dragId.current);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    documentsStore.reorder(section.id, ids);
-    dragId.current = null;
-  };
-  return (
-    <section>
-      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{section.label}</h3>
-      {section.subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{section.subtitle}</p>}
-      <ul className="mt-3 divide-y divide-border/50 rounded-lg border border-border/60">
-        {items.map((it, index) => (
-          <DocumentRow key={it.id} item={it} selected={selectedSet.has(it.id)} onDragStart={() => (dragId.current = it.id)} onDrop={() => onDrop(it.id)} first={index === 0} last={index === items.length - 1} onMove={(direction) => {
-            const ids = items.map(item => item.id);
-            [ids[index], ids[index + direction]] = [ids[index + direction], ids[index]];
-            documentsStore.reorder(section.id, ids);
-          }} />
-        ))}
-        {items.length === 0 && <li className="px-4 py-6 text-center text-xs text-muted-foreground">No items.</li>}
-      </ul>
-    </section>
-  );
-}
-
-function DocumentRow({ item, selected, onDragStart, onDrop, onMove, first, last }: {
-  onMove: (direction: number) => void; first: boolean; last: boolean;
-  item: DocRow; selected: boolean; onDragStart: () => void; onDrop: () => void;
-}) {
-  return (
-    <li draggable onDragStart={onDragStart} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}
-        className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40">
-      <div className="flex flex-col">
-        <button type="button" aria-label="Move document up" disabled={first} onClick={() => onMove(-1)} className="px-1 disabled:opacity-25">↑</button>
-        <button type="button" aria-label="Move document down" disabled={last} onClick={() => onMove(1)} className="px-1 disabled:opacity-25">↓</button>
-      </div>
-      <button onClick={() => documentsStore.toggle(item.id)} aria-pressed={selected}
-        className={cn("grid size-5 place-items-center rounded border transition",
-          selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white hover:border-primary")}>
-        {selected && <Check className="size-3.5" />}
-      </button>
-      <span className={cn("flex-1 text-sm", selected ? "text-foreground" : "text-muted-foreground", item.isCustomNote && "italic")}>
-        {item.title}
-      </span>
-      {item.hasVideo && (
-        <span className="grid size-6 place-items-center rounded bg-muted text-muted-foreground">
-          <Youtube className="size-3.5" />
-        </span>
-      )}
-    </li>
   );
 }
 
