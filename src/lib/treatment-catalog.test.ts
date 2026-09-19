@@ -78,7 +78,7 @@ describe("treatment-catalog", () => {
       (item) => item.name === "Implant - Straumann",
     );
 
-    expect(normalized.sections).toHaveLength(11);
+    expect(normalized.sections).toHaveLength(10);
     expect(nobel).toMatchObject({
       id: "nobel-id",
       key: "nobel-custom",
@@ -88,6 +88,51 @@ describe("treatment-catalog", () => {
     expect(straumann).toMatchObject({
       name: "Implant - Straumann",
       price: 0,
+    });
+  });
+
+  it("keeps veneer treatments inside Crown and removes the standalone Veneer section", () => {
+    const data = makePricelistData();
+    data.sections.push({
+      id: "veneer-source",
+      key: "veneer",
+      n: 8,
+      label: "Veneer",
+      icon: "sparkles",
+      groups: [
+        {
+          id: "veneer-group",
+          key: "veneer",
+          title: "Veneer",
+          price_label: null,
+          items: [
+            {
+              id: "veneer-id",
+              key: "veneer-custom",
+              name: "Veneer",
+              price: 650,
+              note: "custom veneer",
+            },
+          ],
+        },
+      ],
+    });
+
+    const normalized = normalizePricelistData(data);
+    const crown = normalized.sections.find((section) => section.key === "crown");
+
+    expect(normalized.sections.some((section) => section.key === "veneer")).toBe(false);
+    expect(crown?.groups[0]?.items.map((item) => item.name)).toEqual([
+      "Crown",
+      "Veneer",
+      "Veneer Preparation",
+      "Telescopic Crown",
+      "Filling",
+    ]);
+    expect(crown?.groups[0]?.items.find((item) => item.name === "Veneer")).toMatchObject({
+      id: "veneer-id",
+      price: 650,
+      note: "custom veneer",
     });
   });
 
