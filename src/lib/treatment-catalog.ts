@@ -1,4 +1,4 @@
-import type { PricelistData, PricelistGroup, PricelistItem, PricelistSection } from "@/lib/admin/api";
+import type { PricelistData } from "@/lib/admin/api";
 
 type CatalogItemTemplate = {
   key: string;
@@ -319,86 +319,18 @@ function norm(value: string) {
     .trim();
 }
 
-function buildSectionLookup(sections: PricelistSection[]) {
-  const byKey = new Map<string, PricelistSection>();
-  sections.forEach((section) => {
-    if (section.key) byKey.set(norm(section.key), section);
-    byKey.set(norm(section.id), section);
-    byKey.set(norm(section.label), section);
-  });
-  return byKey;
-}
-
-function buildGroupLookup(groups: PricelistGroup[]) {
-  const byTitle = new Map<string, PricelistGroup>();
-  groups.forEach((group) => {
-    if (group.key) byTitle.set(norm(group.key), group);
-    byTitle.set(norm(group.title), group);
-  });
-  return byTitle;
-}
-
-function buildItemLookup(groups: PricelistGroup[]) {
-  const byName = new Map<string, { group: PricelistGroup; item: PricelistItem }>();
-  groups.forEach((group) => {
-    group.items.forEach((item) => {
-      byName.set(norm(item.name), { group, item });
-    });
-  });
-  return byName;
-}
-
-function toSectionFromTemplate(
-  template: CatalogSectionTemplate,
-  sourceSection: PricelistSection | undefined,
-): PricelistSection {
-  const groupsByTitle = buildGroupLookup(sourceSection?.groups ?? []);
-  const itemsByName = buildItemLookup(sourceSection?.groups ?? []);
-
-  const groups = template.groups.map((groupTemplate) => {
-    const sourceGroup = groupsByTitle.get(norm(groupTemplate.title));
-    const items = groupTemplate.items.map((itemTemplate) => {
-      const found = itemsByName.get(norm(itemTemplate.name));
-      return {
-        id: found?.item.id ?? `${template.key}-${groupTemplate.key}-${itemTemplate.key}`,
-        key: found?.item.key ?? itemTemplate.key,
-        name: itemTemplate.name,
-        price: found?.item.price ?? itemTemplate.price,
-        note: found?.item.note ?? "",
-      };
-    });
-
-    return {
-      id: sourceGroup?.id ?? `${template.key}-${groupTemplate.key}`,
-      key: sourceGroup?.key ?? groupTemplate.key,
-      title: groupTemplate.title,
-      price_label: sourceGroup?.price_label ?? null,
-      items,
-    };
-  });
-
-  return {
-    id: sourceSection?.id ?? template.key,
-    key: sourceSection?.key ?? template.key,
-    n: template.n,
-    label: template.label,
-    icon: template.icon,
-    groups,
-  };
-}
-
+// Clinic records are authoritative. Defaults are seeded by the backend when a
+// clinic is created; rebuilding them here loses custom treatments and prices.
 export function normalizePricelistData(data: PricelistData): PricelistData {
-  const sectionLookup = buildSectionLookup(data.sections);
-  const sections = TREATMENT_CATALOG.map((template) => {
-    const sourceSection =
-      sectionLookup.get(norm(template.key)) ??
-      template.aliases.map((alias) => sectionLookup.get(norm(alias))).find(Boolean);
-    return toSectionFromTemplate(template, sourceSection);
-  });
-
   return {
-    settings: data.settings,
-    sections,
+    settings: { ...data.settings },
+    sections: data.sections.map((section) => ({
+      ...section,
+      groups: section.groups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => ({ ...item, price: Number(item.price) })),
+      })),
+    })),
   };
 }
 

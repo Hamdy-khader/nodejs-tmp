@@ -68,7 +68,19 @@ function makePricelistData(): PricelistData {
 }
 
 describe("treatment-catalog", () => {
-  it("preserves backend values while filling missing catalog defaults", () => {
+  it("preserves renamed and custom clinic treatments, duplicate names, zero prices and permissions", () => {
+    const data = makePricelistData();
+    const group = data.sections[0].groups[0];
+    group.items = [
+      { id: "custom-uuid", key: "implant-nobel-biocare", name: "Clinic implant", price: 987.5, note: "custom", can_edit_price: true, can_delete: false },
+      { id: "free", name: "Consultation", price: 0, note: "" },
+    ];
+    data.sections[0].groups.push({ ...group, id: "another-group", items: [{ id: "paid", name: "Consultation", price: 50, note: "" }] });
+    data.sections.push({ id: "custom-section", label: "Clinic services", n: null, icon: "package", groups: [] });
+    expect(normalizePricelistData(data)).toEqual(data);
+    expect(normalizePricelistData({ ...data, sections: [] }).sections).toEqual([]);
+  });
+  it("uses clinic records without inventing missing treatments", () => {
     const normalized = normalizePricelistData(makePricelistData());
     const implantSection = normalized.sections.find((section) => section.key === "implant");
     const nobel = implantSection?.groups[0]?.items.find(
@@ -78,17 +90,14 @@ describe("treatment-catalog", () => {
       (item) => item.name === "Implant - Straumann",
     );
 
-    expect(normalized.sections).toHaveLength(11);
+    expect(normalized.sections).toHaveLength(2);
     expect(nobel).toMatchObject({
       id: "nobel-id",
       key: "nobel-custom",
       price: 2222,
       note: "custom",
     });
-    expect(straumann).toMatchObject({
-      name: "Implant - Straumann",
-      price: 0,
-    });
+    expect(straumann).toBeUndefined();
   });
 
   it("detects built-in catalog items using normalized titles", () => {

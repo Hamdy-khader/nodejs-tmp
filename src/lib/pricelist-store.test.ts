@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { pricelistStore, toPriceSections } from "@/lib/pricelist-store";
+import { describe, expect, it, vi } from "vitest";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { pricelistStore, toPriceSections, usePricelist } from "@/lib/pricelist-store";
 import type { PricelistSection } from "@/lib/admin/api";
+
+const getPricelist = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/admin/api", () => ({ clinicApi: { pricelist: { get: getPricelist } } }));
 
 const rawSections: PricelistSection[] = [
   {
@@ -54,10 +58,31 @@ const rawSections: PricelistSection[] = [
 ];
 
 describe("pricelist-store", () => {
+  it("refreshes saved clinic prices when opening treatment selection again", async () => {
+    pricelistStore.setSections(toPriceSections(rawSections));
+    const latest = structuredClone(rawSections);
+    latest[0].groups[0].items[0].price = 123.75;
+    getPricelist.mockResolvedValueOnce({ sections: latest });
+    const { result } = renderHook(() => usePricelist());
+    await waitFor(() => expect(result.current[0].groups[0].items[0].price).toBe(123.75));
+    cleanup();
+  });
+
+  it("does not let an older load overwrite a newer clinic price edit", async () => {
+    let resolve!: (value: { sections: PricelistSection[] }) => void;
+    getPricelist.mockImplementationOnce(() => new Promise(res => { resolve = res; }));
+    const pending = pricelistStore.reload();
+    const latest = structuredClone(rawSections);
+    latest[0].groups[0].items[0].price = 456;
+    pricelistStore.setSections(toPriceSections(latest));
+    resolve({ sections: rawSections });
+    await pending;
+    expect(pricelistStore.getPriceFor("Panoramic X-Ray")).toBe(456);
+  });
   it("converts API sections into normalized price sections", () => {
     const sections = toPriceSections(rawSections);
     const generalSection = sections.find((section) => section.key === "general");
-    const item = generalSection?.groups[1]?.items.find((entry) => entry.name === "Panoramic X-Ray");
+    const item = generalSection?.groups[0]?.items.find((entry) => entry.name === "Panoramic X-Ray");
 
     expect(generalSection?.label).toBe("General");
     expect(item).toMatchObject({

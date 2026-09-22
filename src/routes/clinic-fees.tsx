@@ -109,7 +109,6 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const ICON_OPTIONS = Object.keys(ICON_MAP);
-const isPersistedId = (id: string) => /^\d+$/.test(id);
 
 function getItemPolicy(item: PricelistItem) {
   const isUsed = Boolean(item.is_used ?? (item.usage_count ?? 0) > 0);
@@ -164,7 +163,6 @@ function ClinicFeesPage() {
   const [data, setData] = useState<PricelistData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [fetchError, setFetchError] = useState("");
 
   const [setupOpen, setSetupOpen] = useState(false);
@@ -223,7 +221,6 @@ function ClinicFeesPage() {
         const saved = normalizePricelistData(await clinicApi.pricelist.save(payload));
         setData(saved);
         syncPricelistStore(saved);
-        setDirty(false);
         toast.success("Pricelist saved");
         return saved;
       } catch {
@@ -285,11 +282,6 @@ function ClinicFeesPage() {
         syncPricelistStore(next);
         return next;
       });
-
-      if (!isPersistedId(itemId)) {
-        setDirty(true);
-        return;
-      }
 
       try {
         await clinicApi.pricelist.updateItem(itemId, patch);
@@ -360,11 +352,6 @@ function ClinicFeesPage() {
         syncPricelistStore(next);
         return next;
       });
-
-      if (!isPersistedId(item.id)) {
-        setDirty(true);
-        return;
-      }
 
       try {
         await clinicApi.pricelist.deleteItem(item.id);
@@ -439,11 +426,6 @@ function ClinicFeesPage() {
             <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur">
               <DollarSign className="h-3.5 w-3.5" /> {currentCurrency.code}
             </span>
-            {dirty && (
-              <span className="rounded-full bg-white/10 px-3 py-1.5 font-medium text-white/75">
-                Unsaved changes
-              </span>
-            )}
             <Button
               variant="ghost"
               size="sm"

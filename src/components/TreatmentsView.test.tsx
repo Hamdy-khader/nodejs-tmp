@@ -3,7 +3,13 @@ import { afterEach, expect, it, vi } from "vitest";
 import { defaultTeeth, patientsStore, type TreatmentPlan } from "@/lib/patients-store";
 import { TreatmentsView } from "./TreatmentsView";
 
-vi.mock("@/lib/pricelist-store", () => ({ usePricelist: () => [], pricelistStore: {} }));
+vi.mock("@/lib/pricelist-store", () => ({ usePricelist: () => [{
+  id: "clinic", key: "clinic", label: "Clinic services", groups: [{
+    id: "group", key: "group", title: "Custom", items: [
+      { id: "clinic-item", key: "clinic-key", name: "Clinic filling", price: 187.5 },
+    ],
+  }],
+}], pricelistStore: {} }));
 vi.mock("@/components/TeethChart", () => ({
   TeethChart: ({ onSelect, highlighted }: { onSelect: (n: number) => void; highlighted: number[] }) => (
     <div>
@@ -13,6 +19,21 @@ vi.mock("@/components/TeethChart", () => ({
   ),
 }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+it("adds the selected clinic treatment with its saved default price and editable price field", async () => {
+  const add = vi.spyOn(patientsStore, "addTreatmentItemToLastVisit").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items: [] }] } as unknown as TreatmentPlan;
+  const { rerender } = render(<TreatmentsView plan={plan} />);
+  fireEvent.keyDown(screen.getByRole("button", { name: "Clinic services" }), { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Custom: Clinic filling/ }));
+  expect(add).toHaveBeenCalledWith("plan", expect.objectContaining({
+    catalogItemId: "clinic-item", name: "Clinic filling", unitPrice: 187.5, manualPriceOverride: false,
+  }));
+  const item = { ...add.mock.calls[0][1], id: "item" };
+  rerender(<TreatmentsView plan={{ ...plan, treatments: [{ id: "visit", kind: "visit", items: [item] }] }} />);
+  expect(screen.getByRole("spinbutton", { name: "Unit price for Clinic filling" })).toHaveValue(187.5);
+  expect(screen.getByText("Payable:")).toHaveTextContent("$ 187.50");
+});
 
 it("lets the user replace a visit treatment price and saves decimal prices on blur", () => {
   const update = vi.spyOn(patientsStore, "updateTreatmentItem").mockImplementation(() => {});

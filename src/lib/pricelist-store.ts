@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
 import { normalizePricelistData } from "@/lib/treatment-catalog";
+import { toast } from "sonner";
 
 export type PriceItem = {
   id: string;
@@ -34,6 +35,7 @@ export type PriceSection = {
 let state: PriceSection[] = [];
 let loaded = false;
 let inflight: Promise<void> | null = null;
+let revision = 0;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -89,9 +91,11 @@ export function toPriceSections(
 async function loadPricelist(force = false) {
   if (!force && loaded) return;
   if (inflight) return inflight;
+  const requestRevision = revision;
   inflight = (async () => {
     try {
       const res = await clinicApi.pricelist.get();
+      if (requestRevision !== revision) return;
       state = toPriceSections(res.sections);
       loaded = true;
       emit();
@@ -104,7 +108,7 @@ async function loadPricelist(force = false) {
 
 export function usePricelist() {
   useEffect(() => {
-    void loadPricelist();
+    void loadPricelist(true).catch(() => toast.error("Could not load clinic treatment prices. Please refresh."));
   }, []);
   return useSyncExternalStore(
     subscribe,
@@ -148,15 +152,15 @@ export const pricelistStore = {
   },
 
   setSections(next: PriceSection[]) {
+    revision += 1;
+    loaded = true;
     state = next;
     emit();
   },
 };
 
 export const priceUid = () => Math.random().toString(36).slice(2, 9);
-export const makePriceItem = (name: string, price = 0, note = ""): PriceItem => ({
-  id: priceUid(),
-  name,
-  price,
-  note,
-});
+export const makePriceItem = (name: string, price = 0, note = ""): PriceItem => {
+  const id = priceUid();
+  return { id, key: id, name, price, note };
+};

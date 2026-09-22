@@ -213,7 +213,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           sectionKey: section.key,
           groupKey: group.key,
           unitPrice: item.price,
-          priceDisplay: item.price > 0 ? `$ ${item.price.toFixed(0)}` : "$ 0",
+          priceDisplay: item.price > 0 ? `$ ${item.price.toFixed(2)}` : "$ 0",
         });
       });
     });
@@ -495,18 +495,18 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Subtotal</span>
-                  <span className="tabular-nums">$ {totals.subtotal.toFixed(0)}</span>
+                  <span className="tabular-nums">$ {totals.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span>Discount</span>
-                  <span className="tabular-nums">- $ {totals.discount.toFixed(0)}</span>
+                  <span className="tabular-nums">- $ {totals.discount.toFixed(2)}</span>
                 </div>
                 <div className="my-2 h-px bg-border/60" />
               </>
             )}
             <div className="flex items-center justify-between text-base font-bold uppercase text-primary">
               <span>Total</span>
-              <span className="text-foreground tabular-nums">$ {totals.total.toFixed(0)}</span>
+              <span className="text-foreground tabular-nums">$ {totals.total.toFixed(2)}</span>
             </div>
             {billingMode === "insurance" &&
               plan.insurance &&
@@ -520,11 +520,11 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                   <>
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="text-foreground">Insurance coverage (estimated)</span>
-                      <span className="font-semibold tabular-nums">$ {coverage.toFixed(0)}</span>
+                      <span className="font-semibold tabular-nums">$ {coverage.toFixed(2)}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-sm">
                       <span className="text-foreground">Out of pocket costs (estimated)</span>
-                      <span className="font-semibold tabular-nums">$ {oop.toFixed(0)}</span>
+                      <span className="font-semibold tabular-nums">$ {oop.toFixed(2)}</span>
                     </div>
                   </>
                 );
@@ -541,17 +541,17 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                   <>
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="text-foreground">Monthly payments</span>
-                      <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+                      <span className="font-semibold tabular-nums">$ {monthly.toFixed(2)}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-sm">
                       <span className="text-foreground">Total interest</span>
                       <span className="font-semibold tabular-nums">
-                        $ {totalInterest.toFixed(0)}
+                        $ {totalInterest.toFixed(2)}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-sm">
                       <span className="text-foreground">Total ({safeTerm} months)</span>
-                      <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+                      <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(2)}</span>
                     </div>
                   </>
                 );
@@ -707,11 +707,11 @@ function VisitRow({
             className="h-7 min-w-0 flex-1 text-xs" />
         </div>
         <div className="text-right text-xs text-muted-foreground">
-          Total: <span className="font-semibold text-primary">$ {total.toFixed(0)}</span>
+          Total: <span className="font-semibold text-primary">$ {total.toFixed(2)}</span>
         </div>
         <div />
         <div className="text-right text-xs text-muted-foreground">
-          Payable: <span className="font-semibold text-primary">$ {total.toFixed(0)}</span>
+          Payable: <span className="font-semibold text-primary">$ {total.toFixed(2)}</span>
         </div>
       </RowShell>
 
@@ -792,7 +792,7 @@ function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item:
           className="h-7 w-20 text-right text-xs"
         />
       </div>
-      <div className="text-right text-xs font-semibold tabular-nums">$ {price.toFixed(0)}</div>
+      <div className="text-right text-xs font-semibold tabular-nums">$ {price.toFixed(2)}</div>
       <div className="flex items-center justify-end">
         <button
           type="button"
@@ -1095,15 +1095,15 @@ function PaymentPlanDialog({
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
               <span>Monthly payments</span>
-              <span className="font-semibold tabular-nums">$ {monthly.toFixed(0)}</span>
+              <span className="font-semibold tabular-nums">$ {monthly.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
               <span>Total interest</span>
-              <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(0)}</span>
+              <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Total</span>
-              <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(0)}</span>
+              <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(2)}</span>
             </div>
           </div>
         </div>
