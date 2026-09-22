@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { defaultTeeth, type TreatmentPlan } from "@/lib/patients-store";
+import { defaultTeeth, patientsStore, type TreatmentPlan } from "@/lib/patients-store";
 import { TreatmentsView } from "./TreatmentsView";
 
 vi.mock("@/lib/pricelist-store", () => ({ usePricelist: () => [], pricelistStore: {} }));
@@ -12,7 +12,25 @@ vi.mock("@/components/TeethChart", () => ({
     </div>
   ),
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+it("lets the user replace a visit treatment price and saves decimal prices on blur", () => {
+  const update = vi.spyOn(patientsStore, "updateTreatmentItem").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [
+    { id: "visit", kind: "visit", items: [{ id: "item", name: "Filling", amount: 1, unitPrice: 150 }] },
+  ] } as unknown as TreatmentPlan;
+  render(<TreatmentsView plan={plan} />);
+  const input = screen.getByRole("spinbutton", { name: "Unit price for Filling" });
+  fireEvent.change(input, { target: { value: "" } });
+  expect(input).toHaveValue(null);
+  expect(update).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "125.5" } });
+  fireEvent.blur(input);
+  expect(update).toHaveBeenCalledWith("plan", "visit", "item", { unitPrice: 125.5 });
+  fireEvent.change(input, { target: { value: "0" } });
+  fireEvent.blur(input);
+  expect(update).toHaveBeenLastCalledWith("plan", "visit", "item", { unitPrice: 0 });
+});
 
 it("clears multiple selected teeth outside while preserving selection on treatment controls", () => {
   const plan = { id: "plan", teeth: defaultTeeth(), treatments: [] } as unknown as TreatmentPlan;

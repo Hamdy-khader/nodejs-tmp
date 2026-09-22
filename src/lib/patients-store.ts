@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { moveTreatment, type TreatmentPosition, type Placement } from "./treatment-order";
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
@@ -632,19 +633,9 @@ export const patientsStore = {
     const plan = getPlanById(planId);
     if (!plan) return;
     const next = [...(plan.treatments ?? []), row];
-    updateLocalPlan(planId, { treatments: next });
-    void clinicApi.plans
-      .createRow(planId, {
-        kind: row.kind,
-        label: "label" in row ? (row.label ?? null) : null,
-        note: row.note ?? null,
-        days: row.kind === "healing" ? (row.days ?? null) : null,
-        mode: row.kind === "discount" ? row.mode : null,
-        value: row.kind === "discount" ? row.value : null,
-        sort_order: next.length,
-      })
-      .then(() => loadPlan(plan.patientId, planId, true))
-      .catch(() => null);
+    void patientsStore.setTreatments(planId, next).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
+    });
   },
 
   updateTreatmentRow(planId: string, rowId: string, patch: Partial<TreatmentRow>) {
@@ -653,26 +644,17 @@ export const patientsStore = {
     const treatments = (plan.treatments ?? []).map((row) =>
       row.id === rowId ? ({ ...row, ...patch } as TreatmentRow) : row,
     );
-    updateLocalPlan(planId, { treatments });
-    const row = treatments.find((item) => item.id === rowId);
-    if (!row) return;
-    void clinicApi.plans.updateRow(planId, rowId, {
-      kind: row.kind,
-      label: "label" in row ? (row.label ?? null) : null,
-      note: row.note ?? null,
-      days: row.kind === "healing" ? (row.days ?? null) : null,
-      mode: row.kind === "discount" ? row.mode : null,
-      value: row.kind === "discount" ? row.value : null,
+    void patientsStore.setTreatments(planId, treatments).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
     });
   },
 
   removeTreatmentRow(planId: string, rowId: string) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    updateLocalPlan(planId, {
-      treatments: (plan.treatments ?? []).filter((row) => row.id !== rowId),
+    void patientsStore.setTreatments(planId, (plan.treatments ?? []).filter((row) => row.id !== rowId)).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
     });
-    void clinicApi.plans.deleteRow(planId, rowId);
   },
 
   addTreatmentItemToLastVisit(planId: string, item: Omit<TreatmentItem, "id">) {
@@ -694,58 +676,25 @@ export const patientsStore = {
         items: [newItem],
       };
       rows.push(newRow);
-      updateLocalPlan(planId, { treatments: rows });
-      void clinicApi.plans
-        .createRow(planId, { kind: "visit", sort_order: rows.length })
-        .then((createdRow) =>
-          clinicApi.plans.createItem(planId, String(createdRow.id), {
-            catalog_section_key: newItem.catalogSectionKey ?? null,
-            catalog_group_key: newItem.catalogGroupKey ?? null,
-            catalog_item_id: newItem.catalogItemId ?? null,
-            catalog_item_key: newItem.catalogItemKey ?? null,
-            name: newItem.name,
-            tooth_number: newItem.toothNumber ?? null,
-            amount: newItem.amount,
-            unit_price: newItem.unitPrice,
-            manual_price_override: newItem.manualPriceOverride ?? false,
-            sort_order: 1,
-          }),
-        )
-        .then(() => loadPlan(plan.patientId, planId, true))
-        .catch(() => null);
-      return;
+    } else {
+      const row = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
+      rows[lastVisitIndex] = { ...row, items: [...row.items, newItem] };
     }
-
-    const row = rows[lastVisitIndex] as Extract<TreatmentRow, { kind: "visit" }>;
-    rows[lastVisitIndex] = { ...row, items: [...row.items, newItem] };
-    updateLocalPlan(planId, { treatments: rows });
-    void clinicApi.plans
-      .createItem(planId, row.id, {
-        catalog_section_key: newItem.catalogSectionKey ?? null,
-        catalog_group_key: newItem.catalogGroupKey ?? null,
-        catalog_item_id: newItem.catalogItemId ?? null,
-        catalog_item_key: newItem.catalogItemKey ?? null,
-        name: newItem.name,
-        tooth_number: newItem.toothNumber ?? null,
-        amount: newItem.amount,
-        unit_price: newItem.unitPrice,
-        manual_price_override: newItem.manualPriceOverride ?? false,
-        sort_order: row.items.length + 1,
-      })
-      .catch(() => null);
+    void patientsStore.setTreatments(planId, rows).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
+    });
   },
 
   removeTreatmentItem(planId: string, rowId: string, itemId: string) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    updateLocalPlan(planId, {
-      treatments: (plan.treatments ?? []).map((row) =>
-        row.kind === "visit" && row.id === rowId
-          ? { ...row, items: row.items.filter((item) => item.id !== itemId) }
-          : row,
-      ),
+    void patientsStore.setTreatments(planId, (plan.treatments ?? []).map((row) =>
+      row.kind === "visit" && row.id === rowId
+        ? { ...row, items: row.items.filter((item) => item.id !== itemId) }
+        : row,
+    )).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
     });
-    void clinicApi.plans.deleteItem(planId, rowId, itemId);
   },
 
   updateTreatmentItem(
@@ -766,18 +715,8 @@ export const patientsStore = {
           }
         : row,
     );
-    updateLocalPlan(planId, { treatments });
-    const row = treatments.find((item) => item.kind === "visit" && item.id === rowId) as
-      | Extract<TreatmentRow, { kind: "visit" }>
-      | undefined;
-    const item = row?.items.find((entry) => entry.id === itemId);
-    if (!item) return;
-    void clinicApi.plans.updateItem(planId, rowId, itemId, {
-      name: item.name,
-      tooth_number: item.toothNumber ?? null,
-      amount: item.amount,
-      unit_price: item.unitPrice,
-      manual_price_override: item.manualPriceOverride ?? true,
+    void patientsStore.setTreatments(planId, treatments).catch(() => {
+      toast.error("Could not save treatments. Please save the plan again.");
     });
   },
 

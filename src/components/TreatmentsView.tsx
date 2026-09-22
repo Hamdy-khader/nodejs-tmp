@@ -734,6 +734,18 @@ function VisitRow({
 }
 
 function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item: TreatmentItem }) {
+  const [priceDraft, setPriceDraft] = useState(String(item.unitPrice));
+  useEffect(() => setPriceDraft(String(item.unitPrice)), [item.unitPrice]);
+  const savePrice = () => {
+    const value = Number(priceDraft);
+    if (!priceDraft.trim() || !Number.isFinite(value) || value < 0) {
+      setPriceDraft(String(item.unitPrice));
+      return;
+    }
+    if (value !== item.unitPrice) {
+      patientsStore.updateTreatmentItem(planId, rowId, item.id, { unitPrice: value });
+    }
+  };
   const price = item.amount * item.unitPrice;
   return (
     <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md bg-background px-2 py-1.5">
@@ -769,12 +781,14 @@ function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item:
         <Input
           type="number"
           min={0}
-          value={item.unitPrice}
-          onChange={(e) =>
-            patientsStore.updateTreatmentItem(planId, rowId, item.id, {
-              unitPrice: Math.max(0, Number(e.target.value) || 0),
-            })
-          }
+          step="0.01"
+          aria-label={`Unit price for ${item.name}`}
+          value={priceDraft}
+          onChange={(e) => setPriceDraft(e.target.value)}
+          onBlur={savePrice}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           className="h-7 w-20 text-right text-xs"
         />
       </div>

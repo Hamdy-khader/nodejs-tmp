@@ -110,6 +110,27 @@ describe("patients-store", () => {
     );
   });
 
+  it("preserves a price edited while a new visit is still saving", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    let release!: () => void;
+    setRowsMock.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+    mod.patientsStore.addTreatmentRow("plan-1", { id: "visit", kind: "visit", items: [] });
+    mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Filling", amount: 2, unitPrice: 150 });
+    const { result } = renderHook(() => mod.usePlansFor("p-1"));
+    const visit = result.current[0].treatments![0];
+    if (visit.kind !== "visit") throw new Error("Expected visit");
+    act(() => mod.patientsStore.updateTreatmentItem("plan-1", "visit", visit.items[0].id, { unitPrice: 125.5 }));
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    release();
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(3));
+    expect(setRowsMock.mock.calls[2][1][0].items[0]).toMatchObject({
+      unit_price: 125.5, amount: 2, manual_price_override: true,
+    });
+    expect(updateItemMock).not.toHaveBeenCalled();
+  });
+
   it("creates a default plan when a patient has no plans", async () => {
     plansCreateMock.mockResolvedValueOnce({
       id: "plan-1",
@@ -183,12 +204,10 @@ describe("patients-store", () => {
       unitPrice: 275,
       manualPriceOverride: true,
     });
-    expect(updateItemMock).toHaveBeenCalledWith("plan-1", "row-1", "item-1", {
-      name: "Filling",
-      tooth_number: null,
-      amount: 1,
-      unit_price: 275,
-      manual_price_override: true,
-    });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledWith("plan-1", [expect.objectContaining({
+      id: "row-1",
+      items: [expect.objectContaining({ name: "Filling", unit_price: 275, manual_price_override: true })],
+    })]));
+
   });
 });
