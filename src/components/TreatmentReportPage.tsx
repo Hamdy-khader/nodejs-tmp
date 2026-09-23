@@ -122,16 +122,19 @@ export function TreatmentReportPage({
               {page.kind === "suggested" && (
                 <ReportTreatment page={page} plan={plan} settings={settings} />
               )}
-              {page.kind === "document" && (
-                <section>
-                  <h3 style={{ fontSize: 14, margin: "14px 0" }}>{page.title}</h3>
-                  <div
-                    style={{ whiteSpace: "pre-wrap", lineHeight: 1.65, overflowWrap: "anywhere" }}
-                  >
-                    {page.body}
-                  </div>
-                </section>
-              )}
+              {page.kind === "document" &&
+                (page.documents ?? [{ title: page.title, body: page.body }]).map(
+                  (document, documentIndex) => (
+                    <section key={documentIndex}>
+                      <h3 style={{ fontSize: 14, margin: "14px 0" }}>{document.title}</h3>
+                      <div
+                        style={{ whiteSpace: "pre-wrap", lineHeight: 1.65, overflowWrap: "anywhere" }}
+                      >
+                        {document.body}
+                      </div>
+                    </section>
+                  ),
+                )}
               {page.kind === "back" && (
                 <div style={{ paddingTop: 100, textAlign: "center" }}>
                   <h2 style={{ fontSize: 26 }}>{settings.pageDesign.backCover.title}</h2>

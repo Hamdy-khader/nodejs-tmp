@@ -165,11 +165,13 @@ function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan, settings: Pl
       kind: "xray" as const, title: "X-ray", imageUrl: xray.url,
     })),
     ...buildTreatmentReportPages(plan, settings),
-    ...selectedDocs.map((doc) => ({
-      kind: "document" as const,
-      title: doc.title,
-      body: doc.body,
-    })),
+    ...(selectedDocs.length > 0
+      ? [{
+          kind: "document" as const,
+          title: "Documents",
+          documents: selectedDocs.map(({ title, body }) => ({ title, body })),
+        }]
+      : []),
 
   ];
 }

@@ -80,4 +80,35 @@ describe("treatment plan PDF export", () => {
 
     page.remove();
   });
+
+  it("breaks flowing documents before a text line that crosses the page edge", async () => {
+    const page = document.createElement("article");
+    page.dataset.pageKind = "document";
+    page.innerHTML = "<main><section>First document</section><section>Second document</section></main>";
+    vi.spyOn(document, "createRange").mockReturnValue({
+      selectNodeContents: vi.fn(),
+      getClientRects: () => [{ top: 830, bottom: 850 }],
+    } as unknown as Range);
+    mocks.html2canvas.mockImplementationOnce(async (element, options) => {
+      options.onclone(document, element);
+      return { width: 595, height: 1000 };
+    });
+    const drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,slice");
+
+    await saveTreatmentPlanPdf({
+      fileName: "documents.pdf",
+      pageElements: [page],
+      settings: { pageSize: "A4" } as PlanSettings,
+    });
+
+    expect(drawImage.mock.calls.map((call) => [call[2], call[4]])).toEqual([
+      [0, 830],
+      [830, 170],
+    ]);
+    expect(mocks.addPage).toHaveBeenCalledTimes(1);
+  });
 });

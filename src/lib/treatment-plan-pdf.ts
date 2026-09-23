@@ -7,6 +7,7 @@ export interface TreatmentPlanPdfPage {
   kind: "cover" | "status" | "suggested" | "document" | "back" | "xray";
   title: string;
   body?: string;
+  documents?: Array<{ title: string; body?: string }>;
   imageUrl?: string;
   treatmentRows?: TreatmentRow[];
   showTreatmentChart?: boolean;
@@ -64,6 +65,20 @@ export async function saveTreatmentPlanPdf(args: {
             return { top: rect.top - pageTop, bottom: rect.bottom - pageTop };
           },
         );
+        // Text documents flow across pages; keep each rendered line intact.
+        if (element.dataset.pageKind === "document") {
+          const main = element.querySelector("main");
+          if (main) {
+            const walker = _document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+            const range = _document.createRange();
+            while (walker.nextNode()) {
+              range.selectNodeContents(walker.currentNode);
+              for (const rect of Array.from(range.getClientRects())) {
+                blockBounds.push({ top: rect.top - pageTop, bottom: rect.bottom - pageTop });
+              }
+            }
+          }
+        }
       },
     });
     const pixelsPerPage = Math.floor((canvas.width * pdfHeight) / pdfWidth);
