@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultTeeth, patientsStore, type TreatmentPlan } from "@/lib/patients-store";
 import { TreatmentsView } from "./TreatmentsView";
+import { treatmentTotals } from "@/lib/treatment-pricing";
 
 vi.mock("@/lib/pricelist-store", () => ({ usePricelist: () => [{
   id: "clinic", key: "clinic", label: "Clinic services", groups: [{
@@ -20,6 +21,28 @@ vi.mock("@/components/TeethChart", () => ({
 }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it("edits the final total for an empty visit and displays a save failure", async () => {
+  const save = vi.spyOn(patientsStore, "setTreatments").mockRejectedValueOnce(new Error("Save failed")).mockResolvedValue({});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "v", kind: "visit", items: [] }] } as unknown as TreatmentPlan;
+  render(<TreatmentsView plan={plan} />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit total" }));
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Final total" }), { target: { value: "250.75" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save total" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Save failed");
+  fireEvent.click(screen.getByRole("button", { name: "Save total" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(treatmentTotals(save.mock.calls[1][1]).total).toBe(250.75);
+});
+
+it("separates financed amount from the treatment total", () => {
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [], billingMode: "payment",
+    paymentPlan: { amount: 434, term: 43, interest: 33 } } as unknown as TreatmentPlan;
+  render(<TreatmentsView plan={plan} />);
+  expect(screen.getByText("Financed amount").parentElement).toHaveTextContent("$ 434.00");
+  expect(screen.getByText(/financed amount differs/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Edit payment plan" })).toBeInTheDocument();
+});
+
 it("adds the selected clinic treatment with its saved default price and editable price field", async () => {
   const add = vi.spyOn(patientsStore, "addTreatmentItemToLastVisit").mockImplementation(() => {});
   const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items: [] }] } as unknown as TreatmentPlan;
@@ -35,7 +58,7 @@ it("adds the selected clinic treatment with its saved default price and editable
   const item = { ...add.mock.calls[0][1], id: "item" };
   rerender(<TreatmentsView plan={{ ...plan, treatments: [{ id: "visit", kind: "visit", items: [item] }] }} />);
   expect(screen.getByRole("spinbutton", { name: "Unit price for Clinic filling" })).toHaveValue(187.5);
-  expect(screen.getByText("Payable:")).toHaveTextContent("$ 187.50");
+  expect(screen.getByText("Visit subtotal").parentElement).toHaveTextContent("$ 187.50");
 });
 
 it("accepts an override before adding and allows cancelling without creating a treatment", async () => {

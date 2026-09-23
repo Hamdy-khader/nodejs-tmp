@@ -45,6 +45,20 @@ async function loadModule() {
 }
 
 describe("patients-store", () => {
+  it("adds treatments to a real visit rather than the total adjustment", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "visit", kind: "visit", items: [] },
+      { id: "adjustment", kind: "visit", note: "Manual total adjustment", items: [{ id: "fee", name: "Price adjustment", amount: 1, unit_price: 100 }] },
+    ] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Filling", amount: 1, unitPrice: 150 });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    const saved = setRowsMock.mock.calls[0][1];
+    expect(saved[0].items[0].name).toBe("Filling");
+    expect(saved[1].items).toHaveLength(1);
+    expect(saved[1].items[0].unit_price).toBe(100);
+  });
   beforeEach(() => {
     patientsListMock.mockReset().mockResolvedValue({ data: [] });
     patientsCreateMock.mockReset();

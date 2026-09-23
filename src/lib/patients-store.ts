@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { isTotalAdjustment } from "./treatment-pricing";
 import { moveTreatment, type TreatmentPosition, type Placement } from "./treatment-order";
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
@@ -663,7 +664,7 @@ export const patientsStore = {
     const rows = [...(plan.treatments ?? [])];
     let lastVisitIndex = -1;
     for (let i = rows.length - 1; i >= 0; i -= 1) {
-      if (rows[i].kind === "visit") {
+      if (rows[i].kind === "visit" && !isTotalAdjustment(rows[i])) {
         lastVisitIndex = i;
         break;
       }

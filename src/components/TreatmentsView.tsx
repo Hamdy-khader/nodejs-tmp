@@ -24,6 +24,8 @@ import { getTreatmentTeeth } from "@/lib/treatment-teeth";
 import { cn } from "@/lib/utils";
 import { TreatmentSorting, SortableTreatment, TreatmentDragHandle } from "./TreatmentSorting";
 import { toggleToothSelection } from "@/lib/tooth-selection";
+import { isTotalAdjustment, setTreatmentTotal, treatmentTotals, withoutTotalAdjustment } from "@/lib/treatment-pricing";
+import { toast } from "sonner";
 
 interface TreatmentMenuItem {
   label: string;
@@ -184,6 +186,10 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
   const [insOpen, setInsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [totalOpen, setTotalOpen] = useState(false);
+  const [totalDraft, setTotalDraft] = useState("");
+  const [totalError, setTotalError] = useState("");
+  const [savingTotal, setSavingTotal] = useState(false);
   const [pendingItems, setPendingItems] = useState<Omit<TreatmentItem, "id">[]>([]);
   const [newPrice, setNewPrice] = useState("");
   const prepareItems = (items: Omit<TreatmentItem, "id">[]) => {
@@ -203,6 +209,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   }, []);
 
   const rows = plan.treatments ?? [];
+  const visibleRows = withoutTotalAdjustment(rows);
   const billingMode = plan.billingMode ?? "insurance";
   const treatmentGroups: TreatmentGroup[] = pricelistSections.map((section) => {
     const items: TreatmentMenuItem[] = [];
@@ -308,21 +315,9 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     cancelBridge();
   };
 
-  const totals = (() => {
-    let subtotal = 0;
-    for (const r of rows) {
-      if (r.kind === "visit") {
-        for (const it of r.items) subtotal += it.amount * it.unitPrice;
-      }
-    }
-    let discount = 0;
-    for (const r of rows) {
-      if (r.kind === "discount") {
-        discount += r.mode === "percent" ? (subtotal * r.value) / 100 : r.value;
-      }
-    }
-    return { subtotal, discount, total: Math.max(0, subtotal - discount) };
-  })();
+  const totals = treatmentTotals(rows);
+  const originalTotal = treatmentTotals(withoutTotalAdjustment(rows)).total;
+  const hasTotalAdjustment = rows.some(isTotalAdjustment);
 
   return (
     <>
@@ -471,33 +466,39 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
 
-        {/* Column headers */}
-        <div className="mt-3 grid grid-cols-[1fr_90px_120px_110px_70px] items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">Edit each treatment price below, or use Edit total to set the final price.</p>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-border/60">
+        <div className="min-w-[740px] p-3">
+        <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div />
           <div>Treatment</div>
-          <div className="text-right">Amount</div>
+          <div className="text-right">Quantity</div>
           <div className="text-right">Unit price</div>
           <div className="text-right">Price</div>
           <div />
         </div>
 
-        <p className="mt-2 text-xs text-muted-foreground">Drag the grip to reorder stages or move treatments between visits. Use arrow keys when a grip is focused.</p>
-        <TreatmentSorting planId={plan.id} rows={rows}>
+        <TreatmentSorting planId={plan.id} rows={visibleRows}>
           <div className="mt-2 space-y-2">
-            {rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <p className="rounded-md bg-muted/40 px-4 py-6 text-center text-sm italic text-muted-foreground">
                 No treatments yet — add a Visit and pick a treatment from the green buttons above.
               </p>
-            ) : rows.map((row, idx) => (
+            ) : visibleRows.map((row, idx) => (
               <SortableTreatment key={row.id} position={{ kind: "row", id: row.id }}>
-                <RowRenderer row={row} index={rows.slice(0, idx).filter(r => r.kind === "visit").length} planId={plan.id} />
+                <RowRenderer row={row} index={visibleRows.slice(0, idx).filter(r => r.kind === "visit").length} planId={plan.id} />
               </SortableTreatment>
             ))}
           </div>
         </TreatmentSorting>
+        </div>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Drag the grip to reorder. Use arrow keys when a grip is focused.</p>
 
         {/* Totals + Note */}
         <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/40 pt-4 lg:grid-cols-[1fr_320px]">
-          <div className="rounded-md bg-muted/40 px-4 py-4">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+            <h3 className="mb-4 text-sm font-semibold">Price summary</h3>
             {totals.discount > 0 && (
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -511,10 +512,17 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 <div className="my-2 h-px bg-border/60" />
               </>
             )}
-            <div className="flex items-center justify-between text-base font-bold uppercase text-primary">
-              <span>Total</span>
-              <span className="text-foreground tabular-nums">$ {totals.total.toFixed(2)}</span>
+            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-primary/15 pb-4">
+              <div><p className="text-sm text-muted-foreground">Final total</p>
+              <p className="mt-1 text-3xl font-bold tracking-tight text-primary tabular-nums">$ {totals.total.toFixed(2)}</p></div>
+              <Button variant="outline" onClick={() => { setTotalDraft(totals.total.toFixed(2)); setTotalError(""); setTotalOpen(true); }}>Edit total</Button>
             </div>
+            {hasTotalAdjustment && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>Before adjustment: $ {originalTotal.toFixed(2)} · Adjustment: {totals.total >= originalTotal ? "+" : "−"}$ {Math.abs(totals.total - originalTotal).toFixed(2)}</span>
+              <Button size="sm" variant="ghost" onClick={() => {
+                void patientsStore.setTreatments(plan.id, withoutTotalAdjustment(rows)).catch(() => toast.error("Could not save the total. Please try again."));
+              }}>Reset total adjustment</Button>
+            </div>}
             {billingMode === "insurance" &&
               plan.insurance &&
               (() => {
@@ -524,7 +532,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 );
                 const oop = Math.max(0, totals.total - coverage);
                 return (
-                  <>
+                  <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
+                    <h4 className="text-sm font-semibold">Insurance estimate</h4>
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="text-foreground">Insurance coverage (estimated)</span>
                       <span className="font-semibold tabular-nums">$ {coverage.toFixed(2)}</span>
@@ -533,7 +542,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                       <span className="text-foreground">Out of pocket costs (estimated)</span>
                       <span className="font-semibold tabular-nums">$ {oop.toFixed(2)}</span>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
             {billingMode === "payment" &&
@@ -545,7 +554,11 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                 const totalPaid = monthly * safeTerm;
                 const totalInterest = Math.max(0, totalPaid - amount);
                 return (
-                  <>
+                  <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
+                    <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold">Payment schedule</h4><Button size="sm" variant="ghost" onClick={() => setPayOpen(true)}>Edit payment plan</Button></div>
+                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Financed amount</span><span className="font-semibold">$ {amount.toFixed(2)}</span></div>
+                    {Math.abs(amount - totals.total) > 0.005 && <p className="text-xs text-muted-foreground">The financed amount differs from the treatment total. Edit the payment plan to update it.</p>}
+
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="text-foreground">Monthly payments</span>
                       <span className="font-semibold tabular-nums">$ {monthly.toFixed(2)}</span>
@@ -560,12 +573,14 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
                       <span className="text-foreground">Total ({safeTerm} months)</span>
                       <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(2)}</span>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
           </div>
-          <div>
+          <div className="space-y-2">
+            <label htmlFor="treatment-note" className="text-sm font-semibold">Plan notes</label>
             <Textarea
+              id="treatment-note"
               placeholder="Note:"
               rows={3}
               value={plan.treatmentNote ?? ""}
@@ -575,6 +590,35 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
       </div>
+
+      <Dialog open={totalOpen} onOpenChange={(open) => { if (!savingTotal) setTotalOpen(open); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit final total</DialogTitle>
+            <DialogDescription>The difference is saved as a separate price adjustment or discount. Treatment unit prices stay the same.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={async (event) => {
+            event.preventDefault();
+            if (!totalDraft.trim() || savingTotal) return;
+            setSavingTotal(true);
+            setTotalError("");
+            try {
+              await patientsStore.setTreatments(plan.id, setTreatmentTotal(rows, Number(totalDraft), uid));
+              setTotalOpen(false);
+            } catch (error) {
+              setTotalError(error instanceof Error ? error.message : "Could not save the total. Please try again.");
+            } finally { setSavingTotal(false); }
+          }}>
+            <p className="text-sm text-muted-foreground">Current total: $ {totals.total.toFixed(2)}</p>
+            <label className="block space-y-2"><span className="text-sm font-medium">Final total</span>
+              <Input autoFocus type="number" min="0" step="0.01" required value={totalDraft} disabled={savingTotal}
+                onChange={(event) => setTotalDraft(event.target.value)} />
+            </label>
+            {totalError && <p role="alert" className="text-sm text-destructive">{totalError}</p>}
+            <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={savingTotal} onClick={() => setTotalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={savingTotal || !totalDraft.trim()}>{savingTotal ? "Saving…" : "Save total"}</Button></div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pendingItems.length > 0} onOpenChange={(open) => { if (!open) setPendingItems([]); }}>
         <DialogContent>
@@ -623,7 +667,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         <PaymentPlanDialog
           initial={
             plan.paymentPlan ?? {
-              amount: totals.total > 0 ? totals.total : 500,
+              amount: totals.total,
               term: 2,
               interest: 0,
             }
@@ -729,30 +773,17 @@ function VisitRow({
   const total = row.items.reduce((acc, it) => acc + it.amount * it.unitPrice, 0);
   return (
     <div className="space-y-1">
-      <RowShell
-        variant="visit"
-        onDelete={() => patientsStore.removeTreatmentRow(planId, row.id)}
-        onToggleNote={() => setOpen((v) => !v)}
-        noteOpen={open}
-        hasNote={Boolean(row.note)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
-            {index + 1}
-          </span>
-          <span className="text-sm font-bold text-primary">Visit:</span>
-          <Input aria-label="Visit description" placeholder="Stage / visit details" value={row.label ?? ""}
-            onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
-            className="h-7 min-w-0 flex-1 text-xs" />
-        </div>
-        <div className="text-right text-xs text-muted-foreground">
-          Total: <span className="font-semibold text-primary">$ {total.toFixed(2)}</span>
-        </div>
-        <div />
-        <div className="text-right text-xs text-muted-foreground">
-          Payable: <span className="font-semibold text-primary">$ {total.toFixed(2)}</span>
-        </div>
-      </RowShell>
+      <div className="flex items-center gap-3 rounded-lg bg-primary/5 px-3 py-3">
+        <TreatmentDragHandle />
+        <span className="text-sm font-semibold text-primary">{isTotalAdjustment(row) ? "Adjustment" : `Visit ${index + 1}`}</span>
+        <Input aria-label="Visit description" placeholder="Visit description" value={row.label ?? ""}
+          onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
+          className="h-9 min-w-0 flex-1 bg-background text-sm" />
+        <div className="px-3 text-right"><p className="text-[11px] text-muted-foreground">Visit subtotal</p>
+          <p className="text-base font-semibold tabular-nums">$ {total.toFixed(2)}</p></div>
+        <Button size="icon" variant="ghost" aria-label="Visit note" onClick={() => setOpen(v => !v)}><StickyNote className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" aria-label="Delete visit" onClick={() => patientsStore.removeTreatmentRow(planId, row.id)}><X className="h-4 w-4" /></Button>
+      </div>
 
       {open && (
         <NoteInput
@@ -763,6 +794,7 @@ function VisitRow({
         />
       )}
 
+      {row.items.length === 0 && <p className="rounded-lg border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">No treatments in this visit. Select a clinic treatment above to add its price.</p>}
       {row.items.map(it => (
         <SortableTreatment key={it.id} position={{ kind: "item", id: it.id }}>
           <ItemRow planId={planId} rowId={row.id} item={it} />
@@ -828,7 +860,7 @@ function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item:
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          className="h-7 w-20 text-right text-xs"
+          className="h-9 w-full bg-background text-right text-sm"
         />
       </div>
       <div className="text-right text-xs font-semibold tabular-nums">$ {price.toFixed(2)}</div>
