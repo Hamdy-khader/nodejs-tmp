@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { getTreatmentTeeth } from "@/lib/treatment-teeth";
 import { cn } from "@/lib/utils";
@@ -182,6 +184,13 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [bridgeSel, setBridgeSel] = useState<number[]>([]);
   const [insOpen, setInsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [pendingItems, setPendingItems] = useState<Omit<TreatmentItem, "id">[]>([]);
+  const [newPrice, setNewPrice] = useState("");
+  const prepareItems = (items: Omit<TreatmentItem, "id">[]) => {
+    setPendingItems(items);
+    setNewPrice(String(items[0].unitPrice));
+  };
+  const validPrice = newPrice.trim() !== "" && Number.isFinite(Number(newPrice)) && Number(newPrice) >= 0;
 
   useEffect(() => {
     const clear = (event: PointerEvent) => {
@@ -243,8 +252,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       return;
     }
     const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
-    for (const toothNumber of targets) {
-      patientsStore.addTreatmentItemToLastVisit(plan.id, {
+    prepareItems(targets.map((toothNumber) => ({
         name: item.value,
         toothNumber,
         amount: 1,
@@ -255,8 +263,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         catalogItemKey: item.itemKey,
         priceSource: item.itemId ? "catalog" : undefined,
         manualPriceOverride: false,
-      });
-    }
+      })));
   };
 
   const startBridge = () => {
@@ -287,7 +294,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     const hi = sorted[sorted.length - 1];
     // Add a treatment line summarizing the bridge span
     const bridgeName = `Bridge ${lo}-${hi}`;
-    patientsStore.addTreatmentItemToLastVisit(plan.id, {
+    prepareItems([{
       name: bridgeName,
       amount: 1,
       unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
@@ -297,7 +304,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       catalogItemKey: defaultBridgeItem?.itemKey,
       priceSource: "catalog",
       manualPriceOverride: false,
-    });
+    }]);
     cancelBridge();
   };
 
@@ -568,6 +575,38 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           </div>
         </div>
       </div>
+
+      <Dialog open={pendingItems.length > 0} onOpenChange={(open) => { if (!open) setPendingItems([]); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add treatment</DialogTitle>
+            <DialogDescription>Review the clinic price or enter a different price for this patient.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => {
+            event.preventDefault();
+            if (!validPrice) return;
+            for (const item of pendingItems) {
+              patientsStore.addTreatmentItemToLastVisit(plan.id, {
+                ...item, unitPrice: Number(newPrice), manualPriceOverride: Number(newPrice) !== item.unitPrice,
+              });
+            }
+            setPendingItems([]);
+          }}>
+            <p className="font-medium">{pendingItems[0]?.name}</p>
+            <p className="text-sm text-muted-foreground">Clinic unit price: $ {pendingItems[0]?.unitPrice.toFixed(2)}</p>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">Unit price</span>
+              <Input autoFocus type="number" min="0" step="0.01" required value={newPrice}
+                onChange={(event) => setNewPrice(event.target.value)} />
+            </label>
+            {pendingItems.length > 1 && <p className="text-sm text-muted-foreground">Applied to {pendingItems.length} selected teeth.</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingItems([])}>Cancel</Button>
+              <Button type="submit" disabled={!validPrice}>Add treatment</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {insOpen && (
         <InsuranceDialog
