@@ -122,11 +122,11 @@ export function TreatmentReportPage({
               {page.kind === "suggested" && (
                 <ReportTreatment page={page} plan={plan} settings={settings} />
               )}
-              {page.kind === "document" &&
-                (page.documents ?? [{ title: page.title, body: page.body }]).map(
+              {(page.kind === "document" || page.kind === "suggested") &&
+                (page.documents ?? (page.kind === "document" ? [{ title: page.title, body: page.body }] : [])).map(
                   (document, documentIndex) => (
                     <section key={documentIndex}>
-                      <h3 style={{ fontSize: 14, margin: "14px 0" }}>{document.title}</h3>
+                      {document.title && <h3 style={{ fontSize: 14, margin: "14px 0" }}>{document.title}</h3>}
                       <div
                         style={{ whiteSpace: "pre-wrap", lineHeight: 1.65, overflowWrap: "anywhere" }}
                       >

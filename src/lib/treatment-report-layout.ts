@@ -7,7 +7,7 @@ export function reportPageHeight(size: PageSize = "A4") {
 }
 
 // Reserve space for page headers, footers, and totals. Visit items remain atomic.
-export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSettings): TreatmentPlanPdfPage[] {
+export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSettings, documents: Array<{ title: string; body?: string }> = []): TreatmentPlanPdfPage[] {
   const pages: TreatmentPlanPdfPage[] = [];
   let rows: TreatmentRow[] = [];
   // Match the report's 48px vertical padding, 46px header and 78px footer.
@@ -63,7 +63,44 @@ export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSe
     Number(prices?.showSubtotal !== false) + Number(prices?.showTotal !== false) + Number(hasDiscount && prices?.showDiscount !== false);
   const totalsHeight = 18 + totalLines * 30 + (plan.treatmentNote ? 12 + textHeight(plan.treatmentNote, 95) : 0);
   if (available < totalsHeight) flush();
+  const remainingAfterTreatments = available - totalsHeight;
   flush();
   pages[pages.length - 1].showTotals = true;
+  // Continue document text in the free space below the final treatment totals.
+  // Subsequent documents share the current page instead of forcing a new one.
+  available = remainingAfterTreatments;
+  let page = pages[pages.length - 1];
+  const nextTextPage = () => {
+    page = { kind: "document", title: "Documents", documents: [] };
+    pages.push(page);
+    available = contentHeight;
+  };
+  for (const document of documents) {
+    let body = document.body ?? "";
+    let title = document.title;
+    do {
+      const headingHeight = title ? 28 + Math.ceil(title.length / 60) * 18 : 0;
+      if (available < headingHeight + 30) nextTextPage();
+      const maxLines = Math.max(1, Math.floor((available - headingHeight) / 15));
+      let end = 0;
+      let lines = 0;
+      while (end < body.length && lines < maxLines) {
+        const newline = body.indexOf("\n", end);
+        let lineEnd = Math.min(end + 75, body.length);
+        if (newline >= end && newline < lineEnd) lineEnd = newline + 1;
+        else if (lineEnd < body.length) {
+          const space = body.lastIndexOf(" ", lineEnd - 1);
+          if (space >= end) lineEnd = space + 1;
+        }
+        end = lineEnd;
+        lines += 1;
+      }
+      (page.documents ??= []).push({ title, body: body.slice(0, end) });
+      available -= headingHeight + Math.max(1, lines) * 15;
+      body = body.slice(end);
+      title = "";
+      if (body) nextTextPage();
+    } while (body);
+  }
   return pages;
 }

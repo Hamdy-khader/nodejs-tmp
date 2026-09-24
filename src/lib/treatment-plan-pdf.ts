@@ -66,7 +66,7 @@ export async function saveTreatmentPlanPdf(args: {
           },
         );
         // Text documents flow across pages; keep each rendered line intact.
-        if (element.dataset.pageKind === "document") {
+        if (["document", "suggested"].includes(element.dataset.pageKind ?? "")) {
           const main = element.querySelector("main");
           if (main) {
             const walker = _document.createTreeWalker(main, NodeFilter.SHOW_TEXT);

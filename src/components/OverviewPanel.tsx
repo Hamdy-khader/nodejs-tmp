@@ -164,14 +164,7 @@ function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan, settings: Pl
     ...[...(plan.xrays ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((xray) => ({
       kind: "xray" as const, title: "X-ray", imageUrl: xray.url,
     })),
-    ...buildTreatmentReportPages(plan, settings),
-    ...(selectedDocs.length > 0
-      ? [{
-          kind: "document" as const,
-          title: "Documents",
-          documents: selectedDocs.map(({ title, body }) => ({ title, body })),
-        }]
-      : []),
+    ...buildTreatmentReportPages(plan, settings, selectedDocs.map(({ title, body }) => ({ title, body }))),
 
   ];
 }

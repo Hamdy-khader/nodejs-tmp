@@ -12,6 +12,22 @@ const base: TreatmentPlan = {
   updatedAt: 0,
 };
 describe("treatment report pagination", () => {
+  it("places short documents below treatment totals on the same page", () => {
+    const docs = [{ title: "Aftercare", body: "Care instructions." }, { title: "Next steps", body: "Return for review." }];
+    const pages = buildTreatmentReportPages(base, undefined, docs);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toMatchObject({ kind: "suggested", showTotals: true, documents: docs });
+  });
+  it("fills remaining treatment space and continues text without losing or duplicating content", () => {
+    const body = "Long aftercare instructions with detailed information.\n".repeat(100);
+    const pages = buildTreatmentReportPages(base, undefined, [{ title: "Aftercare", body }, { title: "Next steps", body: "Review." }]);
+    expect(pages[0].documents?.[0].body?.length).toBeGreaterThan(0);
+    expect(pages.length).toBeGreaterThan(2);
+    const fragments = pages.flatMap(page => page.documents ?? []);
+    expect(fragments.slice(0, -1).map(doc => doc.body).join("")).toBe(body);
+    expect(fragments.filter(doc => doc.title === "Aftercare")).toHaveLength(1);
+    expect(fragments.at(-1)).toEqual({ title: "Next steps", body: "Review." });
+  });
   const settings = (pageSize: PlanSettings["pageSize"], showPrices = true): PlanSettings => ({
     language: "English", pageSize, priceListDesign: "detailed", updatedAt: 0,
     pricePage: { showPrices, showSubtotal: true, showTotal: true, showDiscount: true, showTax: false, showInsurance: false, currency: "EUR" },
