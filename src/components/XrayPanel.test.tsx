@@ -56,3 +56,28 @@ it("keeps edits and the panel open after failed saves, and allows retry", async 
   await waitFor(() => expect(screen.getByText("Zoom (100%)")).toBeInTheDocument());
   expect(patientsStore.replaceXray).toHaveBeenCalledTimes(2);
 });
+
+it("deletes the selected image without saving discarded adjustments", async () => {
+  let finish!: () => void;
+  vi.mocked(patientsStore.removeXray).mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+  setup();
+  fireEvent.click(screen.getByRole("button", { name: "Delete image" }));
+  expect(patientsStore.removeXray).toHaveBeenCalledWith("plan", "xray");
+  expect(screen.getByRole("button", { name: "Deleting…" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Close X-ray" })).toBeDisabled();
+  expect(patientsStore.replaceXray).not.toHaveBeenCalled();
+  finish();
+  await waitFor(() => expect(screen.getByText("Zoom (100%)")).toBeInTheDocument());
+});
+
+it("keeps the image and adjustments after a failed deletion so it can be retried", async () => {
+  vi.mocked(patientsStore.removeXray).mockRejectedValueOnce(new Error("Delete failed")).mockResolvedValueOnce(undefined);
+  setup();
+  fireEvent.click(screen.getByRole("button", { name: "Delete image" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Delete image" })).toBeEnabled());
+  expect(screen.getByText("Zoom (200%)")).toBeInTheDocument();
+  expect(screen.getByAltText("X-ray 1")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Delete image" }));
+  await waitFor(() => expect(screen.getByText("Zoom (100%)")).toBeInTheDocument());
+  expect(patientsStore.removeXray).toHaveBeenCalledTimes(2);
+});

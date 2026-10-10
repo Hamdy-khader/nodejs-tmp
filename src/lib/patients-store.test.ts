@@ -8,6 +8,7 @@ const plansCreateMock = vi.fn();
 const plansGetMock = vi.fn();
 const updateItemMock = vi.fn();
 const setRowsMock = vi.fn();
+const deleteXrayMock = vi.fn();
 
 async function loadModule() {
   vi.resetModules();
@@ -29,7 +30,7 @@ async function loadModule() {
         updateTooth: vi.fn(),
         listXrays: vi.fn(),
         addXray: vi.fn(),
-        deleteXray: vi.fn(),
+        deleteXray: deleteXrayMock,
         setGeneralStatuses: vi.fn(),
         setRows: setRowsMock,
         createRow: vi.fn(),
@@ -46,6 +47,19 @@ async function loadModule() {
 }
 
 describe("patients-store", () => {
+  it("only removes an X-ray after the server confirms deletion", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", xrays: [{ id: "x", url: "/x.png", sort_order: 1 }, { id: "y", url: "/y.png", sort_order: 2 }] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    deleteXrayMock.mockRejectedValueOnce(new Error("Delete failed"));
+    await expect(mod.patientsStore.removeXray("plan-1", "x")).rejects.toThrow("Delete failed");
+    const { result } = renderHook(() => mod.usePlansFor("p-1"));
+    expect(result.current[0].xrays?.map(xray => xray.id)).toEqual(["x", "y"]);
+    await act(async () => { await mod.patientsStore.removeXray("plan-1", "x"); });
+    expect(result.current[0].xrays?.map(xray => xray.id)).toEqual(["y"]);
+    expect(deleteXrayMock).toHaveBeenCalledWith("plan-1", "x");
+  });
+
   it("preserves price modes and other visits when editing assigned teeth", async () => {
     plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
       { id: "v", kind: "visit", items: [
@@ -111,6 +125,7 @@ describe("patients-store", () => {
     plansGetMock.mockReset();
     updateItemMock.mockReset().mockResolvedValue({});
     setRowsMock.mockReset().mockResolvedValue({});
+    deleteXrayMock.mockReset().mockResolvedValue(undefined);
   });
 
   it("serializes rapid reorder saves and preserves item ordering in the payload", async () => {

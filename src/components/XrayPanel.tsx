@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import {
-  ChevronLeft, ChevronRight, Maximize2, UploadCloud, X, RotateCcw, Save,
+  ChevronLeft, ChevronRight, Maximize2, UploadCloud, X, RotateCcw, Save, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -32,11 +32,14 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
   const fullscreenImage = useRef<HTMLImageElement>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const busy = saving || deleting || uploading;
   const current = xrays[index];
   const dirty = Object.keys(DEFAULT_ADJUST).some((key) => adjust[key as keyof ImageAdjust] !== DEFAULT_ADJUST[key as keyof ImageAdjust]);
 
   const save = async (): Promise<boolean> => {
-    if (savingRef.current) return false;
+    if (savingRef.current || deletingRef.current || uploading) return false;
     if (!current || !dirty) return true;
     const image = fullscreen ? fullscreenImage.current : inlineImage.current;
     const frame = image?.parentElement;
@@ -99,11 +102,24 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
     }
   };
 
-  const remove = () => {
-    if (savingRef.current) return;
+  const remove = async () => {
+    if (savingRef.current || deletingRef.current || uploading) return;
     const target = xrays[index];
     if (!target) return;
-    void patientsStore.removeXray(planId, target.id);
+    deletingRef.current = true;
+    setDeleting(true);
+    try {
+      await patientsStore.removeXray(planId, target.id);
+      setAdjust(DEFAULT_ADJUST);
+      setIndex(Math.max(0, Math.min(index, xrays.length - 2)));
+      if (xrays.length === 1) setFullscreen(false);
+      toast.success("X-ray deleted.");
+    } catch {
+      toast.error("Could not delete the X-ray. Please try again.");
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
+    }
   };
 
   const filterStyle = {
@@ -115,17 +131,20 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
 
   return (
     <>
-      <div aria-busy={saving} className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
+      <div aria-busy={busy} className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold uppercase tracking-wider text-primary">X-ray</h3>
           <div className="flex items-center gap-2">
-            <Button size="sm" disabled={!current || !dirty || saving || uploading} onClick={() => void save()}>
+            <Button size="sm" variant="destructive" disabled={!current || busy} onClick={() => void remove()}>
+              <Trash2 className="h-4 w-4" /> {deleting ? "Deleting…" : "Delete image"}
+            </Button>
+            <Button size="sm" disabled={!current || !dirty || busy} onClick={() => void save()}>
               <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save image"}
             </Button>
-            <Button size="sm" variant="outline" disabled={uploading || saving} onClick={() => fileInput.current?.click()}>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => fileInput.current?.click()}>
               <UploadCloud className="h-4 w-4" /> {uploading ? "Uploading…" : "Upload"}
             </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={saving} aria-label="Close X-ray" onClick={() => void close()}>
+            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={busy} aria-label="Close X-ray" onClick={() => void close()}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -169,7 +188,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 />
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={async () => { if (await save()) setFullscreen(true); }}
                   className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
                   title="Fullscreen"
@@ -184,20 +203,13 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 >
                   <UploadCloud className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={remove}
-                  className="absolute left-[6.25rem] top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-destructive"
-                  title="Remove"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+
 
                 {xrays.length > 1 && (
                   <>
                     <button
                       type="button"
-                      disabled={saving}
+                      disabled={busy}
                       onClick={() => void selectImage((index - 1 + xrays.length) % xrays.length)}
                       className="absolute bottom-3 left-1/2 -translate-x-[3.25rem] grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
                     >
@@ -208,7 +220,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                     </span>
                     <button
                       type="button"
-                      disabled={saving}
+                      disabled={busy}
                       onClick={() => void selectImage((index + 1) % xrays.length)}
                       className="absolute bottom-3 left-1/2 translate-x-[1.5rem] grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
                     >
@@ -237,7 +249,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
               value={adjust.zoom}
               min={50}
               max={300}
-              disabled={!current || saving}
+              disabled={!current || busy}
               onChange={(v) => setAdjust((a) => ({ ...a, zoom: v }))}
             />
             <AdjustSlider
@@ -245,7 +257,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
               value={adjust.brightness}
               min={20}
               max={200}
-              disabled={!current || saving}
+              disabled={!current || busy}
               onChange={(v) => setAdjust((a) => ({ ...a, brightness: v }))}
             />
             <AdjustSlider
@@ -253,13 +265,13 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
               value={adjust.contrast}
               min={20}
               max={200}
-              disabled={!current || saving}
+              disabled={!current || busy}
               onChange={(v) => setAdjust((a) => ({ ...a, contrast: v }))}
             />
             <Button
               variant="ghost"
               size="sm"
-              disabled={!current || saving}
+              disabled={!current || busy}
               onClick={() => setAdjust(DEFAULT_ADJUST)}
               className="w-full"
             >
@@ -272,7 +284,9 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                   <button
                     key={xray.id}
                     type="button"
-                    disabled={saving}
+                    aria-label={`Select X-ray ${i + 1}`}
+                    aria-pressed={i === index}
+                    disabled={busy}
                     onClick={() => void selectImage(i)}
                     className={cn(
                       "h-12 w-16 overflow-hidden rounded-md border-2 transition",
@@ -306,7 +320,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
               <>
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => void selectImage((index - 1 + xrays.length) % xrays.length)}
                   className="absolute left-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/25"
                 >
@@ -314,7 +328,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 </button>
                 <button
                   type="button"
-                  disabled={saving}
+                  disabled={busy}
                   onClick={() => void selectImage((index + 1) % xrays.length)}
                   className="absolute right-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/25"
                 >
@@ -326,15 +340,18 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
               </>
             )}
             <div className="absolute right-4 top-12 flex flex-col gap-3 rounded-2xl bg-white/10 p-4 text-white backdrop-blur w-[240px]">
-              <Button size="sm" disabled={!current || !dirty || saving} onClick={() => void save()}>
+              <Button size="sm" disabled={!current || !dirty || busy} onClick={() => void save()}>
                 <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save image"}
+              </Button>
+              <Button size="sm" variant="destructive" disabled={!current || busy} onClick={() => void remove()}>
+                <Trash2 className="h-4 w-4" /> {deleting ? "Deleting�" : "Delete image"}
               </Button>
               <AdjustSlider
                 label="Zoom"
                 value={adjust.zoom}
                 min={50}
                 max={300}
-                disabled={!current || saving}
+                disabled={!current || busy}
                 onChange={(v) => setAdjust((a) => ({ ...a, zoom: v }))}
                 dark
               />
@@ -343,7 +360,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 value={adjust.brightness}
                 min={20}
                 max={200}
-                disabled={!current || saving}
+                disabled={!current || busy}
                 onChange={(v) => setAdjust((a) => ({ ...a, brightness: v }))}
                 dark
               />
@@ -352,7 +369,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 value={adjust.contrast}
                 min={20}
                 max={200}
-                disabled={!current || saving}
+                disabled={!current || busy}
                 onChange={(v) => setAdjust((a) => ({ ...a, contrast: v }))}
                 dark
               />
@@ -360,7 +377,7 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setAdjust(DEFAULT_ADJUST)}
-                disabled={saving}
+                disabled={busy}
                 className="text-white hover:bg-white/15 hover:text-white"
               >
                 <RotateCcw className="h-4 w-4" /> Reset

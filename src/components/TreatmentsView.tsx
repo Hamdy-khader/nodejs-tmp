@@ -118,20 +118,11 @@ export function TreatmentsView({
   const [totalDraft, setTotalDraft] = useState("");
   const [totalError, setTotalError] = useState("");
   const [savingTotal, setSavingTotal] = useState(false);
-  const [pendingItems, setPendingItems] = useState<Omit<TreatmentItem, "id">[]>([]);
-  const [newPrice, setNewPrice] = useState("");
-  const [newPriceMode, setNewPriceMode] = useState<TreatmentPriceMode>("unit");
-  const [newAmount, setNewAmount] = useState("1");
-  const prepareItems = (items: Omit<TreatmentItem, "id">[]) => {
-    setPendingItems(items);
-    setNewPrice(String(items[0].unitPrice));
-    setNewPriceMode("unit");
-    setNewAmount(String(items.length));
+  const addItems = (items: Omit<TreatmentItem, "id">[]) => {
+    for (const item of items) patientsStore.addTreatmentItemToLastVisit(plan.id, { ...item, priceMode: "unit" });
+    setSelectedTeeth([]);
+    setBridgeSel([]);
   };
-  const validPrice =
-    newPrice.trim() !== "" && Number.isFinite(Number(newPrice)) && Number(newPrice) >= 0;
-  const validNewTreatment = (newPriceMode === "free" || newPriceMode === "in-package" || validPrice)
-    && Number.isInteger(Number(newAmount)) && Number(newAmount) >= 1;
 
   useEffect(() => {
     const clear = (event: PointerEvent) => {
@@ -200,7 +191,7 @@ export function TreatmentsView({
       return;
     }
     const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
-    prepareItems(
+    addItems(
       targets.map((toothNumber) => ({
         name: item.value,
         toothNumber,
@@ -244,7 +235,7 @@ export function TreatmentsView({
     const hi = sorted[sorted.length - 1];
     // Add a treatment line summarizing the bridge span
     const bridgeName = `Bridge ${lo}-${hi}`;
-    prepareItems([
+    addItems([
       {
         name: bridgeName,
         amount: 1,
@@ -680,80 +671,6 @@ export function TreatmentsView({
                 </Button>
                 <Button type="submit" disabled={savingTotal || !totalDraft.trim()}>
                   {savingTotal ? "Saving…" : "Save total"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={pendingItems.length > 0}
-          onOpenChange={(open) => {
-            if (!open) setPendingItems([]);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add treatment</DialogTitle>
-              <DialogDescription>
-                Review the clinic price or enter a different price for this patient.
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              className="space-y-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!validNewTreatment) return;
-                for (const [index, item] of pendingItems.entries()) {
-                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                    ...item,
-                    unitPrice: Number(newPrice),
-                    priceMode: newPriceMode,
-                    amount: Math.floor(Number(newAmount) / pendingItems.length) + (index < Number(newAmount) % pendingItems.length ? 1 : 0),
-                    manualPriceOverride: Number(newPrice) !== item.unitPrice,
-                  });
-                }
-                setPendingItems([]);
-              }}
-            >
-              <p className="font-medium">{pendingItems[0]?.name}</p>
-              <p className="text-sm text-muted-foreground">
-                Clinic unit price: <CurrencySymbol /> {pendingItems[0]?.unitPrice.toFixed(2)}
-              </p>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">Price mode</span>
-                <select className="h-9 w-full rounded border bg-background px-3" value={newPriceMode} onChange={event => setNewPriceMode(event.target.value as TreatmentPriceMode)}>
-                  {Object.entries(PRICE_MODES).map(([mode, label]) => <option key={mode} value={mode}>{label}</option>)}
-                </select>
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">Amount</span>
-                <Input type="number" min={1} step={1} required value={newAmount} onChange={event => setNewAmount(event.target.value)} />
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium">{PRICE_MODES[newPriceMode]}</span>
-                <Input
-                  autoFocus
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  disabled={newPriceMode === "free" || newPriceMode === "in-package"}
-                  value={newPrice}
-                  onChange={(event) => setNewPrice(event.target.value)}
-                />
-              </label>
-              {pendingItems.length > 1 && (
-                <p className="text-sm text-muted-foreground">
-                  Applied to {pendingItems.length} selected teeth.
-                </p>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setPendingItems([])}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={!validNewTreatment}>
-                  Add treatment
                 </Button>
               </div>
             </form>

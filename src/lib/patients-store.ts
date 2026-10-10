@@ -865,13 +865,9 @@ export const patientsStore = {
   async removeXray(planId: string, xrayId: string) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    const xrays = plan.xrays ?? [];
-    updateLocalPlan(planId, { xrays: xrays.filter((item) => item.id !== xrayId) });
-    try {
-      await clinicApi.plans.deleteXray(planId, xrayId);
-    } catch {
-      void loadPlan(plan.patientId, planId, true).catch(() => null);
-    }
+    await clinicApi.plans.deleteXray(planId, xrayId);
+    const current = getPlanById(planId);
+    if (current) updateLocalPlan(planId, { xrays: (current.xrays ?? []).filter(item => item.id !== xrayId) });
   },
 };
 

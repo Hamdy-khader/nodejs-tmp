@@ -50,21 +50,18 @@ it("edits teeth on the existing treatment row", async () => {
   expect(save).toHaveBeenCalledWith("plan", "visit", ["a"], [11, 18]);
 });
 
-it("allows choosing package price and quantity before adding selected teeth", async () => {
+it("adds selected teeth immediately and clears selection without a price popup", async () => {
   const add = vi.spyOn(patientsStore, "addTreatmentItemToLastVisit").mockImplementation(() => {});
   const plan = { id: "plan", teeth: defaultTeeth(), treatments: [] } as unknown as TreatmentPlan;
   render(<TreatmentsView plan={plan} />);
-  fireEvent.click(screen.getByRole("button", { name: "12" }));
-  fireEvent.click(screen.getByRole("button", { name: "13" }));
+  for (const name of ["12", "13"]) fireEvent.click(screen.getByRole("button", { name }));
   fireEvent.keyDown(screen.getByRole("button", { name: "Clinic services" }), { key: "ArrowDown" });
   fireEvent.click(await screen.findByRole("menuitem", { name: /Custom: Clinic filling/ }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Price mode" }), { target: { value: "package" } });
-  fireEvent.change(screen.getByRole("spinbutton", { name: "Amount" }), { target: { value: "1" } });
-  fireEvent.change(screen.getByRole("spinbutton", { name: "Package price" }), { target: { value: "500" } });
-  fireEvent.click(screen.getByRole("button", { name: "Add treatment" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByTestId("selected")).toBeEmptyDOMElement();
   expect(add.mock.calls.map(call => call[1])).toMatchObject([
-    { toothNumber: 12, priceMode: "package", amount: 1, unitPrice: 500 },
-    { toothNumber: 13, priceMode: "package", amount: 0, unitPrice: 500 },
+    { toothNumber: 12, priceMode: "unit", amount: 1, unitPrice: 187.5 },
+    { toothNumber: 13, priceMode: "unit", amount: 1, unitPrice: 187.5 },
   ]);
 });
 
@@ -118,9 +115,7 @@ it("adds the selected clinic treatment with its saved default price and editable
   const { rerender } = render(<TreatmentsView plan={plan} />);
   fireEvent.keyDown(screen.getByRole("button", { name: "Clinic services" }), { key: "ArrowDown" });
   fireEvent.click(await screen.findByRole("menuitem", { name: /Custom: Clinic filling/ }));
-  expect(add).not.toHaveBeenCalled();
-  expect(screen.getByRole("spinbutton", { name: "Unit price" })).toHaveValue(187.5);
-  fireEvent.click(screen.getByRole("button", { name: "Add treatment" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(add).toHaveBeenCalledWith("plan", expect.objectContaining({
     catalogItemId: "clinic-item", name: "Clinic filling", unitPrice: 187.5, manualPriceOverride: false,
   }));
@@ -128,26 +123,6 @@ it("adds the selected clinic treatment with its saved default price and editable
   rerender(<TreatmentsView plan={{ ...plan, treatments: [{ id: "visit", kind: "visit", items: [item] }] }} />);
   expect(screen.getByRole("spinbutton", { name: "Unit price for Clinic filling" })).toHaveValue(187.5);
   expect(screen.getByText("Visit subtotal").parentElement).toHaveTextContent("$ 187.50");
-});
-
-it("accepts an override before adding and allows cancelling without creating a treatment", async () => {
-  const add = vi.spyOn(patientsStore, "addTreatmentItemToLastVisit").mockImplementation(() => {});
-  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [] } as unknown as TreatmentPlan;
-  render(<TreatmentsView plan={plan} />);
-  const open = async () => {
-    fireEvent.keyDown(screen.getByRole("button", { name: "Clinic services" }), { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: /Custom: Clinic filling/ }));
-  };
-  await open();
-  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-  expect(add).not.toHaveBeenCalled();
-  await open();
-  const price = screen.getByRole("spinbutton", { name: "Unit price" });
-  fireEvent.change(price, { target: { value: "" } });
-  expect(screen.getByRole("button", { name: "Add treatment" })).toBeDisabled();
-  fireEvent.change(price, { target: { value: "125.5" } });
-  fireEvent.click(screen.getByRole("button", { name: "Add treatment" }));
-  expect(add).toHaveBeenCalledWith("plan", expect.objectContaining({ unitPrice: 125.5, manualPriceOverride: true }));
 });
 
 it("lets the user replace a visit treatment price and saves decimal prices on blur", () => {

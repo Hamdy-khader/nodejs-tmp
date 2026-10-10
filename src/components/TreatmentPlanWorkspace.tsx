@@ -157,11 +157,15 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   const [malocclusionPanelOpen, setMalocclusionPanelOpen] = useState(false);
   const [facialPanelOpen, setFacialPanelOpen] = useState(false);
   const [generalDialogOpen, setGeneralDialogOpen] = useState(false);
+  const [generalToothNumbers, setGeneralToothNumbers] = useState<number[]>([]);
   const [panelKey, setPanelKey] = useState(0);
+  const [panelToothNumber, setPanelToothNumber] = useState<number | null>(null);
+  const clearToothSelection = () => { setSelected(null); setSelectedTeeth([]); };
   const [open, setOpen] = useState({ general: true, upper: true, lower: true });
   const [saving, setSaving] = useState(false);
 
   const closeAllPanels = () => {
+    setPanelToothNumber(null);
     setFilledPanelOpen(false);
     setSeverityPanelOpen(false);
     setImplantPanelOpen(false);
@@ -176,6 +180,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
     setSelectedTeeth([n]);
     setSelected(n);
     closeAllPanels();
+    setPanelToothNumber(n);
     if (t.status === "filled" && FILLED_VARIANTS.includes(t.note)) setFilledPanelOpen(true);
     else if (t.status === "intact" && SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
     else if (GENERAL_SEVERITY_VARIANTS.includes(t.note)) setSeverityPanelOpen(true);
@@ -209,6 +214,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   }
 
   const selectedTooth = selected != null ? plan.teeth[selected] : null;
+  const panelTooth = panelToothNumber != null ? plan.teeth[panelToothNumber] : null;
   const canSelectStatus = selectedTooth != null;
   const showRightRail = step === "diagnosis" || step === "treatments";
 
@@ -439,7 +445,9 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                             teeth[number] = { ...teeth[number], status: group.id as ToothStatus, note: item, diagnosis: [] };
                           }
                           patientsStore.updatePlan(plan.id, { teeth });
+                          clearToothSelection();
                           if (targets.length > 1) return;
+                          setPanelToothNumber(targets[0]);
                           if (group.id === "filled" && FILLED_VARIANTS.includes(item)) {
                             setFilledPanelOpen(true);
                           }
@@ -458,6 +466,8 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                             (group.id === "general" && item === "General") ||
                             (group.id === "other" && item === "Other...")
                           ) {
+                            setGeneralToothNumbers(selectedTeeth.length ? [...selectedTeeth] : selectedTooth ? [selectedTooth.number] : []);
+                            clearToothSelection();
                             setGeneralDialogOpen(true);
                           } else if (selectedTooth) {
                             // Tooth selected — attach as note on that tooth (shows in jaw row)
@@ -465,7 +475,9 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                             const teeth = { ...plan.teeth };
                             for (const number of targets) teeth[number] = { ...teeth[number], note: item, diagnosis: [] };
                             patientsStore.updatePlan(plan.id, { teeth });
+                            clearToothSelection();
                             if (targets.length > 1) return;
+                            setPanelToothNumber(targets[0]);
                             if (MALOCCLUSION_VARIANTS.includes(item)) setMalocclusionPanelOpen(true);
                             else if (FACIAL_VARIANTS.includes(item)) setFacialPanelOpen(true);
                             else if (GENERAL_SEVERITY_VARIANTS.includes(item)) setSeverityPanelOpen(true);
@@ -605,83 +617,83 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
         <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
           <div data-diagnosis-selection>
           {filledPanelOpen &&
-            selectedTooth &&
-            selectedTooth.status === "filled" &&
-            selectedTooth.note &&
-            FILLED_VARIANTS.includes(selectedTooth.note) && (
+            panelTooth &&
+            panelTooth.status === "filled" &&
+            panelTooth.note &&
+            FILLED_VARIANTS.includes(panelTooth.note) && (
               <FilledDiagnosisPanel
                 key={`filled-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setFilledPanelOpen(false)}
               />
             )}
 
           {severityPanelOpen &&
-            selectedTooth &&
-            selectedTooth.note &&
-            ((selectedTooth.status === "intact" && SEVERITY_VARIANTS.includes(selectedTooth.note)) ||
-              GENERAL_SEVERITY_VARIANTS.includes(selectedTooth.note)) && (
+            panelTooth &&
+            panelTooth.note &&
+            ((panelTooth.status === "intact" && SEVERITY_VARIANTS.includes(panelTooth.note)) ||
+              GENERAL_SEVERITY_VARIANTS.includes(panelTooth.note)) && (
               <SeverityDiagnosisPanel
                 key={`severity-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setSeverityPanelOpen(false)}
               />
             )}
 
           {implantPanelOpen &&
-            selectedTooth &&
-            selectedTooth.status === "implant" &&
-            selectedTooth.note &&
-            IMPLANT_VARIANTS.includes(selectedTooth.note) && (
+            panelTooth &&
+            panelTooth.status === "implant" &&
+            panelTooth.note &&
+            IMPLANT_VARIANTS.includes(panelTooth.note) && (
               <ImplantDiagnosisPanel
                 key={`implant-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setImplantPanelOpen(false)}
               />
             )}
 
           {bridgePanelOpen &&
-            selectedTooth &&
-            selectedTooth.status === "bridge" &&
-            selectedTooth.note &&
-            BRIDGE_VARIANTS.includes(selectedTooth.note) && (
+            panelTooth &&
+            panelTooth.status === "bridge" &&
+            panelTooth.note &&
+            BRIDGE_VARIANTS.includes(panelTooth.note) && (
               <BridgeDiagnosisPanel
                 key={`bridge-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setBridgePanelOpen(false)}
               />
             )}
 
           {malocclusionPanelOpen &&
-            selectedTooth &&
-            selectedTooth.note &&
-            MALOCCLUSION_VARIANTS.includes(selectedTooth.note) && (
+            panelTooth &&
+            panelTooth.note &&
+            MALOCCLUSION_VARIANTS.includes(panelTooth.note) && (
               <MalocclusionDiagnosisPanel
                 key={`malocclusion-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setMalocclusionPanelOpen(false)}
               />
             )}
 
           {facialPanelOpen &&
-            selectedTooth &&
-            selectedTooth.note &&
-            FACIAL_VARIANTS.includes(selectedTooth.note) && (
+            panelTooth &&
+            panelTooth.note &&
+            FACIAL_VARIANTS.includes(panelTooth.note) && (
               <FacialDisproportionsPanel
                 key={`facial-${panelKey}`}
                 planId={plan.id}
-                tooth={selectedTooth}
-                variant={selectedTooth.note}
+                tooth={panelTooth}
+                variant={panelTooth.note}
                 onClose={() => setFacialPanelOpen(false)}
               />
             )}
@@ -810,11 +822,14 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
 
       <GeneralStatusDialog
         open={generalDialogOpen}
-        toothNumber={selectedTooth?.number}
+        toothNumber={generalToothNumbers[0]}
         onClose={() => setGeneralDialogOpen(false)}
         onSubmit={(status) => {
-          if (selectedTooth) {
-            patientsStore.setTooth(plan.id, { ...selectedTooth, note: status });
+          clearToothSelection();
+          if (generalToothNumbers.length) {
+            const teeth = { ...plan.teeth };
+            for (const number of generalToothNumbers) teeth[number] = { ...teeth[number], note: status };
+            patientsStore.updatePlan(plan.id, { teeth });
           } else {
             const next = [...(plan.generalStatuses ?? []), status];
             patientsStore.updatePlan(plan.id, { generalStatuses: next });
