@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, Save, Trash2, RotateCcw, Pencil, Undo2, Redo2,
   ScanLine, Pin, Check, ChevronDown, ChevronRight, ChevronUp, Plus,
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { XrayPanel } from "@/components/XrayPanel";
+import { XrayPanel, type XrayPanelHandle } from "@/components/XrayPanel";
 import { FilledDiagnosisPanel } from "@/components/FilledDiagnosisPanel";
 import { SeverityDiagnosisPanel } from "@/components/SeverityDiagnosisPanel";
 import { ImplantDiagnosisPanel } from "@/components/ImplantDiagnosisPanel";
@@ -149,6 +149,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   const [delOpen, setDelOpen] = useState(false);
   const [pinned, setPinned] = useState(true);
   const [xrayOpen, setXrayOpen] = useState(false);
+  const xrayEditor = useRef<XrayPanelHandle>(null);
   const [filledPanelOpen, setFilledPanelOpen] = useState(false);
   const [severityPanelOpen, setSeverityPanelOpen] = useState(false);
   const [implantPanelOpen, setImplantPanelOpen] = useState(false);
@@ -201,7 +202,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   if (!patient || !plan) {
     return (
       <div className="p-8">
-        <p className="text-muted-foreground">Plan not found.</p>
+        <p role="status" className="text-muted-foreground">Loading patient and saved plan…</p>
         <Link to="/patients" className="mt-4 inline-block text-primary underline">← Back</Link>
       </div>
     );
@@ -219,6 +220,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   const handleSavePlan = async () => {
     setSaving(true);
     try {
+      if (xrayEditor.current && !await xrayEditor.current.save()) return;
       await patientsStore.savePlan(plan.id);
       toast.success("Plan saved");
     } catch (error) {
@@ -257,7 +259,10 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
             return (
               <button
                 key={s.id}
-                onClick={() => setStep(s.id)}
+                onClick={async () => {
+                  if (xrayEditor.current && !await xrayEditor.current.save()) return;
+                  setStep(s.id);
+                }}
                 className={cn(
                   "relative flex flex-1 min-w-0 items-center justify-center gap-2 px-3 py-3 text-[11px] font-semibold uppercase tracking-wide transition-all sm:px-5 sm:py-4 sm:text-sm",
                   active
@@ -319,6 +324,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
 
           {xrayOpen && step === "treatments" && (
             <XrayPanel
+              ref={xrayEditor}
               planId={plan.id}
               xrays={plan.xrays ?? []}
               onClose={() => setXrayOpen(false)}
@@ -326,7 +332,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
           )}
 
           {step === "treatments" ? (
-            <TreatmentsView plan={plan} />
+            <TreatmentsView plan={plan} currency={patient.currency ?? "USD"} />
           ) : step === "documents" ? (
             <DocumentsPanel />
           ) : step === "overview" ? (
@@ -340,7 +346,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
           ) : (
             <>
               {/* Teeth chart + status grid (no heavy card chrome) */}
-              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,1.6fr)_minmax(240px,1fr)]">
                 <div>
                   <div>
                     <Button data-diagnosis-selection size="sm" variant={multiSelect ? "default" : "outline"} aria-pressed={multiSelect}
@@ -396,7 +402,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                           : group.label;
                       const isSingle = group.items.length <= 1;
                       const triggerClass = cn(
-                        "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
+                        "group flex h-8 items-center justify-between gap-2 rounded-full px-3 text-left text-[11px] font-semibold transition-all",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : disabled
@@ -525,6 +531,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
 
               {xrayOpen && (
                 <XrayPanel
+                  ref={xrayEditor}
                   planId={plan.id}
                   xrays={plan.xrays ?? []}
                   onClose={() => setXrayOpen(false)}
@@ -693,7 +700,10 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
             <RailButton icon={<Redo2 className="h-4 w-4" />} label="Redo" disabled />
             <RailButton icon={<RotateCcw className="h-4 w-4" />} label="Reset" onClick={() => setResetOpen(true)} />
             <div className="my-2 h-px bg-border" />
-            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={() => setXrayOpen((o) => !o)} active={xrayOpen} />
+            <RailButton icon={<ScanLine className="h-4 w-4" />} label="X-ray" onClick={async () => {
+              if (xrayEditor.current && !await xrayEditor.current.save()) return;
+              setXrayOpen((o) => !o);
+            }} active={xrayOpen} />
             {step === "treatments" && (
               <>
                 <div className="my-2 h-px bg-border" />

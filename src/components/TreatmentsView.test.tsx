@@ -21,6 +21,75 @@ vi.mock("@/components/TeethChart", () => ({
 }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+it("offers all four price modes and applies the selected mode to the whole tooth group", async () => {
+  const update = vi.spyOn(patientsStore, "updateTreatmentItems").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items: [
+    { id: "a", name: "Veneer", toothNumber: 11, amount: 1, unitPrice: 500 },
+    { id: "b", name: "Veneer", toothNumber: 12, amount: 1, unitPrice: 500 },
+  ] }] } as unknown as TreatmentPlan;
+  const { rerender } = render(<TreatmentsView plan={plan} />);
+  fireEvent.keyDown(screen.getByRole("button", { name: "Price mode for Veneer" }), { key: "ArrowDown" });
+  for (const name of ["Unit price", "Package price", "Free", "In package"]) expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Package price" }));
+  expect(update).toHaveBeenCalledWith("plan", "visit", { a: { priceMode: "package" }, b: { priceMode: "package" } });
+  for (const mode of ["package", "free", "in-package"] as const) {
+    rerender(<TreatmentsView plan={{ ...plan, treatments: plan.treatments!.map(row => row.kind === "visit" ? { ...row, items: row.items.map(item => ({ ...item, priceMode: mode })) } : row) }} />);
+    expect(screen.getByLabelText("Price for Veneer")).toHaveTextContent(mode === "package" ? "500.00" : "0.00");
+  }
+});
+
+it("edits teeth on the existing treatment row", async () => {
+  const save = vi.spyOn(patientsStore, "setTreatmentItemTeeth").mockResolvedValue({});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items: [{ id: "a", name: "Veneer", toothNumber: 11, amount: 1, unitPrice: 265 }] }] } as unknown as TreatmentPlan;
+  render(<TreatmentsView plan={plan} />);
+  fireEvent.click(screen.getByRole("button", { name: "Edit teeth for Veneer" }));
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(dialog.querySelector('button[aria-pressed="false"]')!);
+  fireEvent.click(screen.getByRole("button", { name: "Save teeth" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(save).toHaveBeenCalledWith("plan", "visit", ["a"], [11, 18]);
+});
+
+it("allows choosing package price and quantity before adding selected teeth", async () => {
+  const add = vi.spyOn(patientsStore, "addTreatmentItemToLastVisit").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [] } as unknown as TreatmentPlan;
+  render(<TreatmentsView plan={plan} />);
+  fireEvent.click(screen.getByRole("button", { name: "12" }));
+  fireEvent.click(screen.getByRole("button", { name: "13" }));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Clinic services" }), { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Custom: Clinic filling/ }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Price mode" }), { target: { value: "package" } });
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Amount" }), { target: { value: "1" } });
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Package price" }), { target: { value: "500" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add treatment" }));
+  expect(add.mock.calls.map(call => call[1])).toMatchObject([
+    { toothNumber: 12, priceMode: "package", amount: 1, unitPrice: 500 },
+    { toothNumber: 13, priceMode: "package", amount: 0, unitPrice: 500 },
+  ]);
+});
+
+it("shows matching treatment teeth on one row and edits or removes the whole group", () => {
+  const update = vi.spyOn(patientsStore, "updateTreatmentItems").mockImplementation(() => {});
+  const remove = vi.spyOn(patientsStore, "removeTreatmentItems").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items: [
+    { id: "a", name: "Veneer", toothNumber: 11, amount: 1, unitPrice: 265 },
+    { id: "b", name: "Veneer", toothNumber: 12, amount: 1, unitPrice: 265 },
+  ] }] } as unknown as TreatmentPlan;
+  const { container } = render(<TreatmentsView plan={plan} currency="EUR" />);
+  expect(container.querySelectorAll('[data-treatment-group]')).toHaveLength(1);
+  expect(screen.getByLabelText("Teeth for Veneer")).toHaveTextContent("1112");
+  expect(screen.getByLabelText("Amount for Veneer")).toHaveValue(2);
+  expect(screen.getByLabelText("Price for Veneer")).toHaveTextContent("€ 530.00");
+  fireEvent.change(screen.getByLabelText("Unit price for Veneer"), { target: { value: "200" } });
+  fireEvent.blur(screen.getByLabelText("Unit price for Veneer"));
+  expect(update).toHaveBeenLastCalledWith("plan", "visit", { a: { unitPrice: 200 }, b: { unitPrice: 200 } });
+  fireEvent.change(screen.getByLabelText("Amount for Veneer"), { target: { value: "4" } });
+  fireEvent.blur(screen.getByLabelText("Amount for Veneer"));
+  expect(update).toHaveBeenLastCalledWith("plan", "visit", { a: { amount: 2 }, b: { amount: 2 } });
+  fireEvent.click(screen.getByRole("button", { name: "Remove item" }));
+  expect(remove).toHaveBeenCalledWith("plan", "visit", ["a", "b"]);
+});
+
 it("edits the final total for an empty visit and displays a save failure", async () => {
   const save = vi.spyOn(patientsStore, "setTreatments").mockRejectedValueOnce(new Error("Save failed")).mockResolvedValue({});
   const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "v", kind: "visit", items: [] }] } as unknown as TreatmentPlan;

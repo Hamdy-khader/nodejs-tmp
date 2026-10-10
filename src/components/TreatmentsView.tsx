@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Check, ChevronDown, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
   type TreatmentPlan,
   type TreatmentRow,
   type TreatmentItem,
+  type TreatmentPriceMode,
   UPPER_TEETH,
   LOWER_TEETH,
 } from "@/lib/patients-store";
 import { pricelistStore, usePricelist } from "@/lib/pricelist-store";
-import { TeethChart, type ToothAnnotation } from "@/components/TeethChart";
+import { TeethChart } from "@/components/TeethChart";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,14 +19,49 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { getTreatmentTeeth } from "@/lib/treatment-teeth";
+import { getTreatmentTeeth, getTreatmentAnnotations } from "@/lib/treatment-teeth";
 import { cn } from "@/lib/utils";
 import { TreatmentSorting, SortableTreatment, TreatmentDragHandle } from "./TreatmentSorting";
 import { toggleToothSelection } from "@/lib/tooth-selection";
-import { isTotalAdjustment, setTreatmentTotal, treatmentTotals, withoutTotalAdjustment } from "@/lib/treatment-pricing";
+import {
+  isTotalAdjustment,
+  setTreatmentTotal,
+  treatmentTotals,
+  withoutTotalAdjustment,
+} from "@/lib/treatment-pricing";
 import { toast } from "sonner";
+import {
+  groupTreatmentItems,
+  groupAmountPatches,
+  PRICE_MODES,
+  treatmentItemsTotal,
+  type TreatmentItemGroup,
+} from "@/lib/treatment-groups";
+import "./treatment-workspace.css";
+
+const CurrencyContext = createContext("$");
+function CurrencySymbol() {
+  return <>{useContext(CurrencyContext)}</>;
+}
+function currencySymbol(currency: string) {
+  try {
+    return (
+      new Intl.NumberFormat("en", { style: "currency", currency, currencyDisplay: "narrowSymbol" })
+        .formatToParts(0)
+        .find((part) => part.type === "currency")?.value ?? currency
+    );
+  } catch {
+    return currency;
+  }
+}
 
 interface TreatmentMenuItem {
   label: string;
@@ -43,72 +79,6 @@ interface TreatmentGroup {
   label: string;
   items: TreatmentMenuItem[];
 }
-
-const TREATMENT_VISUALS: Record<
-  string,
-  { shortLabel: string; color: string; background: string; border: string }
-> = {
-  extraction: {
-    shortLabel: "EXT",
-    color: "#9f2f28",
-    background: "rgba(201, 73, 59, 0.14)",
-    border: "rgba(201, 73, 59, 0.34)",
-  },
-  filling: {
-    shortLabel: "FIL",
-    color: "#1f5fa8",
-    background: "rgba(66, 133, 244, 0.14)",
-    border: "rgba(66, 133, 244, 0.34)",
-  },
-  "root-canal-treatment": {
-    shortLabel: "RCT",
-    color: "#b54d19",
-    background: "rgba(229, 115, 35, 0.14)",
-    border: "rgba(229, 115, 35, 0.34)",
-  },
-  implant: {
-    shortLabel: "IMP",
-    color: "#38567d",
-    background: "rgba(90, 122, 167, 0.14)",
-    border: "rgba(90, 122, 167, 0.34)",
-  },
-  crown: {
-    shortLabel: "CRN",
-    color: "#8c6512",
-    background: "rgba(224, 184, 64, 0.16)",
-    border: "rgba(200, 152, 12, 0.34)",
-  },
-  veneer: {
-    shortLabel: "VNR",
-    color: "#7b4bb3",
-    background: "rgba(177, 122, 255, 0.14)",
-    border: "rgba(177, 122, 255, 0.34)",
-  },
-  bridge: {
-    shortLabel: "BRG",
-    color: "#6a2ec0",
-    background: "rgba(128, 64, 200, 0.14)",
-    border: "rgba(128, 64, 200, 0.34)",
-  },
-  dentures: {
-    shortLabel: "DNS",
-    color: "#0d766e",
-    background: "rgba(20, 184, 166, 0.14)",
-    border: "rgba(20, 184, 166, 0.34)",
-  },
-  general: {
-    shortLabel: "GEN",
-    color: "#475467",
-    background: "rgba(71, 84, 103, 0.10)",
-    border: "rgba(71, 84, 103, 0.26)",
-  },
-  other: {
-    shortLabel: "AUX",
-    color: "#475467",
-    background: "rgba(71, 84, 103, 0.10)",
-    border: "rgba(71, 84, 103, 0.26)",
-  },
-};
 
 /** Ordered FDI map across both jaws for finding "between" teeth. */
 const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
@@ -129,56 +99,14 @@ function buildTreatmentLookup(groups: TreatmentGroup[]) {
   return lookup;
 }
 
-function buildToothAnnotations(
-  rows: TreatmentRow[],
-  treatmentLookup: Map<string, string>,
-): Record<number, ToothAnnotation[]> {
-  const perTooth = new Map<number, Map<string, ToothAnnotation & { count: number }>>();
-
-  rows.forEach((row) => {
-    if (row.kind !== "visit") return;
-
-    row.items.forEach((item) => {
-      if (item.toothNumber == null) return;
-
-      const sectionId = treatmentLookup.get(norm(item.name)) ?? "general";
-      const visual = TREATMENT_VISUALS[sectionId] ?? TREATMENT_VISUALS.general;
-      const toothBucket = perTooth.get(item.toothNumber) ?? new Map();
-      const key = `${sectionId}:${item.name}`;
-      const current = toothBucket.get(key);
-
-      if (current) {
-        current.count += Math.max(1, item.amount);
-      } else {
-        toothBucket.set(key, {
-          id: key,
-          label: item.name,
-          shortLabel: visual.shortLabel,
-          color: visual.color,
-          background: visual.background,
-          border: visual.border,
-          count: Math.max(1, item.amount),
-        });
-      }
-
-      perTooth.set(item.toothNumber, toothBucket);
-    });
-  });
-
-  return Object.fromEntries(
-    [...perTooth.entries()].map(([toothNumber, bucket]) => [
-      toothNumber,
-      [...bucket.values()]
-        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-        .map(({ count, ...annotation }) => ({
-          ...annotation,
-          shortLabel: count > 1 ? `${annotation.shortLabel}${count}` : annotation.shortLabel,
-        })),
-    ]),
-  );
-}
-
-export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
+export function TreatmentsView({
+  plan,
+  currency = "USD",
+}: {
+  plan: TreatmentPlan;
+  currency?: string;
+}) {
+  const symbol = currencySymbol(currency);
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
   const pricelistSections = usePricelist();
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
@@ -192,15 +120,28 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const [savingTotal, setSavingTotal] = useState(false);
   const [pendingItems, setPendingItems] = useState<Omit<TreatmentItem, "id">[]>([]);
   const [newPrice, setNewPrice] = useState("");
+  const [newPriceMode, setNewPriceMode] = useState<TreatmentPriceMode>("unit");
+  const [newAmount, setNewAmount] = useState("1");
   const prepareItems = (items: Omit<TreatmentItem, "id">[]) => {
     setPendingItems(items);
     setNewPrice(String(items[0].unitPrice));
+    setNewPriceMode("unit");
+    setNewAmount(String(items.length));
   };
-  const validPrice = newPrice.trim() !== "" && Number.isFinite(Number(newPrice)) && Number(newPrice) >= 0;
+  const validPrice =
+    newPrice.trim() !== "" && Number.isFinite(Number(newPrice)) && Number(newPrice) >= 0;
+  const validNewTreatment = (newPriceMode === "free" || newPriceMode === "in-package" || validPrice)
+    && Number.isInteger(Number(newAmount)) && Number(newAmount) >= 1;
 
   useEffect(() => {
     const clear = (event: PointerEvent) => {
-      if (!(event.target instanceof Element) || event.target.closest('[data-tooth-number], [data-treatment-selection], [role="menu"], [role="dialog"]')) return;
+      if (
+        !(event.target instanceof Element) ||
+        event.target.closest(
+          '[data-tooth-number], [data-treatment-selection], [role="menu"], [role="dialog"]',
+        )
+      )
+        return;
       setSelectedTeeth([]);
       setBridgeSel([]);
     };
@@ -229,7 +170,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
           sectionKey: section.key,
           groupKey: group.key,
           unitPrice: item.price,
-          priceDisplay: item.price > 0 ? `$ ${item.price.toFixed(2)}` : "$ 0",
+          priceDisplay: item.price > 0 ? `${symbol} ${item.price.toFixed(2)}` : `${symbol} 0`,
         });
       });
     });
@@ -240,7 +181,7 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     };
   });
   const treatmentLookup = buildTreatmentLookup(treatmentGroups);
-  const toothAnnotations = buildToothAnnotations(rows, treatmentLookup);
+  const toothAnnotations = getTreatmentAnnotations(rows, treatmentLookup);
   const defaultBridgeItem = treatmentGroups
     .find((group) => group.id === "bridge")
     ?.items.find((item) => item.itemId);
@@ -259,7 +200,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
       return;
     }
     const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
-    prepareItems(targets.map((toothNumber) => ({
+    prepareItems(
+      targets.map((toothNumber) => ({
         name: item.value,
         toothNumber,
         amount: 1,
@@ -270,7 +212,8 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
         catalogItemKey: item.itemKey,
         priceSource: item.itemId ? "catalog" : undefined,
         manualPriceOverride: false,
-      })));
+      })),
+    );
   };
 
   const startBridge = () => {
@@ -301,17 +244,19 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
     const hi = sorted[sorted.length - 1];
     // Add a treatment line summarizing the bridge span
     const bridgeName = `Bridge ${lo}-${hi}`;
-    prepareItems([{
-      name: bridgeName,
-      amount: 1,
-      unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
-      catalogSectionKey: defaultBridgeItem?.sectionKey ?? "bridge",
-      catalogGroupKey: defaultBridgeItem?.groupKey ?? "bridge",
-      catalogItemId: defaultBridgeItem?.itemId,
-      catalogItemKey: defaultBridgeItem?.itemKey,
-      priceSource: "catalog",
-      manualPriceOverride: false,
-    }]);
+    prepareItems([
+      {
+        name: bridgeName,
+        amount: 1,
+        unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
+        catalogSectionKey: defaultBridgeItem?.sectionKey ?? "bridge",
+        catalogGroupKey: defaultBridgeItem?.groupKey ?? "bridge",
+        catalogItemId: defaultBridgeItem?.itemId,
+        catalogItemKey: defaultBridgeItem?.itemKey,
+        priceSource: "catalog",
+        manualPriceOverride: false,
+      },
+    ]);
     cancelBridge();
   };
 
@@ -320,366 +265,530 @@ export function TreatmentsView({ plan }: { plan: TreatmentPlan }) {
   const hasTotalAdjustment = rows.some(isTotalAdjustment);
 
   return (
-    <>
-      {/* Teeth + Treatment categories */}
-      <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] 2xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-2">
-          <TeethChart
-            teeth={getTreatmentTeeth(plan.teeth, rows, treatmentLookup)}
-            selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
-            onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
-            highlighted={bridgeMode ? bridgeSel : selectedTeeth}
-            annotations={toothAnnotations}
-          />
-          {bridgeMode && (
-            <div data-treatment-selection className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2">
-              <p className="text-xs font-medium text-foreground">
-                Bridge mode — pick 2+ teeth across a missing tooth
-                {bridgeSel.length > 0 && (
-                  <span className="ml-2 font-semibold text-violet-700">
-                    Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
-                  </span>
+    <CurrencyContext.Provider value={symbol}>
+      <div className="treatment-workspace">
+        {/* Teeth + Treatment categories */}
+        <div className="treatment-chart-panel">
+          <div className="treatment-chart">
+            <TeethChart
+              teeth={getTreatmentTeeth(plan.teeth, rows, treatmentLookup)}
+              baseTeeth={plan.teeth}
+              selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
+              onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
+              highlighted={bridgeMode ? bridgeSel : selectedTeeth}
+              annotations={toothAnnotations}
+            />
+            {bridgeMode && (
+              <div
+                data-treatment-selection
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2"
+              >
+                <p className="text-xs font-medium text-foreground">
+                  Bridge mode — pick 2+ teeth across a missing tooth
+                  {bridgeSel.length > 0 && (
+                    <span className="ml-2 font-semibold text-violet-700">
+                      Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
+                    </span>
+                  )}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={cancelBridge}
+                    className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={applyBridge}
+                    disabled={bridgeSel.length < 2}
+                    className="rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Apply Bridge
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div data-treatment-selection className="treatment-categories">
+            <div className="sr-only">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Clinic treatments
+              </h3>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  bridgeMode
+                    ? "bg-violet-500/15 text-violet-700"
+                    : selectedTeeth.length > 0
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted text-muted-foreground",
                 )}
+              >
+                {bridgeMode
+                  ? "Bridge mode"
+                  : selectedTeeth.length > 0
+                    ? `${selectedTeeth.length} ${selectedTeeth.length === 1 ? "tooth" : "teeth"}`
+                    : "Any tooth"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {treatmentGroups.map((group) => {
+                const isActive = group.id === "bridge" && bridgeMode;
+                return (
+                  <DropdownMenu key={group.id}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={cn(
+                          "group flex h-8 items-center justify-between gap-2 rounded-full px-3 text-left text-[11px] font-semibold transition-all",
+                          isActive
+                            ? "bg-violet-600 text-white"
+                            : "bg-[#66b96a] text-white hover:bg-[#54a85a]",
+                        )}
+                      >
+                        <span className="truncate">{group.label}</span>
+                        {isActive ? (
+                          <Check className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      className="max-h-[320px] min-w-[240px] overflow-y-auto"
+                    >
+                      {group.items?.map((item) => (
+                        <DropdownMenuItem
+                          key={`${group.id}-${item.value}-${item.label}`}
+                          onSelect={() => handlePick(group, item)}
+                          className="flex items-center justify-between gap-3 text-xs font-medium"
+                        >
+                          <span className="truncate">{item.label}</span>
+                          {item.priceDisplay && (
+                            <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                              {item.priceDisplay}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Suggested treatment header */}
+        <div className="treatment-suggestion">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
+            <h2 className="text-base font-bold tracking-tight">Your suggested treatment</h2>
+            <div className="inline-flex gap-3">
+              <button
+                onClick={() => {
+                  patientsStore.updatePlan(plan.id, { billingMode: "insurance" });
+                  setInsOpen(true);
+                }}
+                className={cn(
+                  "rounded-full border border-border px-4 py-1 text-xs font-normal transition-colors",
+                  billingMode === "insurance"
+                    ? "bg-white text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Insurance
+              </button>
+              <button
+                onClick={() => {
+                  patientsStore.updatePlan(plan.id, { billingMode: "payment" });
+                  setPayOpen(true);
+                }}
+                className={cn(
+                  "rounded-full border border-border px-4 py-1 text-xs font-normal transition-colors",
+                  billingMode === "payment"
+                    ? "bg-white text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Payment plan
+              </button>
+            </div>
+          </div>
+
+          <p className="sr-only">
+            Edit each treatment price below, or use Edit total to set the final price.
+          </p>
+          <div className="mt-2 overflow-x-auto">
+            <div className="min-w-[720px]">
+              <div className="grid grid-cols-[18px_minmax(0,1fr)_72px_112px_100px_50px] items-center gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div />
+                <div>Treatment</div>
+                <div className="text-right">Amount</div>
+                <div className="text-right">Unit price</div>
+                <div className="text-right">Price</div>
+                <div />
+              </div>
+
+              <TreatmentSorting planId={plan.id} rows={visibleRows}>
+                <div className="mt-1 space-y-3">
+                  {visibleRows.length === 0 ? (
+                    <p className="rounded-md bg-muted/40 px-4 py-6 text-center text-sm italic text-muted-foreground">
+                      No treatments yet — add a Visit and pick a treatment from the green buttons
+                      above.
+                    </p>
+                  ) : (
+                    visibleRows.map((row, idx) => (
+                      <SortableTreatment key={row.id} position={{ kind: "row", id: row.id }}>
+                        <RowRenderer
+                          row={row}
+                          index={visibleRows.slice(0, idx).filter((r) => r.kind === "visit").length}
+                          planId={plan.id}
+                        />
+                      </SortableTreatment>
+                    ))
+                  )}
+                </div>
+              </TreatmentSorting>
+            </div>
+          </div>
+          <p className="sr-only">
+            Drag the grip to reorder. Use arrow keys when a grip is focused.
+          </p>
+
+          {/* Totals + Note */}
+          <div className="treatment-total-panel">
+            <div className="min-w-0">
+              {totals.discount > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">
+                      <CurrencySymbol /> {totals.subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Discount</span>
+                    <span className="tabular-nums">
+                      - <CurrencySymbol /> {totals.discount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="my-2 h-px bg-border/60" />
+                </>
+              )}
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-primary/15 pb-4">
+                <div className="flex flex-1 items-center justify-between gap-4">
+                  <p className="text-sm font-bold text-[#1672cb]">TOTAL</p>
+                  <p aria-label="Final total" className="text-sm font-semibold tabular-nums">
+                    <CurrencySymbol /> {totals.total.toFixed(2)}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTotalDraft(totals.total.toFixed(2));
+                    setTotalError("");
+                    setTotalOpen(true);
+                  }}
+                >
+                  Edit total
+                </Button>
+              </div>
+              {hasTotalAdjustment && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    Before adjustment: <CurrencySymbol /> {originalTotal.toFixed(2)} · Adjustment:{" "}
+                    {totals.total >= originalTotal ? "+" : "−"}
+                    <CurrencySymbol /> {Math.abs(totals.total - originalTotal).toFixed(2)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      void patientsStore
+                        .setTreatments(plan.id, withoutTotalAdjustment(rows))
+                        .catch(() => toast.error("Could not save the total. Please try again."));
+                    }}
+                  >
+                    Reset total adjustment
+                  </Button>
+                </div>
+              )}
+              {billingMode === "insurance" &&
+                plan.insurance &&
+                (() => {
+                  const coverage = Math.max(
+                    0,
+                    Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
+                  );
+                  const oop = Math.max(0, totals.total - coverage);
+                  return (
+                    <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
+                      <h4 className="text-sm font-semibold">Insurance estimate</h4>
+                      <div className="mt-2 flex items-center justify-between text-sm">
+                        <span className="text-foreground">Insurance coverage (estimated)</span>
+                        <span className="font-semibold tabular-nums">
+                          <CurrencySymbol /> {coverage.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm">
+                        <span className="text-foreground">Out of pocket costs (estimated)</span>
+                        <span className="font-semibold tabular-nums">
+                          <CurrencySymbol /> {oop.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              {billingMode === "payment" &&
+                plan.paymentPlan &&
+                (() => {
+                  const { amount, term, interest } = plan.paymentPlan;
+                  const safeTerm = Math.max(1, term);
+                  const monthly =
+                    interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
+                  const totalPaid = monthly * safeTerm;
+                  const totalInterest = Math.max(0, totalPaid - amount);
+                  return (
+                    <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h4 className="text-sm font-semibold">Payment schedule</h4>
+                        <Button size="sm" variant="ghost" onClick={() => setPayOpen(true)}>
+                          Edit payment plan
+                        </Button>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Financed amount</span>
+                        <span className="font-semibold">
+                          <CurrencySymbol /> {amount.toFixed(2)}
+                        </span>
+                      </div>
+                      {Math.abs(amount - totals.total) > 0.005 && (
+                        <p className="text-xs text-muted-foreground">
+                          The financed amount differs from the treatment total. Edit the payment
+                          plan to update it.
+                        </p>
+                      )}
+
+                      <div className="mt-2 flex items-center justify-between text-sm">
+                        <span className="text-foreground">Monthly payments</span>
+                        <span className="font-semibold tabular-nums">
+                          <CurrencySymbol /> {monthly.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm">
+                        <span className="text-foreground">Total interest</span>
+                        <span className="font-semibold tabular-nums">
+                          <CurrencySymbol /> {totalInterest.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm">
+                        <span className="text-foreground">Total ({safeTerm} months)</span>
+                        <span className="font-semibold tabular-nums">
+                          <CurrencySymbol /> {totalPaid.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="treatment-note" className="text-sm font-semibold">
+                Plan notes
+              </label>
+              <Textarea
+                id="treatment-note"
+                placeholder="Note:"
+                rows={3}
+                value={plan.treatmentNote ?? ""}
+                onChange={(e) =>
+                  patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })
+                }
+                className="bg-muted/30"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Dialog
+          open={totalOpen}
+          onOpenChange={(open) => {
+            if (!savingTotal) setTotalOpen(open);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit final total</DialogTitle>
+              <DialogDescription>
+                The difference is saved as a separate price adjustment or discount. Treatment unit
+                prices stay the same.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              className="space-y-4"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (!totalDraft.trim() || savingTotal) return;
+                setSavingTotal(true);
+                setTotalError("");
+                try {
+                  await patientsStore.setTreatments(
+                    plan.id,
+                    setTreatmentTotal(rows, Number(totalDraft), uid),
+                  );
+                  setTotalOpen(false);
+                } catch (error) {
+                  setTotalError(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not save the total. Please try again.",
+                  );
+                } finally {
+                  setSavingTotal(false);
+                }
+              }}
+            >
+              <p className="text-sm text-muted-foreground">
+                Current total: <CurrencySymbol /> {totals.total.toFixed(2)}
               </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={cancelBridge}
-                  className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Final total</span>
+                <Input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={totalDraft}
+                  disabled={savingTotal}
+                  onChange={(event) => setTotalDraft(event.target.value)}
+                />
+              </label>
+              {totalError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {totalError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={savingTotal}
+                  onClick={() => setTotalOpen(false)}
                 >
                   Cancel
-                </button>
-                <button
-                  onClick={applyBridge}
-                  disabled={bridgeSel.length < 2}
-                  className="rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  Apply Bridge
-                </button>
+                </Button>
+                <Button type="submit" disabled={savingTotal || !totalDraft.trim()}>
+                  {savingTotal ? "Saving…" : "Save total"}
+                </Button>
               </div>
-            </div>
-          )}
-        </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-        <div data-treatment-selection>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Clinic treatments
-            </h3>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                bridgeMode
-                  ? "bg-violet-500/15 text-violet-700"
-                  : selectedTeeth.length > 0
-                    ? "bg-primary/15 text-primary"
-                    : "bg-muted text-muted-foreground",
-              )}
-            >
-              {bridgeMode
-                ? "Bridge mode"
-                : selectedTeeth.length > 0
-                  ? `${selectedTeeth.length} ${selectedTeeth.length === 1 ? "tooth" : "teeth"}`
-                  : "Any tooth"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {treatmentGroups.map((group) => {
-              const isActive = group.id === "bridge" && bridgeMode;
-              return (
-                <DropdownMenu key={group.id}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className={cn(
-                        "group flex h-10 items-center justify-between gap-2 rounded-md px-3 text-left text-xs font-semibold transition-all",
-                        isActive
-                          ? "bg-violet-600 text-white"
-                          : "bg-emerald-500 text-white hover:bg-emerald-600",
-                      )}
-                    >
-                      <span className="truncate">{group.label}</span>
-                      {isActive ? (
-                        <Check className="h-3.5 w-3.5 shrink-0 opacity-90" />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
-                      )}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="max-h-[320px] min-w-[240px] overflow-y-auto"
-                  >
-                    {group.items?.map((item) => (
-                      <DropdownMenuItem
-                        key={`${group.id}-${item.value}-${item.label}`}
-                        onSelect={() => handlePick(group, item)}
-                        className="flex items-center justify-between gap-3 text-xs font-medium"
-                      >
-                        <span className="truncate">{item.label}</span>
-                        {item.priceDisplay && (
-                          <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                            {item.priceDisplay}
-                          </span>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Suggested treatment header */}
-      <div className="mt-5 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
-          <h2 className="text-base font-bold tracking-tight">Your suggested treatment</h2>
-          <div className="inline-flex rounded-full border border-border/60 p-0.5">
-            <button
-              onClick={() => {
-                patientsStore.updatePlan(plan.id, { billingMode: "insurance" });
-                setInsOpen(true);
+        <Dialog
+          open={pendingItems.length > 0}
+          onOpenChange={(open) => {
+            if (!open) setPendingItems([]);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add treatment</DialogTitle>
+              <DialogDescription>
+                Review the clinic price or enter a different price for this patient.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!validNewTreatment) return;
+                for (const [index, item] of pendingItems.entries()) {
+                  patientsStore.addTreatmentItemToLastVisit(plan.id, {
+                    ...item,
+                    unitPrice: Number(newPrice),
+                    priceMode: newPriceMode,
+                    amount: Math.floor(Number(newAmount) / pendingItems.length) + (index < Number(newAmount) % pendingItems.length ? 1 : 0),
+                    manualPriceOverride: Number(newPrice) !== item.unitPrice,
+                  });
+                }
+                setPendingItems([]);
               }}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
-                billingMode === "insurance"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
             >
-              Insurance
-            </button>
-            <button
-              onClick={() => {
-                patientsStore.updatePlan(plan.id, { billingMode: "payment" });
-                setPayOpen(true);
-              }}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
-                billingMode === "payment"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Payment plan
-            </button>
-          </div>
-        </div>
-
-        <p className="mt-3 text-xs text-muted-foreground">Edit each treatment price below, or use Edit total to set the final price.</p>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-border/60">
-        <div className="min-w-[740px] p-3">
-        <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 px-2 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          <div />
-          <div>Treatment</div>
-          <div className="text-right">Quantity</div>
-          <div className="text-right">Unit price</div>
-          <div className="text-right">Price</div>
-          <div />
-        </div>
-
-        <TreatmentSorting planId={plan.id} rows={visibleRows}>
-          <div className="mt-2 space-y-2">
-            {visibleRows.length === 0 ? (
-              <p className="rounded-md bg-muted/40 px-4 py-6 text-center text-sm italic text-muted-foreground">
-                No treatments yet — add a Visit and pick a treatment from the green buttons above.
+              <p className="font-medium">{pendingItems[0]?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                Clinic unit price: <CurrencySymbol /> {pendingItems[0]?.unitPrice.toFixed(2)}
               </p>
-            ) : visibleRows.map((row, idx) => (
-              <SortableTreatment key={row.id} position={{ kind: "row", id: row.id }}>
-                <RowRenderer row={row} index={visibleRows.slice(0, idx).filter(r => r.kind === "visit").length} planId={plan.id} />
-              </SortableTreatment>
-            ))}
-          </div>
-        </TreatmentSorting>
-        </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Drag the grip to reorder. Use arrow keys when a grip is focused.</p>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Price mode</span>
+                <select className="h-9 w-full rounded border bg-background px-3" value={newPriceMode} onChange={event => setNewPriceMode(event.target.value as TreatmentPriceMode)}>
+                  {Object.entries(PRICE_MODES).map(([mode, label]) => <option key={mode} value={mode}>{label}</option>)}
+                </select>
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">Amount</span>
+                <Input type="number" min={1} step={1} required value={newAmount} onChange={event => setNewAmount(event.target.value)} />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium">{PRICE_MODES[newPriceMode]}</span>
+                <Input
+                  autoFocus
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  disabled={newPriceMode === "free" || newPriceMode === "in-package"}
+                  value={newPrice}
+                  onChange={(event) => setNewPrice(event.target.value)}
+                />
+              </label>
+              {pendingItems.length > 1 && (
+                <p className="text-sm text-muted-foreground">
+                  Applied to {pendingItems.length} selected teeth.
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setPendingItems([])}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!validNewTreatment}>
+                  Add treatment
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
-        {/* Totals + Note */}
-        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-border/40 pt-4 lg:grid-cols-[1fr_320px]">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-            <h3 className="mb-4 text-sm font-semibold">Price summary</h3>
-            {totals.discount > 0 && (
-              <>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span className="tabular-nums">$ {totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Discount</span>
-                  <span className="tabular-nums">- $ {totals.discount.toFixed(2)}</span>
-                </div>
-                <div className="my-2 h-px bg-border/60" />
-              </>
-            )}
-            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-primary/15 pb-4">
-              <div><p className="text-sm text-muted-foreground">Final total</p>
-              <p className="mt-1 text-3xl font-bold tracking-tight text-primary tabular-nums">$ {totals.total.toFixed(2)}</p></div>
-              <Button variant="outline" onClick={() => { setTotalDraft(totals.total.toFixed(2)); setTotalError(""); setTotalOpen(true); }}>Edit total</Button>
-            </div>
-            {hasTotalAdjustment && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>Before adjustment: $ {originalTotal.toFixed(2)} · Adjustment: {totals.total >= originalTotal ? "+" : "−"}$ {Math.abs(totals.total - originalTotal).toFixed(2)}</span>
-              <Button size="sm" variant="ghost" onClick={() => {
-                void patientsStore.setTreatments(plan.id, withoutTotalAdjustment(rows)).catch(() => toast.error("Could not save the total. Please try again."));
-              }}>Reset total adjustment</Button>
-            </div>}
-            {billingMode === "insurance" &&
-              plan.insurance &&
-              (() => {
-                const coverage = Math.max(
-                  0,
-                  Math.min(plan.insurance.unusedMax, totals.total) - plan.insurance.deductible,
-                );
-                const oop = Math.max(0, totals.total - coverage);
-                return (
-                  <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
-                    <h4 className="text-sm font-semibold">Insurance estimate</h4>
-                    <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-foreground">Insurance coverage (estimated)</span>
-                      <span className="font-semibold tabular-nums">$ {coverage.toFixed(2)}</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-sm">
-                      <span className="text-foreground">Out of pocket costs (estimated)</span>
-                      <span className="font-semibold tabular-nums">$ {oop.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-            {billingMode === "payment" &&
-              plan.paymentPlan &&
-              (() => {
-                const { amount, term, interest } = plan.paymentPlan;
-                const safeTerm = Math.max(1, term);
-                const monthly = interest === 0 ? amount / safeTerm : (amount / safeTerm) * interest;
-                const totalPaid = monthly * safeTerm;
-                const totalInterest = Math.max(0, totalPaid - amount);
-                return (
-                  <div className="mt-4 space-y-2 rounded-lg border border-border/60 bg-background p-4">
-                    <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold">Payment schedule</h4><Button size="sm" variant="ghost" onClick={() => setPayOpen(true)}>Edit payment plan</Button></div>
-                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Financed amount</span><span className="font-semibold">$ {amount.toFixed(2)}</span></div>
-                    {Math.abs(amount - totals.total) > 0.005 && <p className="text-xs text-muted-foreground">The financed amount differs from the treatment total. Edit the payment plan to update it.</p>}
+        {insOpen && (
+          <InsuranceDialog
+            initial={plan.insurance ?? { unusedMax: 100, deductible: 0 }}
+            onClose={() => setInsOpen(false)}
+            onSave={(v) => {
+              patientsStore.updatePlan(plan.id, { insurance: v, billingMode: "insurance" });
+              setInsOpen(false);
+            }}
+          />
+        )}
 
-                    <div className="mt-2 flex items-center justify-between text-sm">
-                      <span className="text-foreground">Monthly payments</span>
-                      <span className="font-semibold tabular-nums">$ {monthly.toFixed(2)}</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-sm">
-                      <span className="text-foreground">Total interest</span>
-                      <span className="font-semibold tabular-nums">
-                        $ {totalInterest.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-sm">
-                      <span className="text-foreground">Total ({safeTerm} months)</span>
-                      <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="treatment-note" className="text-sm font-semibold">Plan notes</label>
-            <Textarea
-              id="treatment-note"
-              placeholder="Note:"
-              rows={3}
-              value={plan.treatmentNote ?? ""}
-              onChange={(e) => patientsStore.updatePlan(plan.id, { treatmentNote: e.target.value })}
-              className="bg-muted/30"
-            />
-          </div>
-        </div>
+        {payOpen && (
+          <PaymentPlanDialog
+            initial={
+              plan.paymentPlan ?? {
+                amount: totals.total,
+                term: 2,
+                interest: 0,
+              }
+            }
+            onClose={() => setPayOpen(false)}
+            onSave={(v) => {
+              patientsStore.updatePlan(plan.id, { paymentPlan: v, billingMode: "payment" });
+              setPayOpen(false);
+            }}
+          />
+        )}
       </div>
-
-      <Dialog open={totalOpen} onOpenChange={(open) => { if (!savingTotal) setTotalOpen(open); }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit final total</DialogTitle>
-            <DialogDescription>The difference is saved as a separate price adjustment or discount. Treatment unit prices stay the same.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={async (event) => {
-            event.preventDefault();
-            if (!totalDraft.trim() || savingTotal) return;
-            setSavingTotal(true);
-            setTotalError("");
-            try {
-              await patientsStore.setTreatments(plan.id, setTreatmentTotal(rows, Number(totalDraft), uid));
-              setTotalOpen(false);
-            } catch (error) {
-              setTotalError(error instanceof Error ? error.message : "Could not save the total. Please try again.");
-            } finally { setSavingTotal(false); }
-          }}>
-            <p className="text-sm text-muted-foreground">Current total: $ {totals.total.toFixed(2)}</p>
-            <label className="block space-y-2"><span className="text-sm font-medium">Final total</span>
-              <Input autoFocus type="number" min="0" step="0.01" required value={totalDraft} disabled={savingTotal}
-                onChange={(event) => setTotalDraft(event.target.value)} />
-            </label>
-            {totalError && <p role="alert" className="text-sm text-destructive">{totalError}</p>}
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={savingTotal} onClick={() => setTotalOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={savingTotal || !totalDraft.trim()}>{savingTotal ? "Saving…" : "Save total"}</Button></div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={pendingItems.length > 0} onOpenChange={(open) => { if (!open) setPendingItems([]); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add treatment</DialogTitle>
-            <DialogDescription>Review the clinic price or enter a different price for this patient.</DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={(event) => {
-            event.preventDefault();
-            if (!validPrice) return;
-            for (const item of pendingItems) {
-              patientsStore.addTreatmentItemToLastVisit(plan.id, {
-                ...item, unitPrice: Number(newPrice), manualPriceOverride: Number(newPrice) !== item.unitPrice,
-              });
-            }
-            setPendingItems([]);
-          }}>
-            <p className="font-medium">{pendingItems[0]?.name}</p>
-            <p className="text-sm text-muted-foreground">Clinic unit price: $ {pendingItems[0]?.unitPrice.toFixed(2)}</p>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium">Unit price</span>
-              <Input autoFocus type="number" min="0" step="0.01" required value={newPrice}
-                onChange={(event) => setNewPrice(event.target.value)} />
-            </label>
-            {pendingItems.length > 1 && <p className="text-sm text-muted-foreground">Applied to {pendingItems.length} selected teeth.</p>}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPendingItems([])}>Cancel</Button>
-              <Button type="submit" disabled={!validPrice}>Add treatment</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {insOpen && (
-        <InsuranceDialog
-          initial={plan.insurance ?? { unusedMax: 100, deductible: 0 }}
-          onClose={() => setInsOpen(false)}
-          onSave={(v) => {
-            patientsStore.updatePlan(plan.id, { insurance: v, billingMode: "insurance" });
-            setInsOpen(false);
-          }}
-        />
-      )}
-
-      {payOpen && (
-        <PaymentPlanDialog
-          initial={
-            plan.paymentPlan ?? {
-              amount: totals.total,
-              term: 2,
-              interest: 0,
-            }
-          }
-          onClose={() => setPayOpen(false)}
-          onSave={(v) => {
-            patientsStore.updatePlan(plan.id, { paymentPlan: v, billingMode: "payment" });
-            setPayOpen(false);
-          }}
-        />
-      )}
-    </>
+    </CurrencyContext.Provider>
   );
 }
 
@@ -711,7 +820,7 @@ function RowShell({
   return (
     <div
       className={cn(
-        "group grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md px-2 py-2 transition-colors",
+        "group grid grid-cols-[18px_minmax(0,1fr)_72px_112px_100px_50px] items-center gap-2 rounded-md px-2 py-2 transition-colors",
         variant === "visit" ? "bg-primary/10" : "bg-muted/40 hover:bg-muted/60",
       )}
     >
@@ -770,19 +879,45 @@ function VisitRow({
   planId: string;
 }) {
   const [open, setOpen] = useState(Boolean(row.note));
-  const total = row.items.reduce((acc, it) => acc + it.amount * it.unitPrice, 0);
+  const total = treatmentItemsTotal(row.items);
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-3 rounded-lg bg-primary/5 px-3 py-3">
+    <div className="treatment-visit">
+      <div className="treatment-visit-heading">
         <TreatmentDragHandle />
-        <span className="text-sm font-semibold text-primary">{isTotalAdjustment(row) ? "Adjustment" : `Visit ${index + 1}`}</span>
-        <Input aria-label="Visit description" placeholder="Visit description" value={row.label ?? ""}
-          onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
-          className="h-9 min-w-0 flex-1 bg-background text-sm" />
-        <div className="px-3 text-right"><p className="text-[11px] text-muted-foreground">Visit subtotal</p>
-          <p className="text-base font-semibold tabular-nums">$ {total.toFixed(2)}</p></div>
-        <Button size="icon" variant="ghost" aria-label="Visit note" onClick={() => setOpen(v => !v)}><StickyNote className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" aria-label="Delete visit" onClick={() => patientsStore.removeTreatmentRow(planId, row.id)}><X className="h-4 w-4" /></Button>
+        <span className="text-sm font-semibold text-primary">
+          {isTotalAdjustment(row) ? "Adjustment" : `Visit ${index + 1}`}
+        </span>
+        <Input
+          aria-label="Visit description"
+          placeholder="Visit description"
+          value={row.label ?? ""}
+          onChange={(e) =>
+            patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })
+          }
+          className="h-7 min-w-0 flex-1 rounded-none border-0 border-b border-slate-300/60 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+        />
+        <div className="flex items-center gap-1 text-right">
+          <p className="text-[11px] text-muted-foreground">Visit subtotal</p>
+          <p className="text-xs font-bold text-[#1672cb] tabular-nums">
+            <CurrencySymbol /> {total.toFixed(2)}
+          </p>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="Visit note"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <StickyNote className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="Delete visit"
+          onClick={() => patientsStore.removeTreatmentRow(planId, row.id)}
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       {open && (
@@ -794,86 +929,190 @@ function VisitRow({
         />
       )}
 
-      {row.items.length === 0 && <p className="rounded-lg border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">No treatments in this visit. Select a clinic treatment above to add its price.</p>}
-      {row.items.map(it => (
-        <SortableTreatment key={it.id} position={{ kind: "item", id: it.id }}>
-          <ItemRow planId={planId} rowId={row.id} item={it} />
+      {row.items.length === 0 && (
+        <p className="rounded-lg border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
+          No treatments in this visit. Select a clinic treatment above to add its price.
+        </p>
+      )}
+      {groupTreatmentItems(row.items).map((group) => (
+        <SortableTreatment
+          key={group.id}
+          position={{ kind: "item", id: group.id, itemIds: group.items.map((item) => item.id) }}
+        >
+          <ItemRow planId={planId} rowId={row.id} group={group} />
         </SortableTreatment>
       ))}
     </div>
   );
 }
 
-function ItemRow({ planId, rowId, item }: { planId: string; rowId: string; item: TreatmentItem }) {
-  const [priceDraft, setPriceDraft] = useState(String(item.unitPrice));
-  useEffect(() => setPriceDraft(String(item.unitPrice)), [item.unitPrice]);
+function ItemRow({
+  planId,
+  rowId,
+  group,
+}: {
+  planId: string;
+  rowId: string;
+  group: TreatmentItemGroup;
+}) {
+  const item = group.items[0];
+  const [teethOpen, setTeethOpen] = useState(false);
+  const [teethDraft, setTeethDraft] = useState(group.teeth);
+  const [savingTeeth, setSavingTeeth] = useState(false);
+  const saveMode = (priceMode: TreatmentPriceMode) => patientsStore.updateTreatmentItems(
+    planId, rowId, Object.fromEntries(group.items.map(entry => [entry.id, { priceMode }])),
+  );
+  const [priceDraft, setPriceDraft] = useState(String(group.unitPrice));
+  const [amountDraft, setAmountDraft] = useState(String(group.amount));
+  useEffect(() => setPriceDraft(String(group.unitPrice)), [group.unitPrice]);
+  useEffect(() => setAmountDraft(String(group.amount)), [group.amount]);
   const savePrice = () => {
     const value = Number(priceDraft);
     if (!priceDraft.trim() || !Number.isFinite(value) || value < 0) {
-      setPriceDraft(String(item.unitPrice));
+      setPriceDraft(String(group.unitPrice));
       return;
     }
-    if (value !== item.unitPrice) {
+    if (value === group.unitPrice) return;
+    if (group.items.length === 1)
       patientsStore.updateTreatmentItem(planId, rowId, item.id, { unitPrice: value });
-    }
+    else
+      patientsStore.updateTreatmentItems(
+        planId,
+        rowId,
+        Object.fromEntries(group.items.map((entry) => [entry.id, { unitPrice: value }])),
+      );
   };
-  const price = item.amount * item.unitPrice;
+  const saveAmount = () => {
+    const amount = Number(amountDraft);
+    const patches = groupAmountPatches(group, amount);
+    if (!patches) {
+      setAmountDraft(String(group.amount));
+      return;
+    }
+    if (amount === group.amount) return;
+    if (group.items.length === 1)
+      patientsStore.updateTreatmentItem(planId, rowId, item.id, patches[item.id]);
+    else patientsStore.updateTreatmentItems(planId, rowId, patches);
+  };
+  const inputClass =
+    "h-7 rounded-none border-0 border-b border-slate-300/70 bg-transparent px-0 text-right text-xs shadow-none focus-visible:ring-0";
   return (
-    <div className="grid grid-cols-[24px_1fr_90px_120px_110px_70px] items-center gap-2 rounded-md bg-background px-2 py-1.5">
+    <div className="treatment-item" data-treatment-group={group.id}>
       <TreatmentDragHandle />
-      <div className="flex min-w-0 items-center gap-2 text-sm">
-        {item.toothNumber != null && (
-          <span className="grid h-5 min-w-[26px] place-items-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold text-primary tabular-nums">
-            {item.toothNumber}
-          </span>
-        )}
-        <div className="min-w-0">
-          <div className="truncate">{item.name}</div>
-          {item.manualPriceOverride && (
-            <div className="text-[10px] font-medium uppercase tracking-wide text-amber-700">
-              Plan price override
-            </div>
-          )}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span
+          className="inline-block max-w-full border-b border-slate-300/70 pb-0.5"
+          title={item.name}
+        >
+          {item.name}
+        </span>
+        <div className="flex flex-wrap gap-0.5" aria-label={`Teeth for ${item.name}`}>
+          {group.teeth.map((number) => (
+            <span
+              key={number}
+              className="grid h-[19px] w-[19px] place-items-center rounded-full border border-slate-200 bg-white text-[9px] text-slate-600"
+            >
+              {number}
+            </span>
+          ))}
         </div>
+        <button type="button" className="text-primary underline" aria-label={`Edit teeth for ${item.name}`} onClick={() => { setTeethDraft(group.teeth); setTeethOpen(true); }}>Edit teeth</button>
       </div>
-      <Input
-        type="number"
-        min={1}
-        value={item.amount}
-        onChange={(e) =>
-          patientsStore.updateTreatmentItem(planId, rowId, item.id, {
-            amount: Math.max(1, Number(e.target.value) || 1),
-          })
-        }
-        className="h-7 text-right text-xs"
-      />
       <div className="flex items-center justify-end gap-1">
-        <span className="text-xs text-muted-foreground">$</span>
+        <Input
+          type="number"
+          min={1}
+          step={1}
+          aria-label={`Amount for ${item.name}`}
+          value={amountDraft}
+          onChange={(event) => setAmountDraft(event.target.value)}
+          onBlur={saveAmount}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+          className={cn(inputClass, "w-12")}
+        />
+        <span className="text-xs">×</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-1 text-xs">
+        {(group.priceMode === "unit" || group.priceMode === "package") && <CurrencySymbol />}
         <Input
           type="number"
           min={0}
           step="0.01"
-          aria-label={`Unit price for ${item.name}`}
+          aria-label={`${PRICE_MODES[group.priceMode]} for ${item.name}`}
+          hidden={group.priceMode === "free" || group.priceMode === "in-package"}
+          disabled={group.priceMode === "free" || group.priceMode === "in-package"}
           value={priceDraft}
-          onChange={(e) => setPriceDraft(e.target.value)}
+          onChange={(event) => setPriceDraft(event.target.value)}
           onBlur={savePrice}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
           }}
-          className="h-9 w-full bg-background text-right text-sm"
+          className={cn(inputClass, "w-16", (group.priceMode === "free" || group.priceMode === "in-package") && "hidden")}
         />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="flex items-center gap-1" aria-label={`Price mode for ${item.name}`} title={PRICE_MODES[group.priceMode]}>
+              {group.priceMode !== "unit" && <span>{PRICE_MODES[group.priceMode]}</span>}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {Object.entries(PRICE_MODES).map(([mode, label]) => (
+              <DropdownMenuItem key={mode} onSelect={() => saveMode(mode as TreatmentPriceMode)}>
+                <span className="w-4">{group.priceMode === mode && <Check className="h-3.5 w-3.5" />}</span>{label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <span className="pl-1 text-muted-foreground">=</span>
       </div>
-      <div className="text-right text-xs font-semibold tabular-nums">$ {price.toFixed(2)}</div>
-      <div className="flex items-center justify-end">
+      <div className="text-right text-xs tabular-nums" aria-label={`Price for ${item.name}`}>
+        <CurrencySymbol />{" "}
+        {group.total.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </div>
+      <div className="flex justify-end">
         <button
           type="button"
-          onClick={() => patientsStore.removeTreatmentItem(planId, rowId, item.id)}
-          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           aria-label="Remove item"
+          title={`Remove ${item.name}`}
+          onClick={() =>
+            group.items.length === 1
+              ? patientsStore.removeTreatmentItem(planId, rowId, item.id)
+              : patientsStore.removeTreatmentItems(
+                  planId,
+                  rowId,
+                  group.items.map((entry) => entry.id),
+                )
+          }
+          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
+      <Dialog open={teethOpen} onOpenChange={open => { if (!savingTeeth) setTeethOpen(open); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Teeth for {item.name}</DialogTitle><DialogDescription>Select the teeth for this treatment row.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            {[UPPER_TEETH, LOWER_TEETH].map((jaw, index) => <div key={index} className="grid grid-cols-8 gap-1">
+              {jaw.map(number => <button key={number} type="button" aria-pressed={teethDraft.includes(number)} className={cn("rounded border p-2 text-sm", teethDraft.includes(number) && "bg-primary text-primary-foreground")} onClick={() => setTeethDraft(teethDraft.includes(number) ? teethDraft.filter(n => n !== number) : [...teethDraft, number])}>{number}</button>)}
+            </div>)}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={savingTeeth} onClick={() => setTeethOpen(false)}>Cancel</Button>
+            <Button disabled={savingTeeth} onClick={async () => {
+              setSavingTeeth(true);
+              try { await patientsStore.setTreatmentItemTeeth(planId, rowId, group.items.map(entry => entry.id), teethDraft); setTeethOpen(false); }
+              catch { toast.error("Could not save treatment teeth. Please try again."); }
+              finally { setSavingTeeth(false); }
+            }}>{savingTeeth ? "Saving…" : "Save teeth"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -896,9 +1135,15 @@ function HealingRow({
       >
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold italic text-foreground/80">Healing period:</span>
-          <Input aria-label="Healing period description" placeholder="Period details" value={row.label ?? ""}
-            onChange={(e) => patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })}
-            className="h-7 min-w-0 flex-1 text-xs" />
+          <Input
+            aria-label="Healing period description"
+            placeholder="Period details"
+            value={row.label ?? ""}
+            onChange={(e) =>
+              patientsStore.updateTreatmentRow(planId, row.id, { label: e.target.value })
+            }
+            className="h-7 min-w-0 flex-1 text-xs"
+          />
           <Input
             type="number"
             min={0}
@@ -954,7 +1199,7 @@ function DiscountRow({
         <div />
         <div className="flex items-center justify-end gap-1">
           <span className="text-xs text-muted-foreground">
-            {row.mode === "percent" ? "%" : "$"}
+            {row.mode === "percent" ? "%" : <CurrencySymbol />}
           </span>
           <Input
             type="number"
@@ -981,7 +1226,8 @@ function DiscountRow({
                 }
               >
                 <span className="flex items-center gap-2">
-                  {row.mode === "amount" && <Check className="h-3.5 w-3.5" />} Amount ($)
+                  {row.mode === "amount" && <Check className="h-3.5 w-3.5" />} Amount (
+                  <CurrencySymbol />)
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -1066,7 +1312,9 @@ function InsuranceDialog({
         <div className="flex items-center justify-between gap-4">
           <label className="text-sm">Unused annual max for patient:</label>
           <div className="flex items-center gap-1">
-            <span className="text-sm text-muted-foreground">$</span>
+            <span className="text-sm text-muted-foreground">
+              <CurrencySymbol />
+            </span>
             <Input
               type="number"
               min={0}
@@ -1079,7 +1327,9 @@ function InsuranceDialog({
         <div className="flex items-center justify-between gap-4">
           <label className="text-sm">Deductible:</label>
           <div className="flex items-center gap-1">
-            <span className="text-sm text-muted-foreground">$</span>
+            <span className="text-sm text-muted-foreground">
+              <CurrencySymbol />
+            </span>
             <Input
               type="number"
               min={0}
@@ -1125,7 +1375,9 @@ function PaymentPlanDialog({
           <div>
             <div className="text-xs text-muted-foreground">Amount to loan</div>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-lg font-semibold">$</span>
+              <span className="text-lg font-semibold">
+                <CurrencySymbol />
+              </span>
               <Input
                 type="number"
                 min={0}
@@ -1166,15 +1418,21 @@ function PaymentPlanDialog({
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
               <span>Monthly payments</span>
-              <span className="font-semibold tabular-nums">$ {monthly.toFixed(2)}</span>
+              <span className="font-semibold tabular-nums">
+                <CurrencySymbol /> {monthly.toFixed(2)}
+              </span>
             </div>
             <div className="flex items-center justify-between border-b border-border/40 pb-2">
               <span>Total interest</span>
-              <span className="font-semibold tabular-nums">$ {totalInterest.toFixed(2)}</span>
+              <span className="font-semibold tabular-nums">
+                <CurrencySymbol /> {totalInterest.toFixed(2)}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span>Total</span>
-              <span className="font-semibold tabular-nums">$ {totalPaid.toFixed(2)}</span>
+              <span className="font-semibold tabular-nums">
+                <CurrencySymbol /> {totalPaid.toFixed(2)}
+              </span>
             </div>
           </div>
         </div>

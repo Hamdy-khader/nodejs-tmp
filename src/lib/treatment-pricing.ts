@@ -1,4 +1,5 @@
 import type { TreatmentRow } from "./patients-store";
+import { treatmentItemsTotal } from "./treatment-groups";
 
 const adjustmentNote = "Manual total adjustment";
 export const isTotalAdjustment = (row: TreatmentRow) => row.note === adjustmentNote;
@@ -6,7 +7,7 @@ export const withoutTotalAdjustment = (rows: TreatmentRow[]) => rows.filter(row 
 
 export function treatmentTotals(rows: TreatmentRow[]) {
   const subtotal = rows.reduce((sum, row) => sum + (row.kind === "visit"
-    ? row.items.reduce((value, item) => value + item.amount * item.unitPrice, 0) : 0), 0);
+    ? treatmentItemsTotal(row.items) : 0), 0);
   const discount = rows.reduce((sum, row) => sum + (row.kind === "discount"
     ? row.mode === "percent" ? subtotal * row.value / 100 : row.value : 0), 0);
   return { subtotal, discount, total: Math.max(0, subtotal - discount) };

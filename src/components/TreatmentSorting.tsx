@@ -3,6 +3,7 @@ import { GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { patientsStore, type TreatmentRow } from "@/lib/patients-store";
 import type { Placement, TreatmentPosition } from "@/lib/treatment-order";
+import { groupTreatmentItems } from "@/lib/treatment-groups";
 
 const Sorting = createContext<{
   dragged: React.RefObject<TreatmentPosition | null>;
@@ -75,7 +76,7 @@ export function TreatmentDragHandle() {
       event.preventDefault();
       const positions: TreatmentPosition[] = position.kind === "row"
         ? sorting.rows.map(r => ({ kind: "row", id: r.id }))
-        : sorting.rows.flatMap(r => r.kind === "visit" && r.items.some(i => i.id === position.id) ? r.items.map(i => ({ kind: "item" as const, id: i.id })) : []);
+        : sorting.rows.flatMap(r => r.kind === "visit" && r.items.some(i => i.id === position.id) ? groupTreatmentItems(r.items).map(group => ({ kind: "item" as const, id: group.id, itemIds: group.items.map(item => item.id) })) : []);
       const index = positions.findIndex(p => p.id === position.id && p.kind === position.kind);
       const target = positions[index + (event.key === "ArrowUp" ? -1 : 1)];
       if (target) sorting.move(position, target, event.key === "ArrowUp" ? "before" : "after");

@@ -1,3 +1,4 @@
+import { getDentalVisual } from "./dental-visuals";
 import type { PricelistData } from "@/lib/admin/api";
 
 type CatalogItemTemplate = {
@@ -350,21 +351,13 @@ export function getToothStatusForTreatment(
   sectionId: string,
   treatmentName: string,
 ): "missing" | "filled" | "root-treated" | "implant" | "crown" | "bridge" | null {
-  const item = norm(treatmentName);
-
-  if (sectionId === "extraction") return "missing";
-  if (sectionId === "filling") return "filled";
-  if (sectionId === "root-canal-treatment") return "root-treated";
-  if (sectionId === "implant") return "implant";
-  if (sectionId === "crown" || sectionId === "veneer") return "crown";
-  if (sectionId === "bridge") return "bridge";
-
-  if (sectionId === "dentures") {
-    if (item.includes("temporary crown")) return "crown";
-    if (item.includes("temporary bridge")) return "bridge";
-    return null;
-  }
-
+  const { mark } = getDentalVisual(treatmentName, { treatment: true, section: sectionId });
+  if (["extraction", "surgical", "implantRemoval"].includes(mark)) return "missing";
+  if (["composite", "amalgam", "inlay", "onlay", "temporary", "medicated"].includes(mark)) return "filled";
+  if (["root", "rootOne", "rootTwo", "rootThree", "retreatment", "post", "pin"].includes(mark)) return "root-treated";
+  if (["implant", "abutment", "screw"].includes(mark)) return "implant";
+  if (["crown", "veneer"].includes(mark)) return "crown";
+  if (mark === "bridge") return "bridge";
   return null;
 }
 

@@ -552,6 +552,13 @@ export const clinicApi = {
     },
     deleteXray: (planId: string, xrayId: string): Promise<void> =>
       clinicReq("DELETE", `/clinic/plans/${planId}/xrays/${xrayId}`),
+    downloadXray: (planId: string, xrayId: string): Promise<Blob> =>
+      clinicDownloadReq(`/clinic/plans/${planId}/xrays/${xrayId}/image`),
+    replaceXray: (planId: string, xrayId: string, file: File): Promise<XrayRecord> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return clinicUploadReq<XrayRecord>(`/clinic/plans/${planId}/xrays/${xrayId}/image`, formData);
+    },
     setGeneralStatuses: (planId: string, items: { label: string }[]): Promise<unknown> =>
       clinicReq("PUT", `/clinic/plans/${planId}/general-statuses`, { items }),
     setRows: (planId: string, rows: unknown[]): Promise<unknown> =>

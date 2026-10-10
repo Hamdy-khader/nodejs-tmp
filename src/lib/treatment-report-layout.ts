@@ -1,6 +1,11 @@
 import type { TreatmentPlan, TreatmentRow } from "./patients-store";
 import type { TreatmentPlanPdfPage } from "./treatment-plan-pdf";
 import type { PlanSettings, PageSize } from "./plan-settings-store";
+import { groupTreatmentItems } from "./treatment-groups";
+
+export const REPORT_XRAY_HEIGHT = 180;
+// Image plus caption and vertical spacing; shared with the report renderer.
+export const REPORT_XRAY_BLOCK_HEIGHT = REPORT_XRAY_HEIGHT + 36;
 
 export function reportPageHeight(size: PageSize = "A4") {
   return size === "Letter" ? 770 : size === "Legal" ? 980 : 842;
@@ -45,15 +50,15 @@ export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSe
       available -= headerHeight;
     };
     addHeader();
-    for (const item of row.items) {
-      const height = 19 + textHeight(`${item.name}${item.toothNumber == null ? "" : ` (${item.toothNumber})`}`, 55);
+    for (const group of groupTreatmentItems(row.items)) {
+      const height = Math.max(19 + textHeight(`${group.items[0].name}${group.teeth.length ? ` (${group.teeth.join(", ")})` : ""}`, 55), group.priceMode === "package" ? 58 : 0);
       if (available < height) {
         flush();
         fragment = { ...row, note: undefined, items: [] };
         headerHeight = 50 + textHeight(row.label);
         addHeader();
       }
-      fragment.items.push(item);
+      fragment.items.push(...group.items);
       available -= height;
     }
   }
@@ -66,21 +71,25 @@ export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSe
   const remainingAfterTreatments = available - totalsHeight;
   flush();
   pages[pages.length - 1].showTotals = true;
-  // Continue document text in the free space below the final treatment totals.
-  // Subsequent documents share the current page instead of forcing a new one.
+  // Images and document text share the free space below the final treatment totals.
   available = remainingAfterTreatments;
   let page = pages[pages.length - 1];
-  const nextTextPage = () => {
+  const nextContentPage = () => {
     page = { kind: "document", title: "Documents", documents: [] };
     pages.push(page);
     available = contentHeight;
   };
+  for (const [index, xray] of [...(plan.xrays ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).entries()) {
+    if (available < REPORT_XRAY_BLOCK_HEIGHT) nextContentPage();
+    (page.xrays ??= []).push({ title: `X-ray ${index + 1}`, imageUrl: xray.url });
+    available -= REPORT_XRAY_BLOCK_HEIGHT;
+  }
   for (const document of documents) {
     let body = document.body ?? "";
     let title = document.title;
     do {
       const headingHeight = title ? 28 + Math.ceil(title.length / 60) * 18 : 0;
-      if (available < headingHeight + 30) nextTextPage();
+      if (available < headingHeight + 30) nextContentPage();
       const maxLines = Math.max(1, Math.floor((available - headingHeight) / 15));
       let end = 0;
       let lines = 0;
@@ -99,7 +108,7 @@ export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSe
       available -= headingHeight + Math.max(1, lines) * 15;
       body = body.slice(end);
       title = "";
-      if (body) nextTextPage();
+      if (body) nextContentPage();
     } while (body);
   }
   return pages;

@@ -21,6 +21,8 @@ export interface ToothState {
   diagnosis?: string[];
 }
 
+export type TreatmentPriceMode = "unit" | "package" | "free" | "in-package";
+
 export interface TreatmentItem {
   id: string;
   name: string;
@@ -31,6 +33,7 @@ export interface TreatmentItem {
   toothNumber?: number;
   amount: number;
   unitPrice: number;
+  priceMode?: TreatmentPriceMode;
   priceSource?: "catalog";
   manualPriceOverride?: boolean;
 }
@@ -111,6 +114,7 @@ function normalizeToothStatus(value: unknown): ToothStatus {
 
   switch (raw) {
     case "root_treated":
+    case "root-canal-treated":
     case "root treated":
     case "roottreated":
       return "root-treated";
@@ -187,6 +191,7 @@ function toTreatmentItem(raw: Record<string, unknown>): TreatmentItem {
         : Number(raw.tooth_number),
     amount: Number(raw.amount ?? 1),
     unitPrice: Number(raw.unit_price ?? 0),
+    priceMode: ["package", "free", "in-package"].includes(String(raw.price_mode)) ? raw.price_mode as TreatmentPriceMode : "unit",
     priceSource: raw.price_source === "catalog" ? "catalog" : undefined,
     manualPriceOverride:
       raw.manual_price_override === null || raw.manual_price_override === undefined
@@ -333,6 +338,9 @@ function serializePlan(plan: TreatmentPlan) {
 }
 
 const treatmentSaves = new Map<string, Promise<unknown>>();
+const treatmentRevisions = new Map<string, number>();
+const unsavedTreatments = new Set<string>();
+const planDetailsInflight = new Map<string, Promise<void>>();
 
 function serializeTreatmentRows(treatments: TreatmentRow[]) {
   return treatments.map((row, index) => ({
@@ -356,6 +364,7 @@ function serializeTreatmentRows(treatments: TreatmentRow[]) {
             tooth_number: item.toothNumber ?? null,
             amount: item.amount,
             unit_price: item.unitPrice,
+            price_mode: item.priceMode ?? "unit",
             price_source: item.priceSource ?? (item.catalogItemId ? "catalog" : null),
             manual_price_override: item.manualPriceOverride ?? false,
             sort_order: itemIndex + 1,
@@ -401,7 +410,8 @@ async function loadPlansFor(patientId: string, force = false) {
       const rest = state.plans.filter((plan) => plan.patientId !== patientId);
       // preserve any plans already fetched via the detail endpoint (they have full data)
       const merged = plans.map((p) =>
-        planLoaded.has(p.id) ? (state.plans.find((s) => s.id === p.id) ?? p) : p,
+        planLoaded.has(p.id) || treatmentRevisions.has(p.id)
+          ? (state.plans.find((s) => s.id === p.id) ?? p) : p,
       );
       state = { ...state, plans: [...merged, ...rest] };
       plansLoadedFor.add(patientId);
@@ -417,11 +427,32 @@ async function loadPlansFor(patientId: string, force = false) {
 async function loadPlan(patientId: string, id: string, force = false) {
   if (!patientId || !id) return;
   if (!force && planLoaded.has(id)) return;
-  const raw = await clinicApi.plans.get(patientId, id);
-  const plan = toPlan(raw, patientId);
-  mergePlan(plan);
-  plansLoadedFor.add(patientId);
-  planLoaded.add(id);
+  const inflight = planDetailsInflight.get(id);
+  if (inflight) {
+    await inflight;
+    if (!force) return;
+  }
+  const revision = treatmentRevisions.get(id) ?? 0;
+  const wasUnsaved = unsavedTreatments.has(id);
+  const fetchPlan = (async () => {
+    const raw = await clinicApi.plans.get(patientId, id);
+    const plan = toPlan(raw, patientId);
+    const current = getPlanById(id);
+    // A read started before an edit must not roll back that edit, even if its
+    // save has already finished by the time this older response arrives.
+    if (current && (wasUnsaved || unsavedTreatments.has(id) || revision !== (treatmentRevisions.get(id) ?? 0))) {
+      plan.treatments = current.treatments;
+    }
+    plansLoadedFor.add(patientId);
+    planLoaded.add(id);
+    mergePlan(plan);
+  })();
+  planDetailsInflight.set(id, fetchPlan);
+  try {
+    await fetchPlan;
+  } finally {
+    if (planDetailsInflight.get(id) === fetchPlan) planDetailsInflight.delete(id);
+  }
 }
 
 function updateLocalPatient(id: string, patch: Partial<Patient>) {
@@ -498,12 +529,16 @@ export function usePlan(id: string | undefined, patientId?: string) {
   const plan = getPlanById(id);
   const resolvedPatientId = patientId ?? plan?.patientId;
   useEffect(() => {
-    if (resolvedPatientId && id) void loadPlan(resolvedPatientId, id);
+    if (resolvedPatientId && id) void loadPlan(resolvedPatientId, id).catch(() => {
+      toast.error("Could not load the saved plan. Please refresh before editing treatments.");
+    });
   }, [resolvedPatientId, id]);
   return useSyncExternalStore(
     subscribe,
-    () => getPlanById(id),
-    () => getPlanById(id),
+    // List responses contain summaries only. Do not expose an empty treatment
+    // list for editing before the saved visits have loaded from the detail API.
+    () => id && planLoaded.has(id) ? getPlanById(id) : undefined,
+    () => id && planLoaded.has(id) ? getPlanById(id) : undefined,
   );
 }
 
@@ -609,12 +644,23 @@ export const patientsStore = {
   },
 
   setTreatments(planId: string, treatments: TreatmentRow[]) {
+    const revision = (treatmentRevisions.get(planId) ?? 0) + 1;
+    treatmentRevisions.set(planId, revision);
+    unsavedTreatments.add(planId);
     updateLocalPlan(planId, { treatments });
     // Serialize snapshots so a slower earlier reorder cannot overwrite the latest one.
     const previous = treatmentSaves.get(planId) ?? Promise.resolve();
-    const save = previous.catch(() => undefined).then(() =>
-      clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments)),
-    );
+    const save = previous.catch(() => undefined).then(async () => {
+      const response = await clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments));
+      if (treatmentRevisions.get(planId) === revision) {
+        unsavedTreatments.delete(planId);
+        // Use saved row/item IDs only for the latest snapshot; an earlier save
+        // must never replace newer additions that are still waiting to save.
+        const rows = (response as { treatment_rows?: Record<string, unknown>[] } | null)?.treatment_rows;
+        if (Array.isArray(rows)) updateLocalPlan(planId, { treatments: rows.map(toTreatmentRow) });
+      }
+      return response;
+    });
     treatmentSaves.set(planId, save);
     const cleanup = () => { if (treatmentSaves.get(planId) === save) treatmentSaves.delete(planId); };
     void save.then(cleanup, cleanup);
@@ -686,12 +732,41 @@ export const patientsStore = {
     });
   },
 
+  setTreatmentItemTeeth(planId: string, rowId: string, itemIds: string[], teeth: number[]) {
+    const plan = getPlanById(planId);
+    if (!plan) return Promise.reject(new Error("Plan not found."));
+    const validTeeth = [...new Set(teeth)].filter(number => [...UPPER_TEETH, ...LOWER_TEETH].includes(number)).sort((a, b) => a - b);
+    const rows = (plan.treatments ?? []).map(row => {
+      if (row.kind !== "visit" || row.id !== rowId) return row;
+      const existing = row.items.filter(item => itemIds.includes(item.id));
+      if (!existing.length) return row;
+      const targets = validTeeth.length ? validTeeth : [undefined];
+      const oldAmount = existing.reduce((sum, item) => sum + item.amount, 0);
+      const oldTeeth = new Set(existing.flatMap(item => item.toothNumber == null ? [] : [item.toothNumber]));
+      const amount = oldAmount === (oldTeeth.size || 1) ? targets.length : oldAmount;
+      const usedIds = new Set<string>();
+      const replacements = targets.map((toothNumber, index) => {
+        const match = existing.find(item => item.toothNumber === toothNumber && !usedIds.has(item.id));
+        const id = match?.id ?? uid();
+        usedIds.add(id);
+        return { ...existing[0], id, toothNumber, amount: Math.floor(amount / targets.length) + (index < amount % targets.length ? 1 : 0) };
+      });
+      const first = row.items.findIndex(item => itemIds.includes(item.id));
+      return { ...row, items: row.items.flatMap((item, index) => index === first ? replacements : itemIds.includes(item.id) ? [] : [item]) };
+    });
+    return patientsStore.setTreatments(planId, rows);
+  },
+
   removeTreatmentItem(planId: string, rowId: string, itemId: string) {
+    patientsStore.removeTreatmentItems(planId, rowId, [itemId]);
+  },
+
+  removeTreatmentItems(planId: string, rowId: string, itemIds: string[]) {
     const plan = getPlanById(planId);
     if (!plan) return;
     void patientsStore.setTreatments(planId, (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
-        ? { ...row, items: row.items.filter((item) => item.id !== itemId) }
+        ? { ...row, items: row.items.filter((item) => !itemIds.includes(item.id)) }
         : row,
     )).catch(() => {
       toast.error("Could not save treatments. Please save the plan again.");
@@ -704,15 +779,21 @@ export const patientsStore = {
     itemId: string,
     patch: Partial<TreatmentItem>,
   ) {
+    patientsStore.updateTreatmentItems(planId, rowId, { [itemId]: patch });
+  },
+
+  updateTreatmentItems(planId: string, rowId: string, patches: Record<string, Partial<TreatmentItem>>) {
     const plan = getPlanById(planId);
     if (!plan) return;
-    const nextPatch =
-      patch.unitPrice !== undefined ? { ...patch, manualPriceOverride: true } : patch;
     const treatments = (plan.treatments ?? []).map((row) =>
       row.kind === "visit" && row.id === rowId
         ? {
             ...row,
-            items: row.items.map((item) => (item.id === itemId ? { ...item, ...nextPatch } : item)),
+            items: row.items.map((item) => {
+              const patch = patches[item.id];
+              if (!patch) return item;
+              return { ...item, ...patch, ...(patch.unitPrice !== undefined ? { manualPriceOverride: true } : {}) };
+            }),
           }
         : row,
     );
@@ -766,6 +847,19 @@ export const patientsStore = {
         ],
       });
     }
+  },
+
+  async replaceXray(planId: string, xrayId: string, file: File) {
+    const record = await clinicApi.plans.replaceXray(planId, xrayId, file);
+    const plan = getPlanById(planId);
+    if (!plan) return;
+    updateLocalPlan(planId, {
+      xrays: (plan.xrays ?? []).map((xray) => xray.id === xrayId ? {
+        id: String(record.id),
+        url: String(record.file_url),
+        sortOrder: Number(record.sort_order ?? xray.sortOrder),
+      } : xray),
+    });
   },
 
   async removeXray(planId: string, xrayId: string) {

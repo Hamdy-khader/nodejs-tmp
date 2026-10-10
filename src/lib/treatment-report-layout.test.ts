@@ -12,6 +12,32 @@ const base: TreatmentPlan = {
   updatedAt: 0,
 };
 describe("treatment report pagination", () => {
+  const xrays = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `xray-${index}`, url: `/xray-${index}.png`, sortOrder: index }));
+  it("shares one page between treatment totals, an X-ray and document text", () => {
+    const documents = [{ title: "Aftercare", body: "Care instructions." }];
+    const pages = buildTreatmentReportPages({ ...base, xrays: xrays(1) }, undefined, documents);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toMatchObject({ showTotals: true, xrays: [{ title: "X-ray 1", imageUrl: "/xray-0.png" }], documents });
+  });
+  it("packs several X-rays on continuation pages in their saved order", () => {
+    const images = xrays(7).reverse();
+    const pages = buildTreatmentReportPages({ ...base, xrays: images });
+    expect(pages).toHaveLength(3);
+    expect(pages.map(page => page.xrays?.length)).toEqual([1, 3, 3]);
+    expect(pages.flatMap(page => page.xrays ?? []).map(image => image.imageUrl)).toEqual(xrays(7).map(image => image.url));
+    expect(images[0].id).toBe("xray-6");
+    expect(pages.every(page => page.kind !== "xray")).toBe(true);
+  });
+  it("keeps document text complete after images across all supported paper sizes", () => {
+    const body = "Follow these aftercare instructions carefully.\n".repeat(100);
+    for (const size of ["A4", "Letter", "Legal"] as const) {
+      const pages = buildTreatmentReportPages({ ...base, xrays: xrays(4) }, settings(size), [{ title: "Aftercare", body }]);
+      expect(pages.flatMap(page => page.xrays ?? [])).toHaveLength(4);
+      expect(pages.flatMap(page => page.documents ?? []).map(doc => doc.body).join("")).toBe(body);
+      const lastImage = pages.reduce((last, page, index) => page.xrays?.length ? index : last, -1);
+      expect(pages.findIndex(page => page.documents?.length)).toBeGreaterThanOrEqual(lastImage);
+    }
+  });
   it("places short documents below treatment totals on the same page", () => {
     const docs = [{ title: "Aftercare", body: "Care instructions." }, { title: "Next steps", body: "Return for review." }];
     const pages = buildTreatmentReportPages(base, undefined, docs);
@@ -34,7 +60,7 @@ describe("treatment report pagination", () => {
     planSections: { showDiagnosis: true, showTreatments: true, showDocuments: true, showOverview: true },
     pageDesign: { frontCover: { clinicName: "Clinic", title: "Plan" }, innerPages: { headerText: "", footerLeft: "Clinic", footerRight: "", showFooter: true }, backCover: { title: "" } },
   });
-  const planWithItems = (count: number): TreatmentPlan => ({ ...base, treatments: [{ id: "visit", kind: "visit", items: Array.from({ length: count }, (_, i) => ({ id: String(i), name: "Metal-Ceramic Crown", toothNumber: 12, amount: 1, unitPrice: 200 })) }] });
+  const planWithItems = (count: number): TreatmentPlan => ({ ...base, treatments: [{ id: "visit", kind: "visit", items: Array.from({ length: count }, (_, i) => ({ id: String(i), name: `Metal-Ceramic Crown ${i}`, toothNumber: 12, amount: 1, unitPrice: 200 })) }] });
   it("keeps totals with ten short treatments when they fit on the first A4 page", () => {
     const pages = buildTreatmentReportPages(planWithItems(10), settings("A4"));
     expect(pages).toHaveLength(1);
@@ -82,5 +108,15 @@ describe("treatment report pagination", () => {
     const pages = buildTreatmentReportPages(base);
     expect(pages).toHaveLength(1);
     expect(pages[0]).toMatchObject({ showTreatmentChart: true, showTotals: true });
+  });
+  it("does not split one package tooth group across report pages", () => {
+    const plan = planWithItems(10);
+    const visit = plan.treatments![0];
+    if (visit.kind !== "visit") throw new Error("Expected visit");
+    visit.items.push(...[11, 12, 13, 14, 21, 22, 23, 24].map(toothNumber => ({
+      id: `package-${toothNumber}`, toothNumber, name: "Veneer package", amount: 1, unitPrice: 500, priceMode: "package" as const,
+    })));
+    const fragments = buildTreatmentReportPages(plan, settings("Letter")).map(page => (page.treatmentRows ?? []).flatMap(row => row.kind === "visit" ? row.items.filter(item => item.priceMode === "package") : []));
+    expect(fragments.filter(items => items.length).map(items => items.length)).toEqual([8]);
   });
 });

@@ -5,6 +5,7 @@ const patientsListMock = vi.fn();
 const patientsCreateMock = vi.fn();
 const plansListMock = vi.fn();
 const plansCreateMock = vi.fn();
+const plansGetMock = vi.fn();
 const updateItemMock = vi.fn();
 const setRowsMock = vi.fn();
 
@@ -20,7 +21,7 @@ async function loadModule() {
       },
       plans: {
         list: plansListMock,
-        get: vi.fn(),
+        get: plansGetMock,
         create: plansCreateMock,
         update: vi.fn(),
         delete: vi.fn(),
@@ -45,6 +46,49 @@ async function loadModule() {
 }
 
 describe("patients-store", () => {
+  it("preserves price modes and other visits when editing assigned teeth", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "v", kind: "visit", items: [
+        { id: "a", name: "Veneer", tooth_number: 11, amount: 1, unit_price: 500, price_mode: "package" },
+        { id: "b", name: "Veneer", tooth_number: 12, amount: 1, unit_price: 500, price_mode: "package" },
+        { id: "c", name: "Filling", tooth_number: 13, amount: 1, unit_price: 100, price_mode: "free" },
+      ] },
+      { id: "v2", kind: "visit", items: [{ id: "d", name: "Review", amount: 1, unit_price: 50, price_mode: "in-package" }] },
+    ] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    await mod.patientsStore.setTreatmentItemTeeth("plan-1", "v", ["a", "b"], [11, 12, 21]);
+    const saved = setRowsMock.mock.calls[0][1];
+    expect(saved[0].items).toMatchObject([
+      { id: "a", tooth_number: 11, price_mode: "package", amount: 1 },
+      { id: "b", tooth_number: 12, price_mode: "package", amount: 1 },
+      { tooth_number: 21, price_mode: "package", amount: 1 },
+      { id: "c", price_mode: "free" },
+    ]);
+    expect(saved[1].items[0]).toMatchObject({ id: "d", price_mode: "in-package" });
+  });
+  it("saves grouped price changes atomically and deletes the full group without losing other treatments", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "v", kind: "visit", items: [
+        { id: "a", name: "Veneer", tooth_number: 11, amount: 1, unit_price: 265 },
+        { id: "b", name: "Veneer", tooth_number: 12, amount: 1, unit_price: 265 },
+        { id: "c", name: "Filling", tooth_number: 13, amount: 1, unit_price: 100 },
+      ] },
+    ] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    mod.patientsStore.updateTreatmentItems("plan-1", "v", { a: { unitPrice: 200 }, b: { unitPrice: 200 } });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    expect(setRowsMock.mock.calls[0][1][0].items).toMatchObject([
+      { id: "a", tooth_number: 11, unit_price: 200, manual_price_override: true },
+      { id: "b", tooth_number: 12, unit_price: 200, manual_price_override: true },
+      { id: "c", tooth_number: 13, unit_price: 100 },
+    ]);
+    mod.patientsStore.removeTreatmentItems("plan-1", "v", ["a", "b"]);
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(2));
+    expect(setRowsMock.mock.calls[1][1][0].items).toMatchObject([{ id: "c", unit_price: 100 }]);
+    expect(setRowsMock.mock.calls[1][1][0].items).toHaveLength(1);
+  });
   it("adds treatments to a real visit rather than the total adjustment", async () => {
     plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
       { id: "visit", kind: "visit", items: [] },
@@ -64,6 +108,7 @@ describe("patients-store", () => {
     patientsCreateMock.mockReset();
     plansListMock.mockReset().mockResolvedValue([]);
     plansCreateMock.mockReset();
+    plansGetMock.mockReset();
     updateItemMock.mockReset().mockResolvedValue({});
     setRowsMock.mockReset().mockResolvedValue({});
   });
@@ -91,6 +136,70 @@ describe("patients-store", () => {
     expect(saved.map((r: { id: string }) => r.id)).toEqual(["v", "h"]);
     expect(saved[0].items).toMatchObject([{ id: "b", sort_order: 1 }, { id: "a", sort_order: 2 }]);
     expect(saved[1]).toMatchObject({ days: 30, sort_order: 2 });
+  });
+
+  it("waits for all saved visits before exposing a summary plan for editing", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", name: "Summary" }]);
+    let finish!: (plan: unknown) => void;
+    plansGetMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    const { result } = renderHook(() => mod.usePlan("plan-1", "p-1"));
+    expect(result.current).toBeUndefined();
+    await act(async () => finish({ id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "v1", kind: "visit", items: [{ id: "a", name: "Old treatment", amount: 1, unit_price: 100 }] },
+    ] }));
+    expect(result.current?.treatments?.[0]).toMatchObject({ id: "v1", items: [{ name: "Old treatment" }] });
+  });
+
+  it("appends across visits during slow saves and keeps the final server IDs", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "1", kind: "visit", items: [{ id: "10", name: "Filling", tooth_number: 11, amount: 1, unit_price: 100 }] },
+    ] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    let finish!: (response: unknown) => void;
+    setRowsMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Root canal", toothNumber: 11, amount: 1, unitPrice: 200 });
+    mod.patientsStore.addTreatmentRow("plan-1", { id: "new-visit", kind: "visit", items: [] });
+    mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Crown", toothNumber: 11, amount: 1, unitPrice: 300 });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    const finalRows = [
+      { id: 1, kind: "visit", items: [
+        { id: 10, name: "Filling", tooth_number: 11, amount: 1, unit_price: 100 },
+        { id: 11, name: "Root canal", tooth_number: 11, amount: 1, unit_price: 200 },
+      ] },
+      { id: 2, kind: "visit", items: [{ id: 12, name: "Crown", tooth_number: 11, amount: 1, unit_price: 300 }] },
+    ];
+    setRowsMock.mockResolvedValueOnce({ treatment_rows: [] }).mockResolvedValueOnce({ treatment_rows: finalRows });
+    finish({ treatment_rows: [finalRows[0]] });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(3));
+    const saved = setRowsMock.mock.calls[2][1];
+    expect(saved[0].items.map((item: { name: string }) => item.name)).toEqual(["Filling", "Root canal"]);
+    expect(saved[1].items.map((item: { name: string }) => item.name)).toEqual(["Crown"]);
+    mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Veneer", toothNumber: 12, amount: 1, unitPrice: 400 });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(4));
+    expect(setRowsMock.mock.calls[3][1][1]).toMatchObject({ id: "2", items: [{ id: "12", name: "Crown" }, { name: "Veneer" }] });
+  });
+
+  it("does not erase an added treatment when an older plan fetch finishes late", async () => {
+    const serverPlan = { id: "plan-1", patient_id: "p-1", treatment_rows: [
+      { id: "visit", kind: "visit", items: [{ id: "old", name: "Filling", tooth_number: 11, amount: 1, unit_price: 100 }] },
+    ] };
+    plansListMock.mockResolvedValueOnce([serverPlan]);
+    let finish!: (plan: typeof serverPlan) => void;
+    plansGetMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    const { result } = renderHook(() => mod.usePlan("plan-1", "p-1"));
+    act(() => mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Root canal", toothNumber: 11, amount: 1, unitPrice: 200 }));
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
+    await act(async () => finish(serverPlan));
+    const row = result.current?.treatments?.[0];
+    expect(row?.kind === "visit" && row.items.map((item) => item.name)).toEqual(["Filling", "Root canal"]);
+    act(() => mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Crown", toothNumber: 11, amount: 1, unitPrice: 300 }));
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(2));
+    expect(setRowsMock.mock.calls[1][1][0].items.map((item: { name: string }) => item.name)).toEqual(["Filling", "Root canal", "Crown"]);
   });
 
   it("creates a patient and exposes it through the patients hook", async () => {

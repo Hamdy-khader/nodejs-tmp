@@ -1,3 +1,4 @@
+import { groupTreatmentItems, treatmentItemsTotal, PRICE_MODES } from "@/lib/treatment-groups";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { TeethChart } from "./TeethChart";
 import { getStatusMeta, type TreatmentPlan, type TreatmentRow } from "@/lib/patients-store";
@@ -8,8 +9,8 @@ import {
   resolveTemplate,
   type PdfExportContext,
 } from "@/lib/pdf-export-context";
-import { getTreatmentTeeth } from "@/lib/treatment-teeth";
-import { reportPageHeight } from "@/lib/treatment-report-layout";
+import { getTreatmentTeeth, getTreatmentAnnotations } from "@/lib/treatment-teeth";
+import { reportPageHeight, REPORT_XRAY_HEIGHT, REPORT_XRAY_BLOCK_HEIGHT } from "@/lib/treatment-report-layout";
 
 export function TreatmentReportPage({
   page,
@@ -103,25 +104,12 @@ export function TreatmentReportPage({
             <main style={{ flex: 1 }}>
               {page.kind === "status" && <ReportDiagnosis plan={plan} />}
               {page.kind === "xray" && (
-                <div
-                  style={{
-                    height: 680,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <img
-                    src={page.imageUrl}
-                    alt="Patient X-ray"
-                    crossOrigin="anonymous"
-                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-                  />
-                </div>
+                <ReportXray title={page.title} imageUrl={page.imageUrl} />
               )}
               {page.kind === "suggested" && (
                 <ReportTreatment page={page} plan={plan} settings={settings} />
               )}
+              {page.xrays?.map((xray, imageIndex) => <ReportXray key={imageIndex} {...xray} />)}
               {(page.kind === "document" || page.kind === "suggested") &&
                 (page.documents ?? (page.kind === "document" ? [{ title: page.title, body: page.body }] : [])).map(
                   (document, documentIndex) => (
@@ -171,6 +159,15 @@ export function TreatmentReportPage({
         )}
       </article>
     </div>
+  );
+}
+
+function ReportXray({ title, imageUrl }: { title: string; imageUrl?: string }) {
+  return (
+    <figure data-pdf-keep-together style={{ margin: 0, padding: "12px 0", height: REPORT_XRAY_BLOCK_HEIGHT, boxSizing: "border-box", breakInside: "avoid" }}>
+      <figcaption style={{ fontSize: 9, lineHeight: "12px", height: 12 }}>{title}</figcaption>
+      <img src={imageUrl} alt={title} crossOrigin="anonymous" style={{ display: "block", width: "100%", height: REPORT_XRAY_HEIGHT, objectFit: "contain" }} />
+    </figure>
   );
 }
 
@@ -312,7 +309,7 @@ function ReportTreatment({
     (sum, row) =>
       sum +
       (row.kind === "visit"
-        ? row.items.reduce((n, item) => n + item.amount * item.unitPrice, 0)
+        ? treatmentItemsTotal(row.items)
         : 0),
     0,
   );
@@ -332,7 +329,9 @@ function ReportTreatment({
     <>
       {page.showTreatmentChart && (
         <TeethChart
+          baseTeeth={plan.teeth}
           teeth={teeth}
+          annotations={getTreatmentAnnotations(allRows)}
           highlighted={allRows.flatMap((row) =>
             row.kind === "visit"
               ? row.items.flatMap((item) => (item.toothNumber == null ? [] : [item.toothNumber]))
@@ -361,13 +360,7 @@ function ReportTreatment({
                 </span>
                 {showPrices && (
                   <span>
-                    {money(
-                      (
-                        visits.find((visit) => visit.id === row.id) as
-                          | Extract<TreatmentRow, { kind: "visit" }>
-                          | undefined
-                      )?.items.reduce((sum, item) => sum + item.amount * item.unitPrice, 0) ?? 0,
-                    )}
+                    {money(treatmentItemsTotal((visits.find(visit => visit.id === row.id) as Extract<TreatmentRow, { kind: "visit" }> | undefined)?.items ?? []))}
                   </span>
                 )}
               </div>
@@ -396,22 +389,22 @@ function ReportTreatment({
                   </tr>
                 </thead>
                 <tbody>
-                  {row.items.map((item) => (
+                  {groupTreatmentItems(row.items).map((group) => (
                     <tr
-                      key={item.id}
+                      key={group.id}
                       data-pdf-keep-together
                       style={{ borderBottom: "1px solid #ddd" }}
                     >
                       <td style={{ padding: "6px", lineHeight: "13px", overflowWrap: "anywhere" }}>
-                        {item.name}
-                        {item.toothNumber != null && ` (${item.toothNumber})`}
+                        {group.items[0].name}
+                        {group.teeth.length > 0 && ` (${group.teeth.join(", ")})`}
                       </td>
-                      <td style={{ textAlign: "right", padding: 6 }}>{item.amount} ×</td>
+                      <td style={{ textAlign: "right", padding: 6 }}>{group.amount} ×</td>
                       <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && money(item.unitPrice)}
+                        {showPrices && (group.priceMode === "unit" ? money(group.unitPrice) : group.priceMode === "package" ? `${money(group.unitPrice)} (${PRICE_MODES[group.priceMode]})` : PRICE_MODES[group.priceMode])}
                       </td>
                       <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && money(item.unitPrice * item.amount)}
+                        {showPrices && money(group.total)}
                       </td>
                     </tr>
                   ))}

@@ -8,6 +8,7 @@ export interface TreatmentPlanPdfPage {
   title: string;
   body?: string;
   documents?: Array<{ title: string; body?: string }>;
+  xrays?: Array<{ title: string; imageUrl: string }>;
   imageUrl?: string;
   treatmentRows?: TreatmentRow[];
   showTreatmentChart?: boolean;
@@ -55,7 +56,7 @@ export async function saveTreatmentPlanPdf(args: {
         element.style.minHeight = `${pdfHeight}px`;
         element.style.maxWidth = "none";
         element.style.alignSelf = "start";
-        element.style.height = ["cover", "xray", "back"].includes(element.dataset.pageKind ?? "")
+        element.style.height = ["cover", "back"].includes(element.dataset.pageKind ?? "")
           ? `${pdfHeight}px`
           : "auto";
         const pageTop = element.getBoundingClientRect().top;

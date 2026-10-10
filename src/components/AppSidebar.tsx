@@ -24,6 +24,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 const items = [
@@ -48,8 +49,8 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
-      <SidebarHeader className="border-b border-sidebar-border/40 px-4 py-5">
+    <Sidebar collapsible="offcanvas" className="border-r-0">
+      <SidebarHeader className="flex-row items-center justify-between border-b border-sidebar-border/40 px-4 py-5">
         <Link to="/clinic" className="flex items-center gap-2.5">
           <div className="relative grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-accent)] shadow-[var(--shadow-glow)]">
             <Sparkle className="h-4 w-4 text-accent-foreground" />
@@ -63,6 +64,7 @@ export function AppSidebar() {
             </span>
           </div>
         </Link>
+        <SidebarTrigger className="shrink-0 text-sidebar-foreground" />
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-4">
