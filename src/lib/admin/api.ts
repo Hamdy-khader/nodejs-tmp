@@ -482,6 +482,8 @@ export const clinicApi = {
     get: (): Promise<PricelistData> => clinicReq("GET", "/clinic/pricelist"),
     save: (data: PricelistData): Promise<PricelistData> =>
       clinicReq("PUT", "/clinic/pricelist", data),
+    saveCurrency: (settings: Omit<PricelistSettings, "language">): Promise<PricelistData> =>
+      clinicReq("PUT", "/clinic/pricelist", { settings }),
     addItem: (body: {
       group_id: string;
       name: string;
