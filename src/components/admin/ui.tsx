@@ -5,7 +5,7 @@
  * Uses Tailwind v4 utility classes + CSS custom properties injected once.
  */
 
-import React, { useEffect, useRef, useCallback, type ReactNode } from "react";
+import React, { useEffect, useInsertionEffect, useRef, useCallback, type ReactNode } from "react";
 
 // ─── CSS injection (once) ─────────────────────────────────────────────────────
 
@@ -162,7 +162,7 @@ const ADMIN_CSS = `
 
 let cssInjected = false;
 export function useAdminStyles() {
-  useEffect(() => {
+  useInsertionEffect(() => {
     if (cssInjected) return;
     cssInjected = true;
     const el = document.createElement("style");

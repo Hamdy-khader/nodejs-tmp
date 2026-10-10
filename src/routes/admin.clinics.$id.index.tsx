@@ -1,5 +1,5 @@
 import { ClinicUsersPanel } from "@/components/admin/ClinicUsersPanel";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Btn, ConfirmDialog, Empty, Spinner, StatusBadge, toast } from "@/components/admin/ui";
@@ -98,9 +98,9 @@ function AdminClinicDetailPage() {
     <AdminLayout title={clinic.name}>
       <div className="adm-page-hdr">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <a href="/admin/clinics" className="adm-btn ghost sm">
+          <Link to="/admin/clinics" className="adm-btn ghost sm">
             Back
-          </a>
+          </Link>
           <div>
             <div
               className="adm-page-title"
@@ -115,9 +115,9 @@ function AdminClinicDetailPage() {
           </div>
         </div>
         <div className="adm-actions">
-          <a href={`/admin/clinics/${clinicId}/edit`} className="adm-btn primary sm">
+          <Link to="/admin/clinics/$id/edit" params={{ id: String(clinicId) }} className="adm-btn primary sm">
             Edit
-          </a>
+          </Link>
           {clinic.status === "active" ? (
             <Btn variant="danger" size="sm" onClick={() => setConfirm("suspend")}>
               Suspend

@@ -1,5 +1,5 @@
 import { ClinicUsersPanel } from "@/components/admin/ClinicUsersPanel";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ClinicForm } from "@/components/admin/ClinicForm";
 
@@ -19,7 +19,7 @@ function AdminClinicEditPage() {
           <div className="adm-page-title">Edit Clinic</div>
           <div className="adm-page-sub">Update clinic information</div>
         </div>
-        <a href={`/admin/clinics/${clinicId}`} className="adm-btn ghost">← Back</a>
+        <Link to="/admin/clinics/$id" params={{ id: String(clinicId) }} className="adm-btn ghost">← Back</Link>
       </div>
       <ClinicForm
         clinicId={clinicId}

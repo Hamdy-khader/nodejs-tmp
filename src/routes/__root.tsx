@@ -9,7 +9,8 @@ import {
   Navigate,
 } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
-import { adminApi, adminTokenStore, clinicApi, clinicTokenStore } from "@/lib/admin/api";
+import { adminApi, adminTokenStore, clinicApi, clinicTokenStore, type AdminUser } from "@/lib/admin/api";
+import { AdminShell } from "@/components/admin/AdminLayout";
 
 function NotFoundComponent() {
   return (
@@ -104,10 +105,13 @@ import { PatientTabs } from "@/components/PatientTabs";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // During a pending navigation, location can already point at the next page
+  // while Outlet still renders the previous match. Guard the rendered page.
+  const pathname = useRouterState({ select: (s) => s.matches.at(-1)?.pathname ?? s.location.pathname });
   const navigate = useNavigate();
 
   const [hasAdminToken, setHasAdminToken] = useState(() => adminTokenStore.exists());
+  const [admin, setAdmin] = useState<AdminUser | null>(null);
   const [hasClinicToken, setHasClinicToken] = useState(() => clinicTokenStore.exists());
   const [adminSessionValid, setAdminSessionValid] = useState<boolean | null>(
     () => (adminTokenStore.exists() ? null : false),
@@ -128,6 +132,7 @@ function RootComponent() {
 
   useEffect(() => {
     if (!hasAdminToken) {
+      setAdmin(null);
       setAdminSessionValid(false);
       return;
     }
@@ -137,11 +142,18 @@ function RootComponent() {
 
     adminApi
       .me()
-      .then(() => {
-        if (!cancelled) setAdminSessionValid(true);
+      .then((profile) => {
+        if (!cancelled) {
+          setAdmin(profile);
+          setAdminSessionValid(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setAdminSessionValid(false);
+        if (!cancelled) {
+          setAdmin(null);
+          setAdminSessionValid(false);
+          adminTokenStore.clear();
+        }
       });
 
     return () => {
@@ -273,7 +285,9 @@ function RootComponent() {
   if (isAdminRoute) {
     return (
       <QueryClientProvider client={queryClient}>
-        <Outlet />
+        <AdminShell admin={admin}>
+          <Outlet />
+        </AdminShell>
       </QueryClientProvider>
     );
   }

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Btn, ConfirmDialog, Empty, Spinner, StatusBadge, toast } from "@/components/admin/ui";
@@ -100,9 +100,9 @@ function AdminClinicsPage() {
           <div className="adm-page-title">Clinics Management</div>
           <div className="adm-page-sub">{total} clinics registered</div>
         </div>
-        <a href="/admin/clinics/create" className="adm-btn primary">
+        <Link to="/admin/clinics/create" className="adm-btn primary">
           + Add Clinic
-        </a>
+        </Link>
       </div>
 
       <div className="adm-filters">
@@ -140,9 +140,9 @@ function AdminClinicsPage() {
         <Empty
           message="No clinics found."
           action={
-            <a href="/admin/clinics/create" className="adm-btn primary">
+            <Link to="/admin/clinics/create" className="adm-btn primary">
               Add first clinic
-            </a>
+            </Link>
           }
         />
       ) : (
@@ -205,7 +205,7 @@ function AdminClinicsPage() {
                         >
                           Edit
                         </Btn>
-                        <a href={`/admin/clinics/${clinic.id}/users`} className="adm-btn ghost sm">Users</a>
+                        <Link to="/admin/clinics/$id/users" params={{ id: String(clinic.id) }} className="adm-btn ghost sm">Users</Link>
                         {clinic.status === "active" ? (
                           <Btn variant="danger" size="sm" onClick={() => setSuspendTarget(clinic)}>
                             Suspend

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ClinicForm } from "@/components/admin/ClinicForm";
 
@@ -15,7 +15,7 @@ function AdminClinicCreatePage() {
           <div className="adm-page-title">Add New Clinic</div>
           <div className="adm-page-sub">Register a new dental clinic on the platform</div>
         </div>
-        <a href="/admin/clinics" className="adm-btn ghost">← Back to clinics</a>
+        <Link to="/admin/clinics" className="adm-btn ghost">← Back to clinics</Link>
       </div>
       <ClinicForm
         onSuccess={(id) => navigate({ to: "/admin/clinics/$id", params: { id: String(id) } })}

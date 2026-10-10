@@ -1,7 +1,7 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, createContext, useContext, useLayoutEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAdminStyles } from "./ui";
-import { adminApi, adminTokenStore, type AdminUser } from "@/lib/admin/api";
+import { adminApi, type AdminUser } from "@/lib/admin/api";
 
 const NAV = [
   { label: "Dashboard", icon: "D", to: "/admin/dashboard" },
@@ -21,51 +21,25 @@ interface AdminLayoutProps {
   title?: string;
 }
 
+const AdminTitleContext = createContext<(title: string) => void>(() => undefined);
+
+// Pages provide their title and content; the authenticated root owns the persistent shell.
 export function AdminLayout({ children, title = "Super Admin Panel" }: AdminLayoutProps) {
+  const setTitle = useContext(AdminTitleContext);
+  useLayoutEffect(() => setTitle(title), [setTitle, title]);
+  return children;
+}
+
+export function AdminShell({ children, admin }: { children: ReactNode; admin: AdminUser | null }) {
   useAdminStyles();
   const navigate = useNavigate();
-  const state = useRouterState();
-  const pathname = state.location.pathname;
-
-  const [admin, setAdmin] = useState<AdminUser | null>(null);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    if (!adminTokenStore.exists()) {
-      navigate({ to: "/admin/login" });
-      return;
-    }
-    adminApi
-      .me()
-      .then(setAdmin)
-      .catch(() => {
-        adminTokenStore.clear();
-        navigate({ to: "/admin/login" });
-      })
-      .finally(() => setChecking(false));
-  }, [navigate]);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [title, setTitle] = useState("Super Admin Panel");
 
   const handleLogout = async () => {
     await adminApi.logout();
-    window.location.href = "/admin/login";
+    navigate({ to: "/admin/login", replace: true });
   };
-
-  if (checking) {
-    return (
-      <div
-        className="adm"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "100vh",
-          background: "#f4f7fc",
-        }}
-      >
-        <span className="adm-spinner" />
-      </div>
-    );
-  }
 
   const initials = admin?.name
     ? admin.name
@@ -77,6 +51,7 @@ export function AdminLayout({ children, title = "Super Admin Panel" }: AdminLayo
     : "A";
 
   return (
+    <AdminTitleContext.Provider value={setTitle}>
     <div className="adm adm-layout">
       <aside className="adm-sidebar">
         <div className="adm-logo-area">
@@ -144,5 +119,6 @@ export function AdminLayout({ children, title = "Super Admin Panel" }: AdminLayo
         <div className="adm-content">{children}</div>
       </main>
     </div>
+    </AdminTitleContext.Provider>
   );
 }

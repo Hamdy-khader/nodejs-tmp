@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Btn, Empty, Field, Spinner, StatusBadge } from "@/components/admin/ui";
 import { adminApi, type Clinic } from "@/lib/admin/api";
 
@@ -378,12 +379,12 @@ export function HighLevelUsersManagement() {
                   <td>{dateLabel(clinic.created_at)}</td>
                   <td>
                     <div className="adm-actions">
-                      <a className="adm-btn ghost sm" href={`/admin/clinics/${clinic.id}`}>
+                      <Link className="adm-btn ghost sm" to="/admin/clinics/$id" params={{ id: String(clinic.id) }}>
                         View
-                      </a>
-                      <a className="adm-btn ghost sm" href={`/admin/clinics/${clinic.id}/edit`}>
+                      </Link>
+                      <Link className="adm-btn ghost sm" to="/admin/clinics/$id/edit" params={{ id: String(clinic.id) }}>
                         Edit
-                      </a>
+                      </Link>
                       {clinic.status === "active" ? (
                         <Btn size="sm" variant="danger">
                           Suspend
