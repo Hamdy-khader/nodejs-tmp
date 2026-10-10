@@ -22,7 +22,6 @@ import {
   Smile,
   Sparkles,
   StickyNote,
-  Trash2,
   Wrench,
   X,
 } from "lucide-react";
@@ -92,7 +91,6 @@ function getItemPolicy(item: PricelistItem) {
     usageCount: item.usage_count ?? 0,
     canEditName: item.can_edit_name ?? !isUsed,
     canEditNote: item.can_edit_note ?? !isUsed,
-    canDelete: item.can_delete ?? !isUsed,
     canEditPrice: item.can_edit_price ?? true,
   };
 }
@@ -311,46 +309,6 @@ export function ClinicFeesPage() {
     [],
   );
 
-  const deleteItem = useCallback(
-    async (sectionId: string, groupId: string, item: PricelistItem) => {
-      const policy = getItemPolicy(item);
-      if (!policy.canDelete) {
-        toast.error("Used treatments cannot be deleted.");
-        return;
-      }
-
-      setData((prev) => {
-        if (!prev) return prev;
-        const next = updateGroup(prev, sectionId, groupId, (group) => ({
-          ...group,
-          items: group.items.filter((entry) => entry.id !== item.id),
-        }));
-        syncPricelistStore(next);
-        return next;
-      });
-
-      try {
-        await clinicApi.pricelist.deleteItem(item.id);
-        toast.success("Treatment deleted");
-      } catch (error) {
-        toast.error(
-          error instanceof ApiError && error.code === "PRICELIST_ITEM_IN_USE"
-            ? "This treatment is already used in treatment plans and cannot be deleted."
-            : "Failed to delete treatment.",
-        );
-        clinicApi.pricelist
-          .get()
-          .then((next) => {
-            const normalized = normalizePricelistData(next);
-            setData(normalized);
-            syncPricelistStore(normalized);
-          })
-          .catch(() => null);
-      }
-    },
-    [],
-  );
-
   const scrollTo = (id: string) =>
     sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -439,7 +397,6 @@ export function ClinicFeesPage() {
                 patchItem(section.id, groupId, itemId, patch)
               }
               onItemAdd={addItem}
-              onItemDelete={(groupId, item) => deleteItem(section.id, groupId, item)}
             />
           ))}
         </div>
@@ -544,7 +501,6 @@ function SectionCard({
   registerRef,
   onItemPatch,
   onItemAdd,
-  onItemDelete,
 }: {
   section: PricelistSection;
   currency: Currency;
@@ -558,7 +514,6 @@ function SectionCard({
     groupId: string,
     item: { name: string; price: number; note: string },
   ) => Promise<void>;
-  onItemDelete: (groupId: string, item: PricelistItem) => Promise<void>;
 }) {
   const Icon = ICON_MAP[section.icon] ?? Package;
 
@@ -603,7 +558,6 @@ function SectionCard({
             currency={currency}
             onItemPatch={(itemId, patch) => onItemPatch(group.id, itemId, patch)}
             onItemAdd={(item) => onItemAdd(group.id, item)}
-            onItemDelete={(item) => onItemDelete(group.id, item)}
           />
         ))}
       </div>
@@ -617,7 +571,6 @@ function SubGroupBlock({
   currency,
   onItemPatch,
   onItemAdd,
-  onItemDelete,
 }: {
   sectionId: string;
   group: PricelistGroup;
@@ -627,7 +580,6 @@ function SubGroupBlock({
     patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>,
   ) => void;
   onItemAdd: (item: { name: string; price: number; note: string }) => Promise<void>;
-  onItemDelete: (item: PricelistItem) => Promise<void>;
 }) {
   const [open, setOpen] = useState(true);
   const [draftName, setDraftName] = useState("");
@@ -683,7 +635,6 @@ function SubGroupBlock({
               item={item}
               currency={currency}
               onPatch={(patch) => onItemPatch(item.id, patch)}
-              onDelete={() => onItemDelete(item)}
             />
           ))}
           <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-3 py-3">
@@ -741,14 +692,12 @@ function PriceRow({
   item,
   currency,
   onPatch,
-  onDelete,
 }: {
   sectionId: string;
   groupTitle: string;
   item: PricelistItem;
   currency: Currency;
   onPatch: (patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
-  onDelete: () => void;
 }) {
   const [localName, setLocalName] = useState(item.name);
   const [localPrice, setLocalPrice] = useState(String(item.price));
@@ -851,20 +800,6 @@ function PriceRow({
           }
         >
           <StickyNote className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          disabled={!policy.canDelete}
-          onClick={onDelete}
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-md transition",
-            policy.canDelete
-              ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              : "cursor-not-allowed text-muted-foreground/50",
-          )}
-          title={policy.canDelete ? "Delete treatment" : "Used treatments cannot be deleted"}
-        >
-          <Trash2 className="h-4 w-4" />
         </button>
       </div>
 

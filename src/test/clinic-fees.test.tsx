@@ -55,3 +55,13 @@ it("keeps the currency dialog open and shows the server validation message when 
   expect(screen.getByRole("button", { name: "OK" })).toBeEnabled();
   expect(toast.success).not.toHaveBeenCalled();
 });
+
+it("never offers deletion for catalog treatments, even when an older API allows it", async () => {
+  const data = structuredClone(catalog);
+  data.sections[0].groups[0].items = [{ id: "item", name: "Filling", price: 150, note: "", can_delete: true, is_used: false }];
+  vi.mocked(clinicApi.pricelist.get).mockResolvedValue(data);
+  render(<ClinicFeesPage />);
+  await screen.findByDisplayValue("Filling");
+  expect(screen.queryByTitle("Delete treatment")).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue("150")).toBeEnabled();
+});

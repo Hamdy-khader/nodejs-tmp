@@ -494,7 +494,6 @@ export const clinicApi = {
       id: string,
       patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>,
     ): Promise<PricelistItem> => clinicReq("PATCH", `/clinic/pricelist/items/${id}`, patch),
-    deleteItem: (id: string): Promise<void> => clinicReq("DELETE", `/clinic/pricelist/items/${id}`),
   },
 
   patients: {

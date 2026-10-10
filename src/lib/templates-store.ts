@@ -3,6 +3,8 @@ import { clinicApi } from "@/lib/admin/api";
 
 export type TemplateCategory = "diagnosis" | "treatments" | "dentists" | "other";
 
+export const isProtectedTemplate = (category: TemplateCategory) => category === "diagnosis" || category === "treatments";
+
 export interface ClinicTemplate {
   id: string;
   title: string;
@@ -125,6 +127,8 @@ export const templatesStore = {
   },
 
   async remove(id: string) {
+    const template = state.templates.find(item => item.id === id);
+    if (template && isProtectedTemplate(template.category)) throw new Error("Diagnosis and treatment templates cannot be deleted.");
     await clinicApi.templates.delete(id);
     state = { ...state, templates: state.templates.filter((template) => template.id !== id) };
     emit();

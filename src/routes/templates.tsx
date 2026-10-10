@@ -37,6 +37,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   templatesStore,
+  isProtectedTemplate,
   useTemplates,
   type ClinicTemplate,
   type TemplateCategory,
@@ -137,6 +138,7 @@ function TemplatesPage() {
                 >
                   <Pencil className="size-4 text-muted-foreground hover:text-primary" />
                 </button>
+                {!isProtectedTemplate(t.category) && (
                 <button
                   onClick={() => {
                     if (confirm(`Delete "${t.title}"?`)) templatesStore.remove(t.id);
@@ -145,6 +147,7 @@ function TemplatesPage() {
                 >
                   <X className="size-4 text-muted-foreground hover:text-destructive" />
                 </button>
+                )}
               </li>
             ))}
             {items.length === 0 && (
