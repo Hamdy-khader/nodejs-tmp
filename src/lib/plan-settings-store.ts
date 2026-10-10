@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { clinicApi } from "@/lib/admin/api";
+import { toast } from "sonner";
 
 export type PageSize = "A4" | "Letter" | "Legal";
 
@@ -72,6 +73,7 @@ let state: PlanSettings = defaults;
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
 let loaded = false;
+let saveQueue: Promise<unknown> = Promise.resolve();
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -191,25 +193,31 @@ function toPayload(settings: PlanSettings) {
 }
 
 function persist() {
-  void clinicApi.planSettings.update(toPayload(state));
+  const payload = toPayload(state);
+  const save = saveQueue.catch(() => undefined).then(() => clinicApi.planSettings.update(payload));
+  saveQueue = save;
+  // Autosave callers can ignore the promise, while the Save button can await it.
+  void save.catch((error) => toast.error(error instanceof Error ? error.message : "Failed to save plan settings"));
+  return save;
 }
 
 export function usePlanSettings() {
   useEffect(() => {
-    void loadSettings();
+    void loadSettings().catch(() => toast.error("Failed to load plan settings"));
   }, []);
   return useSyncExternalStore(subscribe, () => state, () => state);
 }
 
 export const planSettingsStore = {
   async reload() {
+    await saveQueue.catch(() => undefined);
     await loadSettings(true);
   },
 
   update(patch: Partial<PlanSettings>) {
     state = { ...state, ...patch, updatedAt: Date.now() };
     emit();
-    persist();
+    return persist();
   },
 
   updatePageDesign<K extends keyof PageDesign>(key: K, patch: Partial<PageDesign[K]>) {
@@ -222,6 +230,6 @@ export const planSettingsStore = {
       updatedAt: Date.now(),
     };
     emit();
-    persist();
+    return persist();
   },
 };

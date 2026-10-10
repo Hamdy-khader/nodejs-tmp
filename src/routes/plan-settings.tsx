@@ -47,12 +47,21 @@ type EditorKey = keyof PageDesign | "pageSize" | "priceList" | "pricePage" | "pl
 function PlanSettingsPage() {
   const settings = usePlanSettings();
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editor, setEditor] = useState<EditorKey>(null);
 
-  const save = () => {
-    planSettingsStore.update({});
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  const save = async () => {
+    setSaved(false);
+    setSaving(true);
+    try {
+      await planSettingsStore.update({});
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch {
+      // The store shows the server error; keep the current edits available for retry.
+    } finally {
+      setSaving(false);
+    }
   };
 
 
@@ -68,12 +77,13 @@ function PlanSettingsPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={save}
+                disabled={saving}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary hover:text-primary-deep"
               >
                 <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
                   <Save className="size-4" />
                 </span>
-                {saved ? "Saved ✓" : "Save"}
+                {saving ? "Saving..." : saved ? "Saved ✓" : "Save"}
               </button>
             </div>
           </header>
