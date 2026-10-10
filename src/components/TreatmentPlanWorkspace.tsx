@@ -127,10 +127,9 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
   const navigate = useNavigate();
   const [step, setStep] = useState<(typeof STEPS)[number]["id"]>(initialStep);
   const [selected, setSelected] = useState<number | null>(null);
-  const [multiSelect, setMultiSelect] = useState(true);
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
   const selectTooth = (number: number) => {
-    const next = multiSelect ? toggleToothSelection(selectedTeeth, number) : [number];
+    const next = toggleToothSelection(selectedTeeth, number);
     setSelectedTeeth(next);
     setSelected(next.at(-1) ?? null);
   };
@@ -355,10 +354,6 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
               <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,1.6fr)_minmax(240px,1fr)]">
                 <div>
                   <div>
-                    <Button data-diagnosis-selection size="sm" variant={multiSelect ? "default" : "outline"} aria-pressed={multiSelect}
-                      onClick={() => { setMultiSelect(!multiSelect); setSelectedTeeth([]); setSelected(null); }}>
-                      Multiple selection {selectedTeeth.length > 0 && '(' + selectedTeeth.length + ')'}
-                    </Button>
                     <TeethChart teeth={plan.teeth} selected={selected} highlighted={selectedTeeth} onSelect={selectTooth} />
                   </div>
                   <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
