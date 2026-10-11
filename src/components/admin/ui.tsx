@@ -147,6 +147,10 @@ const ADMIN_CSS = `
   .adm-login-btn { width: 100%; background: var(--adm-blue); border: none; border-radius: 10px; padding: 13px; color: white; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .adm-login-btn:hover:not(:disabled) { background: var(--adm-blue-l); box-shadow: 0 8px 24px rgba(37,99,235,.4); }
   .adm-login-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .adm-login-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
+  .adm-login-link { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; color: #c5d2e5; font-size: 13px; font-weight: 500; text-decoration: none; transition: background .15s, color .15s; }
+  .adm-login-link:hover { color: #fff; background: rgba(255,255,255,.08); }
+  .adm-login-link:focus-visible { outline: 2px solid var(--adm-teal); outline-offset: 3px; }
   .adm-remember { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; font-size: 13px; color: #8898b3; cursor: pointer; }
   .adm-remember input { accent-color: var(--adm-teal); width: 15px; height: 15px; }
   .adm-system-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 28px; background: rgba(45,212,167,.1); border: 1px solid rgba(45,212,167,.2); border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--adm-teal); font-weight: 500; }

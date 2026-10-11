@@ -1,5 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { Home, Building2 } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { adminApi, ApiError } from "@/lib/admin/api";
 
@@ -120,6 +121,17 @@ function AdminLoginPage() {
             {loading ? "Signing in…" : "Sign in to Admin Panel"}
           </button>
         </form>
+
+        <nav className="adm-login-links" aria-label="Other destinations">
+          <Link to="/" className="adm-login-link">
+            <Home size={16} aria-hidden="true" />
+            Main website
+          </Link>
+          <Link to="/clinic/login" className="adm-login-link">
+            <Building2 size={16} aria-hidden="true" />
+            Clinic sign in
+          </Link>
+        </nav>
 
         <div style={{ marginTop: 24, borderTop: "1px solid var(--adm-border)", paddingTop: 18, textAlign: "center", fontSize: 12, color: "var(--adm-muted2)" }}>
           Treatly Admin · Authorized access only
