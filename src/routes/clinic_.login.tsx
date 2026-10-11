@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Home } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
 import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
 
@@ -144,6 +144,13 @@ function ClinicLoginPage() {
             {loading ? "Signing in…" : "Sign in to Clinic"}
           </button>
         </form>
+
+        <nav className="adm-login-links" aria-label="Other destinations">
+          <Link to="/" className="adm-login-link">
+            <Home size={16} aria-hidden="true" />
+            Main website
+          </Link>
+        </nav>
 
         <div style={{ marginTop: 24, textAlign: "center", fontSize: 12, color: "var(--adm-muted2)" }}>
           <a href="/admin/login" style={{ color: "var(--adm-muted2)", textDecoration: "none" }}>Admin login →</a>
