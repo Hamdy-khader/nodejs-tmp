@@ -152,9 +152,6 @@ function ClinicLoginPage() {
           </Link>
         </nav>
 
-        <div style={{ marginTop: 24, textAlign: "center", fontSize: 12, color: "var(--adm-muted2)" }}>
-          <a href="/admin/login" style={{ color: "var(--adm-muted2)", textDecoration: "none" }}>Admin login →</a>
-        </div>
       </div>
     </div>
   );
