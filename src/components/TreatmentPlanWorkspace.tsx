@@ -354,7 +354,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
               <div className="grid grid-cols-1 gap-6 rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,1.6fr)_minmax(240px,1fr)]">
                 <div>
                   <div>
-                    <TeethChart teeth={plan.teeth} selected={selected} highlighted={selectedTeeth} onSelect={selectTooth} />
+                    <TeethChart teeth={plan.teeth} selected={selected} highlighted={selectedTeeth} onSelect={selectTooth} onSelectMany={(numbers) => { setSelectedTeeth(numbers); setSelected(numbers.at(-1) ?? null); }} />
                   </div>
                   <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
                     <button

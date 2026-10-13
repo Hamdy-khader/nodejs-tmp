@@ -266,6 +266,7 @@ export function TreatmentsView({
               baseTeeth={plan.teeth}
               selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
               onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
+              onSelectMany={bridgeMode ? setBridgeSel : setSelectedTeeth}
               highlighted={bridgeMode ? bridgeSel : selectedTeeth}
               annotations={toothAnnotations}
             />

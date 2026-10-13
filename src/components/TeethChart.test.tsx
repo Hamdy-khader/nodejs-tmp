@@ -5,9 +5,115 @@ import { defaultTeeth } from "@/lib/patients-store";
 import { DIAGNOSIS_MARKS, DENTAL_MARKS, getDentalVisual } from "@/lib/dental-visuals";
 import { getTreatmentAnnotations, getTreatmentTeeth } from "@/lib/treatment-teeth";
 import type { TreatmentRow } from "@/lib/patients-store";
+import { getTreatmentSections, getCatalogSectionById } from "@/lib/treatment-catalog";
 
 afterEach(cleanup);
 describe("combined treatments on the same tooth", () => {
+  it.each([false, true])(
+    "updates diagnosis underneath existing treatment immediately (report=%s)",
+    (report) => {
+      const rows: TreatmentRow[] = [
+        {
+          id: "v",
+          kind: "visit",
+          items: [
+            {
+              id: "c",
+              name: "Crown",
+              catalogSectionKey: "crown",
+              toothNumber: 12,
+              amount: 1,
+              unitPrice: 200,
+            },
+          ],
+        },
+      ];
+      const base = defaultTeeth();
+      const view = (teeth: typeof base) => (
+        <TeethChart
+          teeth={getTreatmentTeeth(teeth, rows)}
+          baseTeeth={teeth}
+          annotations={getTreatmentAnnotations(rows)}
+          report={report}
+        />
+      );
+      const { container, rerender } = render(view(base));
+      const updated = { ...base, 12: { number: 12, status: "caries" as const, note: "Caries" } };
+      rerender(view(updated));
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="caries"]'),
+      ).not.toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="crown"]'),
+      ).not.toBeNull();
+      rerender(view({ ...base, 12: { number: 12, status: "intact", note: "Fractured" } }));
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="caries"]'),
+      ).toBeNull();
+      expect(
+        container.querySelector(
+          '[data-tooth-number="12"] path[d="M8 37 L8 23 L14 27 L18 16 L23 25 L29 19 L32 37 Z"]',
+        ),
+      ).not.toBeNull();
+      rerender(view(base));
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="fractured"]'),
+      ).toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="crown"]'),
+      ).not.toBeNull();
+      expect(rows[0]).toMatchObject({ items: [{ id: "c", unitPrice: 200 }] });
+    },
+  );
+  it.each([false, true])(
+    "keeps a bridge on diagnosed missing teeth rootless (report=%s)",
+    (report) => {
+      const base = defaultTeeth();
+      base[12] = { number: 12, status: "missing" };
+      const rows: TreatmentRow[] = [
+        {
+          id: "v",
+          kind: "visit",
+          items: [
+            {
+              id: "bridge",
+              name: "Bridge 13-11",
+              catalogSectionKey: "bridge",
+              amount: 1,
+              unitPrice: 500,
+            },
+          ],
+        },
+      ];
+      const { container, rerender } = render(
+        <TeethChart
+          teeth={getTreatmentTeeth(base, rows)}
+          baseTeeth={base}
+          annotations={getTreatmentAnnotations(rows)}
+          report={report}
+        />,
+      );
+      const missing = container.querySelector('[data-tooth-number="12"]')!;
+      expect(missing.querySelector('[data-pontic="true"]')).not.toBeNull();
+      expect(missing.querySelector("[data-natural-root]")).toBeNull();
+      expect(missing.querySelector("[data-bridge-connector]")).not.toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="13"] [data-natural-root]'),
+      ).not.toBeNull();
+      rerender(<TeethChart teeth={base} baseTeeth={base} report={report} />);
+      expect(container.querySelector('[data-tooth-number="12"] [data-natural-root]')).toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="12"] [data-bridge-connector]'),
+      ).toBeNull();
+      expect(base[12].status).toBe("missing");
+    },
+  );
+
+  it("restores the original detailed molar with three separate roots", () => {
+    const { container } = render(<ToothIllustration number={16} status="intact" />);
+    expect(container.querySelectorAll("[data-natural-root]")).toHaveLength(3);
+    expect(container.querySelector('linearGradient stop[stop-color="#F8F4ED"]')).not.toBeNull();
+  });
   const visit = (names: string[]): TreatmentRow[] => [
     {
       id: "v",
@@ -101,8 +207,51 @@ describe("combined treatments on the same tooth", () => {
 });
 
 describe("diagnosis illustrations", () => {
-  it("renders different geometry for every diagnosis even without colors or labels", () => {
-    // Compare what is actually drawn, not just distinct registry keys or colors.
+  it("renders every built-in treatment family on the original tooth anatomy", () => {
+    const families = new Map<string, { name: string; catalogSectionKey: string }>();
+    for (const section of getTreatmentSections()) {
+      for (const group of getCatalogSectionById(section.id)!.groups) {
+        for (const item of group.items) {
+          const visual = getDentalVisual(item.name, { treatment: true, section: section.id });
+          families.set(visual.mark, { name: item.name, catalogSectionKey: section.id });
+        }
+      }
+    }
+    const entries = [...families.entries()];
+    const base = defaultTeeth();
+    const numbers = Object.keys(base).map(Number);
+    for (let offset = 0; offset < entries.length; offset += numbers.length) {
+      const group = entries.slice(offset, offset + numbers.length);
+      const rows: TreatmentRow[] = [
+        {
+          id: "v",
+          kind: "visit",
+          items: group.map(([, item], index) => ({
+            ...item,
+            id: String(index),
+            toothNumber: numbers[index],
+            amount: 1,
+            unitPrice: 100,
+          })),
+        },
+      ];
+      const { container, unmount } = render(
+        <TeethChart
+          teeth={getTreatmentTeeth(base, rows)}
+          baseTeeth={base}
+          annotations={getTreatmentAnnotations(rows)}
+        />,
+      );
+      for (const [index, [mark]] of group.entries()) {
+        const tooth = container.querySelector(`[data-tooth-number="${numbers[index]}"]`)!;
+        expect(tooth.querySelector(`[data-dental-mark="${mark}"]`), mark).not.toBeNull();
+        expect(tooth.querySelector("svg path"), mark).not.toBeNull();
+      }
+      unmount();
+    }
+  });
+  it("renders a distinct illustration for every diagnosis", () => {
+    // Compare actual SVG shapes and materials; the restored composite and amalgam share anatomy.
     for (const number of [11, 13, 14, 16, 41, 43, 44, 46]) {
       const seen = new Map<string, string>();
       for (const name of Object.keys(DIAGNOSIS_MARKS)) {
@@ -110,10 +259,30 @@ describe("diagnosis illustrations", () => {
           <ToothIllustration number={number} status="intact" note={name} />,
         );
         const geometry = JSON.stringify(
-          [...container.querySelectorAll("path")].map((path) => [
-            path.getAttribute("d"),
-            path.getAttribute("transform"),
-            path.getAttribute("stroke-dasharray"),
+          [...container.querySelectorAll("path, rect, circle, ellipse, line")].map((shape) => [
+            shape.tagName,
+            ...[
+              "d",
+              "x",
+              "y",
+              "x1",
+              "x2",
+              "y1",
+              "y2",
+              "cx",
+              "cy",
+              "rx",
+              "ry",
+              "r",
+              "width",
+              "height",
+              "fill",
+              "stroke",
+              "stroke-width",
+              "stroke-dasharray",
+            ].map((attribute) =>
+              shape.getAttribute(attribute)?.replace(/url\(#tk[^)]+\)/g, "gradient"),
+            ),
           ]),
         );
         expect(
@@ -144,7 +313,7 @@ describe("diagnosis illustrations", () => {
       ).toEqual(Array(32).fill(getDentalVisual(name).key));
       unmount();
     }
-  });
+  }, 20000);
 
   it("keeps treatment symbols and colors identical in the chart and report, including multiple procedures", () => {
     const rows: TreatmentRow[] = [

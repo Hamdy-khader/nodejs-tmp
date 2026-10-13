@@ -1,4 +1,6 @@
-import { useId } from "react";
+import { ORIGINAL_TOOTH_NOTES, detailedDentalStyle } from "@/lib/detailed-dental-style";
+import { DetailedTooth, toothShape } from "./DetailedTooth";
+import { useRef, useState } from "react";
 import { UPPER_TEETH, LOWER_TEETH, type ToothState, type ToothStatus } from "@/lib/patients-store";
 import { DENTAL_MARKS, getDentalVisual, type DentalVisual } from "@/lib/dental-visuals";
 import { DentalMarkPath, DentalSymbol } from "./DentalSymbol";
@@ -10,6 +12,7 @@ interface Props {
   teeth: Record<number, ToothState>;
   selected?: number | null;
   onSelect?: (n: number) => void;
+  onSelectMany?: (numbers: number[]) => void;
   highlighted?: number[];
   annotations?: Record<number, ToothAnnotation[]>;
   baseTeeth?: Record<number, ToothState>;
@@ -25,44 +28,6 @@ export interface ToothAnnotation {
   visual?: DentalVisual;
 }
 
-type Cat = "molar" | "premolar" | "canine" | "incisor";
-
-function categoryOf(n: number): Cat {
-  const t = n % 10;
-  if (t >= 6) return "molar";
-  if (t >= 4) return "premolar";
-  if (t === 3) return "canine";
-  return "incisor";
-}
-
-// ─── Anatomy constants ──────────────────────────────────────────────────────
-// viewBox 0 0 40 80
-// Crown: y 7–32 | Roots: y 29–78. Upper teeth are mirrored vertically.
-const SHAPES: Record<Cat, { crown: string; roots: string[] }> = {
-  incisor: {
-    crown: "M11 30 C10 25 10 16 12 11 Q20 7 28 11 C30 16 30 25 29 30 Q20 33 11 30 Z",
-    roots: ["M12 30 C14 45 15 68 18 76 Q20 80 22 75 C26 57 28 39 28 30 Z"],
-  },
-  canine: {
-    crown: "M10 30 C10 23 11 16 15 12 L20 8 L26 12 C29 17 30 24 30 30 Q20 33 10 30 Z",
-    roots: ["M12 30 C13 47 15 71 19 78 Q21 80 23 73 C26 54 28 38 28 30 Z"],
-  },
-  premolar: {
-    crown:
-      "M8 29 C6 22 7 12 12 9 Q17 7 20 10 Q25 7 29 10 C33 15 33 23 31 29 Q25 33 20 30 Q14 33 8 29 Z",
-    roots: [
-      "M9 29 C8 42 9 63 12 73 Q14 78 16 69 L20 46 L24 70 Q26 77 28 72 C32 55 32 39 31 29 Q20 34 9 29 Z",
-    ],
-  },
-  molar: {
-    crown:
-      "M5 29 C3 22 4 12 8 9 Q13 6 19 10 Q26 6 31 9 C36 12 37 22 34 29 Q29 33 24 30 Q19 33 14 30 Q9 33 5 29 Z",
-    roots: [
-      "M6 29 C4 41 6 61 10 71 Q13 76 15 69 L18 48 Q20 42 22 49 L25 69 Q27 76 30 71 C35 56 36 40 34 29 Q20 34 6 29 Z",
-    ],
-  },
-};
-
 // ─── Tooth SVG ──────────────────────────────────────────────────────────────
 function ToothSVG({
   number,
@@ -73,7 +38,7 @@ function ToothSVG({
   visual: suppliedVisual,
   visuals: suppliedVisuals,
   baseStatus,
-  active = false,
+  baseNote,
 }: {
   number: number;
   status: ToothStatus;
@@ -82,19 +47,14 @@ function ToothSVG({
   visual?: DentalVisual;
   visuals?: DentalVisual[];
   baseStatus?: ToothStatus;
-  active?: boolean;
+  baseNote?: string;
   bridgePosition?: "single" | "left" | "middle" | "right";
 }) {
-  const shape = SHAPES[categoryOf(number)];
-  const id = `tk${number}-${useId().replace(/:/g, "")}`;
+  const shape = toothShape(number);
   const visual = suppliedVisual ?? getDentalVisual(note ?? "", { status });
   const visuals = suppliedVisuals?.length ? suppliedVisuals : [visual];
-  const marks = visuals.map((layer) => layer.mark);
-  const layerColor = (layer: DentalVisual) =>
-    layer.treatment && visuals.length === 1 ? "#66b96a" : layer.color;
+  const layerColor = (layer: DentalVisual) => detailedDentalStyle(layer).color;
   const { mark } = visual;
-  const color = visual.treatment ? "#66b96a" : visual.color;
-  const background = visual.treatment ? "#eef8ee" : visual.background;
   const transform = number < 30 ? "translate(0,80) scale(1,-1)" : undefined;
   const implantVisual = visuals.find((layer) =>
     ["implant", "abutment", "screw"].includes(layer.mark),
@@ -104,19 +64,10 @@ function ToothSVG({
     !implant &&
     !pontic &&
     (status === "missing" ||
+      baseStatus === "missing" ||
       ["missing", "extraction", "surgical", "implantRemoval"].includes(mark));
   const bridgeVisual = visuals.find((layer) => layer.mark === "bridge");
   const bridge = !!bridgePosition;
-  const rootTreatment = [
-    "root",
-    "rootOne",
-    "rootTwo",
-    "rootThree",
-    "retreatment",
-    "post",
-    "pin",
-    "necrosis",
-  ].some((rootMark) => marks.includes(rootMark as typeof mark));
   const crown =
     mark === "fractured"
       ? "M8 37 L8 23 L14 27 L18 16 L23 25 L29 19 L32 37 Z"
@@ -125,18 +76,23 @@ function ToothSVG({
         : mark === "radix"
           ? "M10 37 L12 32 L19 35 L26 31 L30 37 Z"
           : shape.crown;
-  const coloredCrown = ["discolored", "necrosis"].includes(mark);
-  const restoration = [
-    "crown",
-    "bridge",
-    "veneer",
-    "composite",
-    "amalgam",
-    "inlay",
-    "onlay",
-    "temporary",
-    "medicated",
-  ].includes(mark);
+  const detailedStatus: ToothStatus = implant
+    ? "implant"
+    : pontic
+      ? "bridge"
+      : missing
+        ? "missing"
+        : mark === "root"
+          ? "root-treated"
+          : mark === "crown"
+            ? "crown"
+            : mark === "bridge"
+              ? "bridge"
+              : mark === "caries"
+                ? "caries"
+                : ["composite", "amalgam", "inlay"].includes(mark)
+                  ? "filled"
+                  : status;
   const barLeft = bridgePosition === "left" || bridgePosition === "single" ? 4 : -20;
   const barRight = bridgePosition === "right" || bridgePosition === "single" ? 36 : 60;
   return (
@@ -148,141 +104,81 @@ function ToothSVG({
       aria-label={visuals.map((layer) => layer.label).join(", ")}
     >
       <title>{visuals.map((layer) => layer.label).join(", ")}</title>
-      <defs>
-        <linearGradient id={id + "-enamel"} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={coloredCrown ? background : "#ffffff"} />
-          <stop offset="100%" stopColor={coloredCrown ? color : "#fdfefe"} />
-        </linearGradient>
-        <linearGradient id={id + "-root"} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#e5f2f8" />
-          <stop offset="100%" stopColor={rootTreatment ? background : "#cce5f0"} />
-        </linearGradient>
-        <clipPath id={id + "-root-clip"}>
-          <rect x="0" y="29" width="40" height={mark === "resorption" ? 30 : 51} />
-        </clipPath>
-      </defs>
       <g
         transform={transform}
         data-tooth-visual={note || status}
         data-visual-key={visual.key}
         data-pontic={pontic || undefined}
       >
-        {bridge && (
-          <path
-            data-bridge-connector="true"
-            d={`M${barLeft} 28 H${barRight}`}
-            stroke={bridgeVisual ? layerColor(bridgeVisual) : color}
-            strokeWidth="2"
-            strokeLinecap="round"
-            opacity="0.7"
-          />
-        )}
-        {missing ? (
-          <path
-            d={shape.roots[0]}
-            fill={background}
-            stroke={color}
-            strokeWidth="1"
-            strokeDasharray="3 2"
-          />
-        ) : (
-          <>
-            {implant ? (
-              <g
-                data-dental-mark="implant"
-                fill={implantVisual?.background ?? background}
-                stroke={implantVisual ? layerColor(implantVisual) : color}
-                strokeWidth="1.4"
-              >
-                <path d="M14 38 H26 L24 70 Q20 80 16 70 Z" />
-                {[42, 48, 54, 60, 66].map((y) => (
-                  <path key={y} d={`M14 ${y} H26`} />
-                ))}
+        <DetailedTooth
+          number={number}
+          status={detailedStatus}
+          note={baseNote || ORIGINAL_TOOTH_NOTES[mark] || note}
+          pontic={pontic}
+        />
+        <g>
+          {implant && <g data-dental-mark="implant" />}
+          {bridge && (
+            <path
+              data-bridge-connector="true"
+              d={`M${barLeft} 37 H${barRight}`}
+              stroke={bridgeVisual ? layerColor(bridgeVisual) : "#7C4AC9"}
+              strokeWidth="2.8"
+              opacity="0.75"
+            />
+          )}
+          {visuals.map((layer, index) => {
+            const { mark } = layer;
+            const color = layerColor(layer);
+            const background = detailedDentalStyle(layer).background;
+            const classic = ORIGINAL_TOOTH_NOTES[mark] !== undefined;
+            if (visuals.length === 1 && classic)
+              return (
+                <g key={layer.key} data-procedure-visual={layer.key} data-dental-mark={mark} />
+              );
+            return (
+              <g key={layer.key} data-procedure-visual={layer.key}>
+                {["crown", "bridge", "veneer"].includes(mark) ? (
+                  <path
+                    data-dental-mark={mark}
+                    d={
+                      layer.treatment || mark === "crown"
+                        ? crown
+                        : mark === "veneer"
+                          ? DENTAL_MARKS.veneer
+                          : `${crown} M2 28 H38 M4 23 V33 M36 23 V33`
+                    }
+                    fill={mark === "veneer" || visuals.length > 1 ? "none" : background}
+                    stroke={color}
+                    strokeWidth={layer.treatment ? "1.2" : "1.6"}
+                    transform={`translate(20,21) scale(${Math.max(0.52, 0.82 - index * 0.06)},.78) translate(-20,-21)`}
+                  />
+                ) : ["composite", "amalgam", "inlay", "onlay", "temporary", "medicated"].includes(
+                    mark,
+                  ) ? (
+                  <path
+                    data-dental-mark={mark}
+                    d={
+                      !layer.treatment
+                        ? DENTAL_MARKS[mark]
+                        : mark === "inlay"
+                          ? "M20 13 L26 20 L20 27 L14 20 Z"
+                          : mark === "onlay"
+                            ? "M11 13 Q20 8 29 13 L27 22 H13 Z"
+                            : "M14 16 Q20 13 26 16 L26 25 Q20 28 14 25 Z"
+                    }
+                    fill={visuals.length > 1 ? "none" : mark === "amalgam" ? "#a4aab0" : background}
+                    stroke={color}
+                    strokeWidth={layer.treatment ? "1.2" : "1.6"}
+                    strokeDasharray={mark === "temporary" ? "2 1" : undefined}
+                  />
+                ) : mark !== "intact" && mark !== "implant" ? (
+                  <DentalMarkPath visual={{ ...layer, color }} />
+                ) : null}
               </g>
-            ) : (
-              <g clipPath={"url(#" + id + "-root-clip)"}>
-                {!pontic &&
-                  shape.roots.map((d, i) => (
-                    <path
-                      key={i}
-                      d={d}
-                      fill={`url(#${id}-root)`}
-                      stroke={rootTreatment ? color : "#818b91"}
-                      strokeWidth="0.85"
-                    />
-                  ))}
-              </g>
-            )}
-            {(!implant ||
-              marks.some((m) =>
-                [
-                  "crown",
-                  "bridge",
-                  "veneer",
-                  "composite",
-                  "inlay",
-                  "onlay",
-                  "temporary",
-                  "medicated",
-                  "amalgam",
-                ].includes(m),
-              )) && (
-              <path
-                d={crown}
-                fill={`url(#${id}-enamel)`}
-                stroke={active || (visual.treatment && restoration) ? "#66b96a" : "#818b91"}
-                strokeWidth="1.1"
-                strokeLinejoin="round"
-              />
-            )}
-          </>
-        )}
-        {visuals.map((layer, index) => {
-          const { mark } = layer;
-          const color = layerColor(layer);
-          const background = layer.treatment && visuals.length === 1 ? "#eef8ee" : layer.background;
-          return (
-            <g key={layer.key} data-procedure-visual={layer.key}>
-              {["crown", "bridge", "veneer"].includes(mark) ? (
-                <path
-                  data-dental-mark={mark}
-                  d={
-                    layer.treatment || mark === "crown"
-                      ? crown
-                      : mark === "veneer"
-                        ? DENTAL_MARKS.veneer
-                        : `${crown} M2 28 H38 M4 23 V33 M36 23 V33`
-                  }
-                  fill={mark === "veneer" || visuals.length > 1 ? "none" : background}
-                  stroke={color}
-                  strokeWidth={layer.treatment ? "1.2" : "1.6"}
-                  transform={`translate(20,21) scale(${Math.max(0.52, 0.82 - index * 0.06)},.78) translate(-20,-21)`}
-                />
-              ) : ["composite", "amalgam", "inlay", "onlay", "temporary", "medicated"].includes(
-                  mark,
-                ) ? (
-                <path
-                  data-dental-mark={mark}
-                  d={
-                    !layer.treatment
-                      ? DENTAL_MARKS[mark]
-                      : mark === "inlay"
-                        ? "M20 13 L26 20 L20 27 L14 20 Z"
-                        : mark === "onlay"
-                          ? "M11 13 Q20 8 29 13 L27 22 H13 Z"
-                          : "M14 16 Q20 13 26 16 L26 25 Q20 28 14 25 Z"
-                  }
-                  fill={visuals.length > 1 ? "none" : mark === "amalgam" ? "#a4aab0" : background}
-                  stroke={color}
-                  strokeWidth={layer.treatment ? "1.2" : "1.6"}
-                  strokeDasharray={mark === "temporary" ? "2 1" : undefined}
-                />
-              ) : mark !== "intact" && mark !== "implant" ? (
-                <DentalMarkPath visual={{ ...layer, color }} />
-              ) : null}
-            </g>
-          );
-        })}
+            );
+          })}
+        </g>
       </g>
     </svg>
   );
@@ -389,8 +285,9 @@ function Row({
           annotation.visual ? [annotation.visual] : [],
         );
         const base = baseTeeth?.[number];
-        // An existing implant/root treatment remains underneath a new restoration.
-        if (layers.length && base && ["implant", "root-treated"].includes(base.status)) {
+        // Rebuild diagnosis layers from the current plan on every render, not the
+        // treatment's overwritten status/note. Clearing a diagnosis removes its layer.
+        if (layers.length && base && (base.status !== "intact" || base.note)) {
           const baseVisual = toothVisual(base);
           if (!layers.some((layer) => layer.mark === baseVisual.mark)) layers.unshift(baseVisual);
         }
@@ -398,8 +295,11 @@ function Row({
         const hasImplant =
           base?.status === "implant" ||
           layers.some((layer) => ["implant", "abutment", "screw"].includes(layer.mark));
-        const pontic = status === "missing" && !!bridgePosition && !hasImplant;
-        const drawnVisual = pontic ? getDentalVisual("Bridge") : visual;
+        const missingTooth = status === "missing" || base?.status === "missing";
+        const replacement =
+          !!bridgePosition || ["crown", "bridge", "veneer", "dentures"].includes(visual.mark);
+        const pontic = missingTooth && replacement && !hasImplant;
+        const drawnVisual = pontic && bridgePosition ? getDentalVisual("Bridge") : visual;
         const labels = notes.length
           ? layers.map((layer) => layer.label)
           : [visual.label, ...(tooth?.diagnosis ?? [])];
@@ -418,15 +318,15 @@ function Row({
               isUpper ? "flex-col" : "flex-col-reverse",
             )}
           >
-            <div className="relative aspect-[1/2] w-full max-w-[34px]">
+            <div className="relative aspect-[1/2] w-full max-w-[44px]">
               <ToothSVG
                 number={number}
-                active={selectedTooth || !!highlightedTooth}
                 status={bridgePosition ? "bridge" : status}
                 note={pontic ? undefined : tooth?.note}
                 visual={drawnVisual}
                 visuals={layers}
                 baseStatus={base?.status}
+                baseNote={base?.note}
                 pontic={pontic}
                 bridgePosition={bridgePosition}
               />
@@ -452,12 +352,27 @@ export function TeethChart({
   teeth,
   selected,
   onSelect,
+  onSelectMany,
   highlighted,
   annotations,
   baseTeeth,
   report,
   showLegend = false,
 }: Props) {
+  const drag = useRef<{
+    x: number;
+    y: number;
+    active: boolean;
+    initial: number[];
+    additive: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
+  const [selectionBox, setSelectionBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const legend = new Map<string, { visual: DentalVisual; numbers: number[] }>();
   for (const number of [...UPPER_TEETH, ...LOWER_TEETH]) {
     const notes = annotations?.[number] ?? [];
@@ -466,7 +381,7 @@ export function TeethChart({
       : [toothVisual(teeth[number])];
     for (const visual of visuals) {
       if (visual.mark === "intact") continue;
-      const entry = legend.get(visual.key) ?? { visual, numbers: [] };
+      const entry = legend.get(visual.key) ?? { visual: detailedDentalStyle(visual), numbers: [] };
       entry.numbers.push(number);
       legend.set(visual.key, entry);
     }
@@ -474,9 +389,79 @@ export function TeethChart({
   const shared = { teeth, selected, onSelect, highlighted, annotations, baseTeeth, report };
   return (
     <div className={report ? "space-y-1 py-2" : "space-y-1 bg-white px-1 py-2"}>
-      <Row numbers={UPPER_TEETH} isUpper {...shared} />
-      <div className="h-px bg-border" />
-      <Row numbers={LOWER_TEETH} isUpper={false} {...shared} />
+      <div
+        className="relative select-none space-y-1"
+        data-diagnosis-selection
+        data-treatment-selection
+        onPointerDown={(event) => {
+          if (report || !onSelectMany || event.button !== 0 || event.pointerType === "touch")
+            return;
+          suppressClick.current = false;
+          drag.current = {
+            x: event.clientX,
+            y: event.clientY,
+            active: false,
+            initial: [...(highlighted ?? [])],
+            additive: event.shiftKey || event.ctrlKey || event.metaKey,
+          };
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current;
+          if (!start || !onSelectMany || event.buttons !== 1) return;
+          if (!start.active && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 5)
+            return;
+          start.active = true;
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          const left = Math.min(start.x, event.clientX),
+            right = Math.max(start.x, event.clientX);
+          const top = Math.min(start.y, event.clientY),
+            bottom = Math.max(start.y, event.clientY);
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setSelectionBox({
+            left: left - bounds.left,
+            top: top - bounds.top,
+            width: right - left,
+            height: bottom - top,
+          });
+          const numbers = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>("[data-tooth-number]"),
+          )
+            .filter((tooth) => {
+              const box = tooth.getBoundingClientRect();
+              return box.right > left && box.left < right && box.bottom > top && box.top < bottom;
+            })
+            .map((tooth) => Number(tooth.dataset.toothNumber));
+          onSelectMany(start.additive ? [...new Set([...start.initial, ...numbers])] : numbers);
+        }}
+        onPointerUp={() => {
+          suppressClick.current = !!drag.current?.active;
+          drag.current = null;
+          setSelectionBox(null);
+        }}
+        onPointerCancel={() => {
+          if (drag.current?.active) onSelectMany?.(drag.current.initial);
+          drag.current = null;
+          setSelectionBox(null);
+        }}
+        onClickCapture={(event) => {
+          if (suppressClick.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressClick.current = false;
+          }
+        }}
+      >
+        <Row numbers={UPPER_TEETH} isUpper {...shared} />
+        <div className="h-px bg-border" />
+        <Row numbers={LOWER_TEETH} isUpper={false} {...shared} />
+        {selectionBox && (
+          <div
+            data-selection-box
+            className="pointer-events-none absolute z-20 border border-primary bg-primary/15"
+            style={selectionBox}
+          />
+        )}
+      </div>
 
       {!report && showLegend && legend.size > 0 && (
         <div className="border-t border-border/60 pt-3" aria-label="Tooth symbols and colors">
