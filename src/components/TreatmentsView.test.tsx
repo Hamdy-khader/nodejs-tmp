@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultTeeth, patientsStore, type TreatmentPlan } from "@/lib/patients-store";
 import { TreatmentsView } from "./TreatmentsView";
@@ -20,6 +20,57 @@ vi.mock("@/components/TeethChart", () => ({
   ),
 }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+it("shows separate jaw rows and limits tooth, price, amount and delete actions to the selected jaw", async () => {
+  const update = vi.spyOn(patientsStore, "updateTreatmentItems").mockImplementation(() => {});
+  const remove = vi.spyOn(patientsStore, "removeTreatmentItems").mockImplementation(() => {});
+  const saveTeeth = vi.spyOn(patientsStore, "setTreatmentItemTeeth").mockResolvedValue({});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items:
+    [11, 21, 31, 41].map(n => ({ id: String(n), name: "Ceramic bridge on implant", toothNumber: n, amount: 1, unitPrice: 265 })),
+  }] } as unknown as TreatmentPlan;
+  const { container } = render(<TreatmentsView plan={plan} />);
+  const rows = container.querySelectorAll<HTMLElement>("[data-treatment-group]");
+  expect(rows).toHaveLength(2);
+  expect(within(rows[0]).getByText("Upper jaw")).toBeInTheDocument();
+  expect(within(rows[1]).getByText("Lower jaw")).toBeInTheDocument();
+  expect(within(rows[0]).getByLabelText("Teeth for Ceramic bridge on implant")).toHaveTextContent("1121");
+  expect(within(rows[1]).getByLabelText("Teeth for Ceramic bridge on implant")).toHaveTextContent("3141");
+  expect(screen.getByText("Visit subtotal").parentElement).toHaveTextContent("1060.00");
+  const price = within(rows[0]).getByLabelText("Unit price for Ceramic bridge on implant");
+  fireEvent.change(price, { target: { value: "200" } });
+  fireEvent.blur(price);
+  expect(update).toHaveBeenLastCalledWith("plan", "visit", { "11": { unitPrice: 200 }, "21": { unitPrice: 200 } });
+  const amount = within(rows[1]).getByLabelText("Amount for Ceramic bridge on implant");
+  fireEvent.change(amount, { target: { value: "3" } });
+  fireEvent.blur(amount);
+  expect(update).toHaveBeenLastCalledWith("plan", "visit", { "31": { amount: 2 }, "41": { amount: 1 } });
+  fireEvent.click(within(rows[1]).getByRole("button", { name: "Edit teeth for Ceramic bridge on implant" }));
+  const dialog = within(screen.getByRole("dialog"));
+  expect(dialog.getByRole("button", { name: "11" })).toHaveAttribute("aria-pressed", "false");
+  expect(dialog.getByRole("button", { name: "31" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(dialog.getByRole("button", { name: "Save teeth" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(saveTeeth).toHaveBeenCalledWith("plan", "visit", ["31", "41"], [31, 41]);
+  fireEvent.click(within(rows[0]).getByRole("button", { name: "Remove item" }));
+  expect(remove).toHaveBeenCalledWith("plan", "visit", ["11", "21"]);
+});
+
+it("keeps a shared package price linked across its separate jaw rows", () => {
+  const update = vi.spyOn(patientsStore, "updateTreatmentItems").mockImplementation(() => {});
+  const plan = { id: "plan", teeth: defaultTeeth(), treatments: [{ id: "visit", kind: "visit", items:
+    [11, 31].map(n => ({ id: String(n), name: "Bridge", toothNumber: n, amount: 1, unitPrice: 500, priceMode: "package" })),
+  }] } as unknown as TreatmentPlan;
+  const { container } = render(<TreatmentsView plan={plan} />);
+  const rows = container.querySelectorAll<HTMLElement>("[data-treatment-group]");
+  expect(rows).toHaveLength(2);
+  expect(within(rows[0]).getByLabelText("Price for Bridge")).toHaveTextContent("500.00");
+  expect(within(rows[1]).getByLabelText("Price for Bridge")).toHaveTextContent("In package");
+  expect(screen.getByText("Visit subtotal").parentElement).toHaveTextContent("500.00");
+  const price = within(rows[1]).getByLabelText("Package price for Bridge");
+  fireEvent.change(price, { target: { value: "600" } });
+  fireEvent.blur(price);
+  expect(update).toHaveBeenCalledWith("plan", "visit", { "11": { unitPrice: 600 }, "31": { unitPrice: 600 } });
+});
 
 it("offers all four price modes and applies the selected mode to the whole tooth group", async () => {
   const update = vi.spyOn(patientsStore, "updateTreatmentItems").mockImplementation(() => {});

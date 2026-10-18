@@ -51,7 +51,7 @@ export function buildTreatmentReportPages(plan: TreatmentPlan, settings?: PlanSe
     };
     addHeader();
     for (const group of groupTreatmentItems(row.items)) {
-      const height = Math.max(19 + textHeight(`${group.items[0].name}${group.teeth.length ? ` (${group.teeth.join(", ")})` : ""}`, 55), group.priceMode === "package" ? 58 : 0);
+      const height = Math.max(19 + textHeight(`${group.items[0].name}${group.jaw ? ` — ${group.jaw}` : ""}${group.teeth.length ? ` (${group.teeth.join(", ")})` : ""}`, 55), group.priceMode === "package" ? 58 : 0);
       if (available < height) {
         flush();
         fragment = { ...row, note: undefined, items: [] };

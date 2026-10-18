@@ -891,13 +891,14 @@ function ItemRow({
       return;
     }
     if (value === group.unitPrice) return;
-    if (group.items.length === 1)
-      patientsStore.updateTreatmentItem(planId, rowId, item.id, { unitPrice: value });
+    const priceItems = group.packageItems ?? group.items;
+    if (priceItems.length === 1)
+      patientsStore.updateTreatmentItem(planId, rowId, priceItems[0].id, { unitPrice: value });
     else
       patientsStore.updateTreatmentItems(
         planId,
         rowId,
-        Object.fromEntries(group.items.map((entry) => [entry.id, { unitPrice: value }])),
+        Object.fromEntries(priceItems.map((entry) => [entry.id, { unitPrice: value }])),
       );
   };
   const saveAmount = () => {
@@ -924,6 +925,7 @@ function ItemRow({
         >
           {item.name}
         </span>
+        {group.jaw && <span className="text-muted-foreground">{group.jaw}</span>}
         <div className="flex flex-wrap gap-0.5" aria-label={`Teeth for ${item.name}`}>
           {group.teeth.map((number) => (
             <span
@@ -935,6 +937,7 @@ function ItemRow({
           ))}
         </div>
         <button type="button" className="text-primary underline" aria-label={`Edit teeth for ${item.name}`} onClick={() => { setTeethDraft(group.teeth); setTeethOpen(true); }}>Edit teeth</button>
+        {group.packageItems?.some(entry => !group.items.includes(entry)) && <span className="text-muted-foreground">Shared package across both jaws</span>}
       </div>
       <div className="flex items-center justify-end gap-1">
         <Input
@@ -987,11 +990,15 @@ function ItemRow({
         <span className="pl-1 text-muted-foreground">=</span>
       </div>
       <div className="text-right text-xs tabular-nums" aria-label={`Price for ${item.name}`}>
-        <CurrencySymbol />{" "}
-        {group.total.toLocaleString("en-US", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}
+        {group.packageIncluded ? "In package" : (
+          <>
+            <CurrencySymbol />{" "}
+            {group.total.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </>
+        )}
       </div>
       <div className="flex justify-end">
         <button

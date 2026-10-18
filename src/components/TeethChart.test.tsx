@@ -19,8 +19,8 @@ describe("combined treatments on the same tooth", () => {
           items: [
             {
               id: "c",
-              name: "Crown",
-              catalogSectionKey: "crown",
+              name: "Gingival Graft",
+              catalogSectionKey: "other",
               toothNumber: 12,
               amount: 1,
               unitPrice: 200,
@@ -44,7 +44,7 @@ describe("combined treatments on the same tooth", () => {
         container.querySelector('[data-tooth-number="12"] [data-dental-mark="caries"]'),
       ).not.toBeNull();
       expect(
-        container.querySelector('[data-tooth-number="12"] [data-dental-mark="crown"]'),
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="graft"]'),
       ).not.toBeNull();
       rerender(view({ ...base, 12: { number: 12, status: "intact", note: "Fractured" } }));
       expect(
@@ -60,11 +60,189 @@ describe("combined treatments on the same tooth", () => {
         container.querySelector('[data-tooth-number="12"] [data-dental-mark="fractured"]'),
       ).toBeNull();
       expect(
-        container.querySelector('[data-tooth-number="12"] [data-dental-mark="crown"]'),
+        container.querySelector('[data-tooth-number="12"] [data-dental-mark="graft"]'),
       ).not.toBeNull();
       expect(rows[0]).toMatchObject({ items: [{ id: "c", unitPrice: 200 }] });
     },
   );
+  it.each([false, true])(
+    "clears a deleted bridge and old diagnosis marks before drawing zirconia crowns (report=%s)",
+    (report) => {
+      const base = defaultTeeth();
+      base[14] = { number: 14, status: "intact", note: "Necrosis" };
+      base[13] = { number: 13, status: "intact", note: "Fractured root" };
+      base[12] = { number: 12, status: "missing", note: "Missing" };
+      const original = structuredClone(base);
+      const bridge: TreatmentRow = {
+        id: "temporary",
+        kind: "visit",
+        items: [
+          {
+            id: "bridge",
+            name: "Bridge 14-11",
+            catalogSectionKey: "bridge",
+            amount: 1,
+            unitPrice: 100,
+          },
+        ],
+      };
+      const crowns: TreatmentRow = {
+        id: "final",
+        kind: "visit",
+        items: [14, 13, 12, 11].map((number) => ({
+          id: `crown-${number}`,
+          name: "Zirconia Crown",
+          catalogSectionKey: "crown",
+          toothNumber: number,
+          amount: 1,
+          unitPrice: 200,
+        })),
+      };
+      const view = (rows: TreatmentRow[]) => (
+        <TeethChart
+          teeth={getTreatmentTeeth(base, rows)}
+          baseTeeth={base}
+          annotations={getTreatmentAnnotations(rows)}
+          report={report}
+        />
+      );
+      const { container, rerender } = render(view([bridge]));
+      expect(container.querySelectorAll("[data-bridge-connector]")).toHaveLength(4);
+      rerender(view([]));
+      expect(container.querySelector("[data-bridge-connector]")).toBeNull();
+      expect(container.querySelector('[data-dental-mark="bridge"]')).toBeNull();
+      rerender(view([crowns]));
+      for (const number of [14, 13, 12, 11]) {
+        const tooth = container.querySelector(`[data-tooth-number="${number}"]`)!;
+        expect(tooth).toHaveAccessibleName(`Tooth ${number}: Zirconia Crown`);
+        expect(tooth.querySelector('[data-dental-mark="crown"]')).not.toBeNull();
+        expect(tooth.querySelector("[data-bridge-connector]")).toBeNull();
+        for (const mark of ["bridge", "missing", "necrosis", "fracturedRoot"])
+          expect(tooth.querySelector(`[data-dental-mark="${mark}"]`)).toBeNull();
+        // Check the actual anatomy as well as the overlay metadata.
+        expect(tooth.querySelector('path[d="M9 51 L17 55 L23 50 L30 54"]')).toBeNull();
+        expect(tooth.querySelector('path[fill="#72717c"]')).toBeNull();
+        expect(tooth.querySelector('line[x1="14"][x2="26"]')).toBeNull();
+      }
+      expect(container.querySelector('[data-tooth-number="12"] [data-natural-root]')).toBeNull();
+      expect(base).toEqual(original);
+      rerender(view([]));
+      expect(container.querySelector('[data-dental-mark="crown"]')).toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="12"] line[x1="14"][x2="26"]'),
+      ).not.toBeNull();
+      expect(base).toEqual(original);
+    },
+  );
+
+  it("does not reconnect a diagnosed bridge underneath replacement crowns", () => {
+    const base = defaultTeeth();
+    for (const number of [14, 13]) base[number] = { number, status: "bridge", note: "Bridge" };
+    const rows: TreatmentRow[] = [
+      {
+        id: "final",
+        kind: "visit",
+        items: [14, 13].map((number) => ({
+          id: String(number),
+          name: "Zirconia Crown",
+          toothNumber: number,
+          amount: 1,
+          unitPrice: 200,
+        })),
+      },
+    ];
+    const { container } = render(
+      <TeethChart
+        baseTeeth={base}
+        teeth={getTreatmentTeeth(base, rows)}
+        annotations={getTreatmentAnnotations(rows)}
+      />,
+    );
+    expect(container.querySelector("[data-bridge-connector]")).toBeNull();
+    expect(container.querySelector('[data-dental-mark="bridge"]')).toBeNull();
+    expect(container.querySelectorAll('[data-dental-mark="crown"]')).toHaveLength(2);
+  });
+
+  it.each(["Bridge Removal", "Crown Removal", "Extraction"])(
+    "clears the X when %s is replaced on the same treatment item",
+    (name) => {
+      const base = defaultTeeth();
+      const view = (name: string, catalogSectionKey: string) => {
+        const rows: TreatmentRow[] = [
+          {
+            id: "v",
+            kind: "visit",
+            items: [
+              {
+                id: "same-item",
+                name,
+                catalogSectionKey,
+                toothNumber: 14,
+                amount: 1,
+                unitPrice: 100,
+              },
+            ],
+          },
+        ];
+        return (
+          <TeethChart
+            baseTeeth={base}
+            teeth={getTreatmentTeeth(base, rows)}
+            annotations={getTreatmentAnnotations(rows)}
+            showLegend
+          />
+        );
+      };
+      const oldMark = getDentalVisual(name, { treatment: true }).mark;
+      const { container, rerender } = render(view(name, "prosthesis-removal"));
+      expect(
+        container.querySelector(`[data-tooth-number="14"] [data-dental-mark="${oldMark}"]`),
+      ).not.toBeNull();
+      rerender(view("Zirconia Crown", "crown"));
+      expect(container.querySelector(`[data-dental-mark="${oldMark}"]`)).toBeNull();
+      expect(container.querySelector("[data-bridge-connector]")).toBeNull();
+      expect(
+        container.querySelector('[data-tooth-number="14"] [data-dental-mark="crown"]'),
+      ).not.toBeNull();
+      expect(container.querySelector('[data-tooth-number="14"] line[x1="14"][x2="26"]')).toBeNull();
+      expect(
+        container.querySelector('[aria-label="Tooth symbols and colors"]'),
+      ).not.toHaveTextContent(name);
+    },
+  );
+
+  it("keeps a diagnosed root treatment beneath a crown without reintroducing old necrosis", () => {
+    const base = defaultTeeth();
+    base[14] = { number: 14, status: "root-treated", note: "Necrosis" };
+    const rows: TreatmentRow[] = [
+      {
+        id: "v",
+        kind: "visit",
+        items: [
+          {
+            id: "crown",
+            name: "Zirconia Crown",
+            toothNumber: 14,
+            amount: 1,
+            unitPrice: 200,
+          },
+        ],
+      },
+    ];
+    const { container } = render(
+      <TeethChart
+        baseTeeth={base}
+        teeth={getTreatmentTeeth(base, rows)}
+        annotations={getTreatmentAnnotations(rows)}
+      />,
+    );
+    const tooth = container.querySelector('[data-tooth-number="14"]')!;
+    expect(tooth.querySelector('[data-dental-mark="root"]')).not.toBeNull();
+    expect(tooth.querySelector('[data-dental-mark="crown"]')).not.toBeNull();
+    expect(tooth.querySelector('[data-dental-mark="necrosis"]')).toBeNull();
+    expect(tooth.querySelector('path[fill="#72717c"]')).toBeNull();
+    expect(base[14].note).toBe("Necrosis");
+  });
   it.each([false, true])(
     "keeps a bridge on diagnosed missing teeth rootless (report=%s)",
     (report) => {

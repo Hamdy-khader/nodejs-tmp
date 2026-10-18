@@ -207,12 +207,10 @@ function bridgeRuns(
   numbers: number[],
   teeth: Record<number, ToothState>,
   annotations?: Record<number, ToothAnnotation[]>,
-  baseTeeth?: Record<number, ToothState>,
 ) {
   const isBridge = (number: number) =>
     annotations?.[number]?.some((annotation) => annotation.visual?.mark === "bridge") ||
-    (teeth[number]?.status === "bridge" && toothVisual(teeth[number]).mark === "bridge") ||
-    (baseTeeth?.[number]?.status === "bridge" && toothVisual(baseTeeth[number]).mark === "bridge");
+    (teeth[number]?.status === "bridge" && toothVisual(teeth[number]).mark === "bridge");
   const runs: { start: number; end: number }[] = [];
   let i = 0;
   while (i < numbers.length) {
@@ -256,7 +254,7 @@ function Row({
   baseTeeth,
   report,
 }: { numbers: number[]; isUpper: boolean } & Props) {
-  const runs = bridgeRuns(numbers, teeth, annotations, baseTeeth);
+  const runs = bridgeRuns(numbers, teeth, annotations);
   const runLookup = new Map<number, "single" | "left" | "middle" | "right">();
   for (const run of runs) {
     for (let k = run.start; k <= run.end; k++) {
@@ -285,17 +283,34 @@ function Row({
           annotation.visual ? [annotation.visual] : [],
         );
         const base = baseTeeth?.[number];
-        // Rebuild diagnosis layers from the current plan on every render, not the
-        // treatment's overwritten status/note. Clearing a diagnosis removes its layer.
+        const replacesBaseDrawing = layers.some((layer) =>
+          ["crown", "bridge", "veneer", "dentures", "implant", "abutment"].includes(layer.mark),
+        );
+        let baseNote: string | undefined;
+        // A replacement uses the current treatment drawing. Keep supporting
+        // implants/root treatments, but do not redraw the old prosthesis or X
+        // from the diagnosis over it. The saved diagnosis remains unchanged.
         if (layers.length && base && (base.status !== "intact" || base.note)) {
-          const baseVisual = toothVisual(base);
-          if (!layers.some((layer) => layer.mark === baseVisual.mark)) layers.unshift(baseVisual);
+          const baseVisual =
+            replacesBaseDrawing && ["implant", "root-treated"].includes(base.status)
+              ? getDentalVisual("", { status: base.status })
+              : toothVisual(base);
+          const keepBase =
+            !replacesBaseDrawing ||
+            ["implant", "abutment", "root", "post", "pin"].includes(baseVisual.mark);
+          if (keepBase) {
+            if (!layers.some((layer) => layer.mark === baseVisual.mark)) layers.unshift(baseVisual);
+            baseNote = replacesBaseDrawing ? ORIGINAL_TOOTH_NOTES[baseVisual.mark] : base.note;
+          }
         }
         const bridgePosition = runLookup.get(index);
         const hasImplant =
           base?.status === "implant" ||
           layers.some((layer) => ["implant", "abutment", "screw"].includes(layer.mark));
-        const missingTooth = status === "missing" || base?.status === "missing";
+        // A later bridge overwrites the preview status, but cannot restore a
+        // natural root lost in the diagnosis or an earlier extraction stage.
+        const missingTooth = status === "missing" || base?.status === "missing" ||
+          layers.some(layer => ["missing", "extraction", "surgical", "implantRemoval"].includes(layer.mark));
         const replacement =
           !!bridgePosition || ["crown", "bridge", "veneer", "dentures"].includes(visual.mark);
         const pontic = missingTooth && replacement && !hasImplant;
@@ -326,7 +341,7 @@ function Row({
                 visual={drawnVisual}
                 visuals={layers}
                 baseStatus={base?.status}
-                baseNote={base?.note}
+                baseNote={baseNote}
                 pontic={pontic}
                 bridgePosition={bridgePosition}
               />

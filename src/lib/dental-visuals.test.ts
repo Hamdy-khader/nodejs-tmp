@@ -29,8 +29,22 @@ describe("name-based treatment visuals", () => {
     ["Root Canal Treatment (1 Root)", "root-canal-treatment", "rootOne"],
     ["Root Canal Treatment (2 Roots)", "root-canal-treatment", "rootTwo"],
     ["Root Canal Treatment (3 Roots)", "root-canal-treatment", "rootThree"],
+    ["Ceramic bridge on implant", "bridge", "bridge"],
+    ["Temporary bridge on implants", "implant", "bridge"],
+    ["Screw-retained implant bridge", "implant", "bridge"],
+    ["Bridge on implant abutments", "bridge", "bridge"],
+    ["Ceramic crown on implant", "implant", "crown"],
+    ["Screw-retained implant crown", "crown", "crown"],
+    ["Implant-supported dentures", "dentures", "dentures"],
   ])("uses the specific procedure %s before its category", (name, section, mark) => {
     expect(getDentalVisual(name, { treatment: true, section }).mark).toBe(mark);
+  });
+  it.each([
+    ["Ceramic bridge on implant", "bridge"],
+    ["Ceramic crown on implant", "crown"],
+  ])("does not create an implant for the restoration %s", (name, status) => {
+    expect(getToothStatusForTreatment("implant", name)).toBe(status);
+    expect(getDentalVisual(name, { treatment: true }).mark).toBe(status);
   });
   it("normalizes names and infers legacy treatments without a section", () => {
     expect(getDentalVisual("  TEMPORARY   Filling ", { treatment: true }).color).toBe(

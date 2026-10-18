@@ -160,8 +160,9 @@ Backend behavior:
 - Copy current `price` into `unit_price`.
 - Save the catalog references on the plan item.
 - Mark `price_source = "catalog"`.
-- Apply the mapped tooth status if the selected treatment belongs to a tooth-based category.
-- Suggested mappings:
+- Keep saved tooth diagnoses unchanged when creating, updating, moving, or deleting treatment items, including bulk row saves. Only the tooth endpoints update the diagnosis.
+- The frontend derives the treatment chart from the current items and the saved diagnosis on every render. A replacement restoration hides the previous diagnosis symbols while retaining implant/root-treatment support and missing-tooth anatomy. Removing all treatments restores the diagnosis drawing.
+- Suggested mappings for the derived preview (never persisted to the diagnosis):
   - `extraction` -> `missing`
   - `filling` -> `filled`
   - `root-canal-treatment` -> `root-treated`
@@ -257,6 +258,6 @@ treatment_plan_items
 - Clinics cannot add, delete, or rename treatments.
 - The plan page can create treatment items from a catalog item id.
 - The backend fills the item name and price from the catalog automatically.
-- The backend returns or applies tooth-status mapping for the selected treatment.
+- Treatment edits leave saved tooth diagnoses unchanged; the chart derives tooth-status mapping from the current treatment items.
 - `GET plan` returns the catalog references for every treatment item.
 - Existing old records without catalog references still load safely.

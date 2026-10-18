@@ -389,7 +389,7 @@ function ReportTreatment({
                   </tr>
                 </thead>
                 <tbody>
-                  {groupTreatmentItems(row.items).map((group) => (
+                  {groupTreatmentItems(row.items, visits.find(visit => visit.id === row.id)?.items ?? row.items).map((group) => (
                     <tr
                       key={group.id}
                       data-pdf-keep-together
@@ -397,14 +397,15 @@ function ReportTreatment({
                     >
                       <td style={{ padding: "6px", lineHeight: "13px", overflowWrap: "anywhere" }}>
                         {group.items[0].name}
+                        {group.jaw && ` — ${group.jaw}`}
                         {group.teeth.length > 0 && ` (${group.teeth.join(", ")})`}
                       </td>
                       <td style={{ textAlign: "right", padding: 6 }}>{group.amount} ×</td>
                       <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && (group.priceMode === "unit" ? money(group.unitPrice) : group.priceMode === "package" ? `${money(group.unitPrice)} (${PRICE_MODES[group.priceMode]})` : PRICE_MODES[group.priceMode])}
+                        {showPrices && (group.packageIncluded ? "In package" : group.priceMode === "unit" ? money(group.unitPrice) : group.priceMode === "package" ? `${money(group.unitPrice)} (${PRICE_MODES[group.priceMode]})` : PRICE_MODES[group.priceMode])}
                       </td>
                       <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && money(group.total)}
+                        {showPrices && (group.packageIncluded ? "In package" : money(group.total))}
                       </td>
                     </tr>
                   ))}
