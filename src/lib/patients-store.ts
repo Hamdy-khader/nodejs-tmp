@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { isTotalAdjustment } from "./treatment-pricing";
 import { moveTreatment, type TreatmentPosition, type Placement } from "./treatment-order";
 import { useEffect, useSyncExternalStore } from "react";
-import { clinicApi } from "@/lib/admin/api";
+import { ApiError, clinicApi } from "@/lib/admin/api";
 
 export type ToothStatus =
   | "intact"
@@ -338,9 +338,53 @@ function serializePlan(plan: TreatmentPlan) {
 }
 
 const treatmentSaves = new Map<string, Promise<unknown>>();
+const treatmentSaveAfter = new Map<string, number>();
+const treatmentRetryAfter = new Map<string, number>();
+const TREATMENT_SAVE_DELAY_MS = 500;
+const MAX_TREATMENT_RATE_LIMIT_RETRIES = 2;
 const treatmentRevisions = new Map<string, number>();
 const unsavedTreatments = new Set<string>();
 const planDetailsInflight = new Map<string, Promise<void>>();
+
+async function savePendingTreatments(planId: string): Promise<unknown> {
+  let rateLimitRetries = 0;
+  while (true) {
+    // Edits reset the quiet period. A rate-limit cooldown always takes priority.
+    const waitMs = Math.max(
+      treatmentSaveAfter.get(planId) ?? 0,
+      treatmentRetryAfter.get(planId) ?? 0,
+    ) - Date.now();
+    if (waitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+
+    const plan = getPlanById(planId);
+    if (!plan) throw new Error("Plan not found");
+    const revision = treatmentRevisions.get(planId);
+    let response: unknown;
+    try {
+      response = await clinicApi.plans.setRows(planId, serializeTreatmentRows(plan.treatments ?? []));
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 429) throw error;
+      // Cross-origin servers may omit/exclude Retry-After. Allow a full minute
+      // in that case, and retain the deadline even if automatic retries stop.
+      treatmentRetryAfter.set(planId, Date.now() + Math.max(1000, error.retryAfterMs ?? 60_000));
+      if (rateLimitRetries++ >= MAX_TREATMENT_RATE_LIMIT_RETRIES) throw error;
+      continue;
+    }
+
+    treatmentRetryAfter.delete(planId);
+    rateLimitRetries = 0;
+    if (treatmentRevisions.get(planId) !== revision) continue;
+
+    unsavedTreatments.delete(planId);
+    // An older response must never overwrite edits made while it was in flight.
+    const rows = (response as { treatment_rows?: Record<string, unknown>[] } | null)?.treatment_rows;
+    if (Array.isArray(rows)) updateLocalPlan(planId, { treatments: rows.map(toTreatmentRow) });
+    return response;
+  }
+}
 
 function serializeTreatmentRows(treatments: TreatmentRow[]) {
   return treatments.map((row, index) => ({
@@ -644,25 +688,24 @@ export const patientsStore = {
   },
 
   setTreatments(planId: string, treatments: TreatmentRow[]) {
+    if (!getPlanById(planId)) return Promise.reject(new Error("Plan not found"));
     const revision = (treatmentRevisions.get(planId) ?? 0) + 1;
     treatmentRevisions.set(planId, revision);
     unsavedTreatments.add(planId);
     updateLocalPlan(planId, { treatments });
-    // Serialize snapshots so a slower earlier reorder cannot overwrite the latest one.
-    const previous = treatmentSaves.get(planId) ?? Promise.resolve();
-    const save = previous.catch(() => undefined).then(async () => {
-      const response = await clinicApi.plans.setRows(planId, serializeTreatmentRows(treatments));
-      if (treatmentRevisions.get(planId) === revision) {
-        unsavedTreatments.delete(planId);
-        // Use saved row/item IDs only for the latest snapshot; an earlier save
-        // must never replace newer additions that are still waiting to save.
-        const rows = (response as { treatment_rows?: Record<string, unknown>[] } | null)?.treatment_rows;
-        if (Array.isArray(rows)) updateLocalPlan(planId, { treatments: rows.map(toTreatmentRow) });
-      }
-      return response;
-    });
+    treatmentSaveAfter.set(planId, Date.now() + TREATMENT_SAVE_DELAY_MS);
+    // One worker per plan sends only the newest snapshot; every caller waits
+    // until all edits made during that worker's lifetime have been saved.
+    const pending = treatmentSaves.get(planId);
+    if (pending) return pending;
+    const save = savePendingTreatments(planId);
     treatmentSaves.set(planId, save);
-    const cleanup = () => { if (treatmentSaves.get(planId) === save) treatmentSaves.delete(planId); };
+    const cleanup = () => {
+      if (treatmentSaves.get(planId) === save) {
+        treatmentSaves.delete(planId);
+        treatmentSaveAfter.delete(planId);
+      }
+    };
     void save.then(cleanup, cleanup);
     return save;
   },

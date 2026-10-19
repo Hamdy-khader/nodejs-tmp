@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const patientsListMock = vi.fn();
 const patientsCreateMock = vi.fn();
@@ -12,7 +12,8 @@ const deleteXrayMock = vi.fn();
 
 async function loadModule() {
   vi.resetModules();
-  vi.doMock("@/lib/admin/api", () => ({
+  vi.doMock("@/lib/admin/api", async () => ({
+    ...await vi.importActual<typeof import("@/lib/admin/api")>("@/lib/admin/api"),
     clinicApi: {
       patients: {
         list: patientsListMock,
@@ -47,6 +48,151 @@ async function loadModule() {
 }
 
 describe("patients-store", () => {
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("coalesces a multi-tooth selection and rapid typing into one save after editing pauses", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+
+    mod.patientsStore.addTreatmentRow("plan-1", { id: "visit", kind: "visit", items: [] });
+    for (const toothNumber of [...mod.UPPER_TEETH, ...mod.LOWER_TEETH]) {
+      mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Filling", toothNumber, amount: 1, unitPrice: 100 });
+    }
+    await vi.advanceTimersByTimeAsync(400);
+    mod.patientsStore.updateTreatmentRow("plan-1", "visit", { label: "First visit" });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(setRowsMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(setRowsMock).toHaveBeenCalledTimes(1);
+    expect(setRowsMock.mock.calls[0][1][0]).toMatchObject({ label: "First visit" });
+    expect(setRowsMock.mock.calls[0][1][0].items).toHaveLength(32);
+  });
+
+  it("waits for Retry-After and saves the latest edits without resolving callers early", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    const { ApiError } = await import("@/lib/admin/api");
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+    setRowsMock.mockRejectedValueOnce(new ApiError("RATE_LIMITED", "Too many requests", 429, undefined, 5000));
+
+    const first = mod.patientsStore.setTreatments("plan-1", [{ id: "v", kind: "visit", items: [] }]);
+    const finished = vi.fn();
+    void first.then(finished);
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(1000);
+    const latest = mod.patientsStore.setTreatments("plan-1", [{ id: "v", kind: "visit", label: "Latest", items: [] }]);
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(setRowsMock).toHaveBeenCalledTimes(1);
+    expect(finished).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await Promise.all([first, latest]);
+    expect(setRowsMock).toHaveBeenCalledTimes(2);
+    expect(setRowsMock.mock.calls[1][1][0]).toMatchObject({ label: "Latest" });
+    expect(finished).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses a minute cooldown when the server does not expose Retry-After", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    const { ApiError } = await import("@/lib/admin/api");
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+    setRowsMock.mockRejectedValueOnce(new ApiError("RATE_LIMITED", "Too many requests", 429));
+    const save = mod.patientsStore.setTreatments("plan-1", []);
+    await vi.advanceTimersByTimeAsync(60_499);
+    expect(setRowsMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await save;
+    expect(setRowsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds rate-limit retries and keeps unsaved edits and the cooldown for a later save", async () => {
+    const serverPlan = { id: "plan-1", patient_id: "p-1", treatment_rows: [] };
+    plansListMock.mockResolvedValueOnce([serverPlan]);
+    plansGetMock.mockResolvedValue(serverPlan);
+    const mod = await loadModule();
+    const { ApiError } = await import("@/lib/admin/api");
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+    const error = new ApiError("RATE_LIMITED", "Too many requests", 429, undefined, 5000);
+    setRowsMock.mockRejectedValue(error);
+    const rows = [{ id: "v", kind: "visit" as const, label: "Unsaved", items: [] }];
+    const save = mod.patientsStore.setTreatments("plan-1", rows);
+    const rejected = expect(save).rejects.toBe(error);
+    await vi.advanceTimersByTimeAsync(10_500);
+    await rejected;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(setRowsMock).toHaveBeenCalledTimes(3);
+
+    const { result } = renderHook(() => mod.usePlan("plan-1", "p-1"));
+    await act(async () => {});
+    expect(result.current?.treatments).toEqual(rows);
+    setRowsMock.mockResolvedValue({});
+    let retry!: Promise<unknown>;
+    act(() => { retry = mod.patientsStore.setTreatments("plan-1", rows); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(3999); });
+    expect(setRowsMock).toHaveBeenCalledTimes(3);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); await retry; });
+    expect(setRowsMock).toHaveBeenCalledTimes(4);
+    expect(setRowsMock.mock.calls[3][1][0]).toMatchObject({ label: "Unsaved" });
+  });
+
+  it("does not retry validation failures and can save a correction afterward", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    const { ApiError } = await import("@/lib/admin/api");
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+    const error = new ApiError("VALIDATION_ERROR", "Invalid treatment", 422);
+    setRowsMock.mockRejectedValueOnce(error);
+    const save = mod.patientsStore.setTreatments("plan-1", []);
+    const rejected = expect(save).rejects.toBe(error);
+    await vi.advanceTimersByTimeAsync(500);
+    await rejected;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(setRowsMock).toHaveBeenCalledTimes(1);
+    const retry = mod.patientsStore.setTreatments("plan-1", []);
+    await vi.advanceTimersByTimeAsync(500);
+    await retry;
+    expect(setRowsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits for newer edits before completing an explicit plan save", async () => {
+    plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", treatment_rows: [] }]);
+    const mod = await loadModule();
+    await mod.patientsStore.ensurePlanFor("p-1");
+    vi.useFakeTimers();
+    let finish!: (response: unknown) => void;
+    setRowsMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const rows = [{ id: "1", kind: "visit" as const, label: "Latest", items: [] }];
+    setRowsMock.mockResolvedValueOnce({ treatment_rows: rows });
+    plansGetMock.mockResolvedValueOnce({ id: "plan-1", patient_id: "p-1", treatment_rows: rows });
+
+    mod.patientsStore.addTreatmentRow("plan-1", { id: "v", kind: "visit", items: [] });
+    const save = mod.patientsStore.savePlan("plan-1");
+    const finished = vi.fn();
+    void save.then(finished);
+    await vi.advanceTimersByTimeAsync(500);
+    mod.patientsStore.updateTreatmentRow("plan-1", "v", { label: "Latest" });
+    finish({ treatment_rows: [] });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(setRowsMock).toHaveBeenCalledTimes(1);
+    expect(plansGetMock).not.toHaveBeenCalled();
+    expect(finished).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await save;
+    expect(setRowsMock).toHaveBeenCalledTimes(2);
+    expect(setRowsMock.mock.calls[1][1][0]).toMatchObject({ label: "Latest" });
+    expect(finished).toHaveBeenCalledTimes(1);
+  });
+
   it("only removes an X-ray after the server confirms deletion", async () => {
     plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", xrays: [{ id: "x", url: "/x.png", sort_order: 1 }, { id: "y", url: "/y.png", sort_order: 2 }] }]);
     const mod = await loadModule();
@@ -128,7 +274,7 @@ describe("patients-store", () => {
     deleteXrayMock.mockReset().mockResolvedValue(undefined);
   });
 
-  it("serializes rapid reorder saves and preserves item ordering in the payload", async () => {
+  it("coalesces reorders made during an in-flight save and preserves the final ordering", async () => {
     plansListMock.mockResolvedValueOnce([{ id: "plan-1", patient_id: "p-1", name: "Plan", treatment_rows: [
       { id: "v", kind: "visit", sort_order: 1, items: [
         { id: "a", name: "Implant", amount: 1, unit_price: 400, sort_order: 1 },
@@ -141,13 +287,15 @@ describe("patients-store", () => {
     let release!: () => void;
     setRowsMock.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
     const first = mod.patientsStore.moveTreatment("plan-1", { kind: "row", id: "h" }, { kind: "row", id: "v" }, "before");
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
     const second = mod.patientsStore.moveTreatment("plan-1", { kind: "row", id: "h" }, { kind: "row", id: "v" }, "after");
     const third = mod.patientsStore.moveTreatment("plan-1", { kind: "item", id: "b" }, { kind: "item", id: "a" }, "before");
     await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
     expect(setRowsMock.mock.calls[0][1].map((r: { id: string }) => r.id)).toEqual(["h", "v"]);
     release();
     await Promise.all([first, second, third]);
-    const saved = setRowsMock.mock.calls[2][1];
+    expect(setRowsMock).toHaveBeenCalledTimes(2);
+    const saved = setRowsMock.mock.calls[1][1];
     expect(saved.map((r: { id: string }) => r.id)).toEqual(["v", "h"]);
     expect(saved[0].items).toMatchObject([{ id: "b", sort_order: 1 }, { id: "a", sort_order: 2 }]);
     expect(saved[1]).toMatchObject({ days: 30, sort_order: 2 });
@@ -176,6 +324,7 @@ describe("patients-store", () => {
     let finish!: (response: unknown) => void;
     setRowsMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Root canal", toothNumber: 11, amount: 1, unitPrice: 200 });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
     mod.patientsStore.addTreatmentRow("plan-1", { id: "new-visit", kind: "visit", items: [] });
     mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Crown", toothNumber: 11, amount: 1, unitPrice: 300 });
     await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
@@ -186,15 +335,15 @@ describe("patients-store", () => {
       ] },
       { id: 2, kind: "visit", items: [{ id: 12, name: "Crown", tooth_number: 11, amount: 1, unit_price: 300 }] },
     ];
-    setRowsMock.mockResolvedValueOnce({ treatment_rows: [] }).mockResolvedValueOnce({ treatment_rows: finalRows });
+    setRowsMock.mockResolvedValueOnce({ treatment_rows: finalRows });
     finish({ treatment_rows: [finalRows[0]] });
-    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(3));
-    const saved = setRowsMock.mock.calls[2][1];
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(2));
+    const saved = setRowsMock.mock.calls[1][1];
     expect(saved[0].items.map((item: { name: string }) => item.name)).toEqual(["Filling", "Root canal"]);
     expect(saved[1].items.map((item: { name: string }) => item.name)).toEqual(["Crown"]);
     mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Veneer", toothNumber: 12, amount: 1, unitPrice: 400 });
-    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(4));
-    expect(setRowsMock.mock.calls[3][1][1]).toMatchObject({ id: "2", items: [{ id: "12", name: "Crown" }, { name: "Veneer" }] });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(3));
+    expect(setRowsMock.mock.calls[2][1][1]).toMatchObject({ id: "2", items: [{ id: "12", name: "Crown" }, { name: "Veneer" }] });
   });
 
   it("does not erase an added treatment when an older plan fetch finishes late", async () => {
@@ -255,6 +404,7 @@ describe("patients-store", () => {
     let release!: () => void;
     setRowsMock.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
     mod.patientsStore.addTreatmentRow("plan-1", { id: "visit", kind: "visit", items: [] });
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
     mod.patientsStore.addTreatmentItemToLastVisit("plan-1", { name: "Filling", amount: 2, unitPrice: 150 });
     const { result } = renderHook(() => mod.usePlansFor("p-1"));
     const visit = result.current[0].treatments![0];
@@ -262,8 +412,8 @@ describe("patients-store", () => {
     act(() => mod.patientsStore.updateTreatmentItem("plan-1", "visit", visit.items[0].id, { unitPrice: 125.5 }));
     await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(1));
     release();
-    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(3));
-    expect(setRowsMock.mock.calls[2][1][0].items[0]).toMatchObject({
+    await waitFor(() => expect(setRowsMock).toHaveBeenCalledTimes(2));
+    expect(setRowsMock.mock.calls[1][1][0].items[0]).toMatchObject({
       unit_price: 125.5, amount: 2, manual_price_override: true,
     });
     expect(updateItemMock).not.toHaveBeenCalled();

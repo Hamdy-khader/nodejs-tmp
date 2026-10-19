@@ -56,10 +56,19 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly errors?: Record<string, string[]>,
+    public readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const value = response.headers.get("Retry-After")?.trim();
+  if (!value) return undefined;
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }
 
 export interface AdminUser {
@@ -307,6 +316,7 @@ async function request<T>(
       err.message ?? `Request failed (${res.status})`,
       res.status,
       err.errors,
+      res.status === 429 ? retryAfterMs(res) : undefined,
     );
   }
 
