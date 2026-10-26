@@ -35,10 +35,15 @@ function displayKey(item: TreatmentItem): string {
   return JSON.stringify([treatmentKey(item), treatmentJaw(item.toothNumber) ?? item.toothNumber]);
 }
 
-/** A display group keeps the original per-tooth records and their saved prices. */
+/**
+ * A display group keeps the original per-tooth records and their saved prices.
+ * Only consecutive items of one treatment join, one row per jaw: teeth added
+ * together form one row, the same treatment added after something else starts
+ * a new row until Autocorrect brings them together.
+ */
 export function groupTreatmentItems(items: TreatmentItem[], visitItems = items): TreatmentItemGroup[] {
   const groups: TreatmentItemGroup[] = [];
-  const byKey = new Map<string, TreatmentItemGroup>();
+  let block: { key: string; byJaw: Map<string, TreatmentItemGroup> } | null = null;
   // A package can cover both jaws. Splitting its display must not charge it twice.
   // Reports pass the full visit so a continuation page retains the same package owner.
   const packages = new Map<string, TreatmentItem[]>();
@@ -52,12 +57,13 @@ export function groupTreatmentItems(items: TreatmentItem[], visitItems = items):
   for (const item of items) {
     const jaw = treatmentJaw(item.toothNumber);
     const key = displayKey(item);
-    let group = byKey.get(key);
+    if (block?.key !== treatmentKey(item)) block = { key: treatmentKey(item), byJaw: new Map() };
+    let group = block.byJaw.get(key);
     if (!group) {
       group = { id: item.id, jaw, items: [], teeth: [], amount: 0, unitPrice: item.unitPrice, total: 0, priceMode: item.priceMode ?? "unit", packageIncluded: false };
       group.packageItems = packages.get(treatmentKey(item));
       group.packageIncluded = Boolean(group.packageItems && displayKey(group.packageItems[0]) !== key);
-      byKey.set(key, group);
+      block.byJaw.set(key, group);
       groups.push(group);
     }
     group.items.push(item);

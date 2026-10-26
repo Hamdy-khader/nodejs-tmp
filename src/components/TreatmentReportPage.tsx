@@ -1,7 +1,9 @@
 import { groupTreatmentItems, treatmentItemsTotal, PRICE_MODES } from "@/lib/treatment-groups";
-import { useEffect, useRef, useState, type RefObject } from "react";
-import { TeethChart } from "./TeethChart";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Odontogram } from "./odontogram/Odontogram";
 import { getStatusMeta, type TreatmentPlan, type TreatmentRow } from "@/lib/patients-store";
+import { planEntries } from "@/lib/dental/plan-diagnosis";
+import { plannedStates } from "@/lib/dental/treatment-engine";
 import type { TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
 import type { PlanSettings } from "@/lib/plan-settings-store";
 import {
@@ -9,7 +11,6 @@ import {
   resolveTemplate,
   type PdfExportContext,
 } from "@/lib/pdf-export-context";
-import { getTreatmentTeeth, getTreatmentAnnotations } from "@/lib/treatment-teeth";
 import { reportPageHeight, REPORT_XRAY_HEIGHT, REPORT_XRAY_BLOCK_HEIGHT } from "@/lib/treatment-report-layout";
 
 export function TreatmentReportPage({
@@ -231,10 +232,22 @@ function ReportCover({ settings, context }: { settings: PlanSettings; context: P
   );
 }
 
+// The same chart as the plan screen, read-only; the treatment page adds the
+// planned work in green.
+function ReportChart({ plan, rows }: { plan: TreatmentPlan; rows?: TreatmentRow[] }) {
+  const entries = useMemo(() => planEntries(plan.teeth, plan.generalStatuses), [plan.teeth, plan.generalStatuses]);
+  const planned = useMemo(() => (rows ? plannedStates(rows) : []), [rows]);
+  return (
+    <div data-pdf-keep-together style={{ padding: "4px 0" }}>
+      <Odontogram entries={entries} planned={planned} mode={rows ? "treatments" : "diagnosis"} readOnly />
+    </div>
+  );
+}
+
 function ReportDiagnosis({ plan }: { plan: TreatmentPlan }) {
   return (
     <>
-      <TeethChart teeth={plan.teeth} report />
+      <ReportChart plan={plan} />
       {!!plan.generalStatuses?.length && (
         <p style={{ margin: "8px 0" }}>{plan.generalStatuses.join(" · ")}</p>
       )}
@@ -323,23 +336,10 @@ function ReportTreatment({
         : 0),
     0,
   );
-  const teeth = getTreatmentTeeth(plan.teeth, allRows);
   const visits = allRows.filter((row) => row.kind === "visit");
   return (
     <>
-      {page.showTreatmentChart && (
-        <TeethChart
-          baseTeeth={plan.teeth}
-          teeth={teeth}
-          annotations={getTreatmentAnnotations(allRows)}
-          highlighted={allRows.flatMap((row) =>
-            row.kind === "visit"
-              ? row.items.flatMap((item) => (item.toothNumber == null ? [] : [item.toothNumber]))
-              : [],
-          )}
-          report
-        />
-      )}
+      {page.showTreatmentChart && <ReportChart plan={plan} rows={allRows} />}
       {(page.treatmentRows ?? []).map((row, index) => (
         <section key={`${row.id}-${index}`} style={{ marginTop: 10 }}>
           {row.kind === "visit" ? (

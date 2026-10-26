@@ -1,16 +1,33 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
   type TreatmentPlan,
   type TreatmentRow,
-  type TreatmentItem,
   type TreatmentPriceMode,
   UPPER_TEETH,
   LOWER_TEETH,
 } from "@/lib/patients-store";
-import { pricelistStore, usePricelist } from "@/lib/pricelist-store";
-import { TeethChart } from "@/components/TeethChart";
+import { usePricelist, type PriceSection } from "@/lib/pricelist-store";
+import { Odontogram } from "@/components/odontogram/Odontogram";
+import { TreatmentButtons } from "@/components/treatments/TreatmentButtons";
+import { GeneralStatusDialog } from "@/components/GeneralStatusDialog";
+import { planEntries } from "@/lib/dental/plan-diagnosis";
+import { shortLabel } from "@/lib/dental/states";
+import { treatmentHistory } from "@/lib/dental/treatment-history";
+import {
+  SELECT_TEETH_MESSAGE,
+  appendToLastVisit,
+  buildTreatmentButtons,
+  isTypeGroup,
+  itemsForEntry,
+  needsTeeth,
+  plannedStates,
+  switchType,
+  treatmentState,
+  type CatalogEntry,
+  type TreatmentEntry,
+} from "@/lib/dental/treatment-engine";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,10 +44,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { getTreatmentTeeth, getTreatmentAnnotations } from "@/lib/treatment-teeth";
 import { cn } from "@/lib/utils";
 import { TreatmentSorting, SortableTreatment, TreatmentDragHandle } from "./TreatmentSorting";
-import { toggleToothSelection } from "@/lib/tooth-selection";
 import {
   isTotalAdjustment,
   setTreatmentTotal,
@@ -63,41 +78,14 @@ function currencySymbol(currency: string) {
   }
 }
 
-interface TreatmentMenuItem {
-  label: string;
-  value: string;
-  itemId?: string;
-  itemKey?: string;
-  sectionKey?: string;
-  groupKey?: string;
-  unitPrice?: number;
-  priceDisplay?: string;
+// Row actions that need the whole plan (type switching, removal) reach the
+// item rows through this context.
+interface TreatmentActions {
+  sections: PriceSection[];
+  switchType: (itemIds: string[], entry: CatalogEntry) => void;
+  remove: (rowId: string, itemIds: string[], label: string) => void;
 }
-
-interface TreatmentGroup {
-  id: string;
-  label: string;
-  items: TreatmentMenuItem[];
-}
-
-/** Ordered FDI map across both jaws for finding "between" teeth. */
-const JAW_ORDER: number[][] = [UPPER_TEETH, LOWER_TEETH];
-
-function norm(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function buildTreatmentLookup(groups: TreatmentGroup[]) {
-  const lookup = new Map<string, string>();
-  groups.forEach((group) => {
-    group.items.forEach((item) => {
-      if (!item.value.startsWith("__")) {
-        lookup.set(norm(item.value), group.id);
-      }
-    });
-  });
-  return lookup;
-}
+const TreatmentActionsContext = createContext<TreatmentActions | null>(null);
 
 export function TreatmentsView({
   plan,
@@ -110,19 +98,14 @@ export function TreatmentsView({
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
   const pricelistSections = usePricelist();
   const [selectedTeeth, setSelectedTeeth] = useState<number[]>([]);
-  const [bridgeMode, setBridgeMode] = useState(false);
-  const [bridgeSel, setBridgeSel] = useState<number[]>([]);
+  const [lastButton, setLastButton] = useState<string>();
+  const [customEntry, setCustomEntry] = useState<TreatmentEntry | null>(null);
   const [insOpen, setInsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [totalOpen, setTotalOpen] = useState(false);
   const [totalDraft, setTotalDraft] = useState("");
   const [totalError, setTotalError] = useState("");
   const [savingTotal, setSavingTotal] = useState(false);
-  const addItems = (items: Omit<TreatmentItem, "id">[]) => {
-    for (const item of items) patientsStore.addTreatmentItemToLastVisit(plan.id, { ...item, priceMode: "unit" });
-    setSelectedTeeth([]);
-    setBridgeSel([]);
-  };
 
   useEffect(() => {
     const clear = (event: PointerEvent) => {
@@ -134,7 +117,6 @@ export function TreatmentsView({
       )
         return;
       setSelectedTeeth([]);
-      setBridgeSel([]);
     };
     document.addEventListener("pointerdown", clear);
     return () => document.removeEventListener("pointerdown", clear);
@@ -143,112 +125,59 @@ export function TreatmentsView({
   const rows = plan.treatments ?? [];
   const visibleRows = withoutTotalAdjustment(rows);
   const billingMode = plan.billingMode ?? "insurance";
-  const treatmentGroups: TreatmentGroup[] = pricelistSections.map((section) => {
-    const items: TreatmentMenuItem[] = [];
-    if (section.label === "Bridge") {
-      items.push({
-        label: "Bridge Span...",
-        value: "__bridge_span__",
-      });
-    }
-    section.groups.forEach((group) => {
-      group.items.forEach((item) => {
-        items.push({
-          label: `${group.title}: ${item.name}`,
-          value: item.name,
-          itemId: item.id,
-          itemKey: item.key,
-          sectionKey: section.key,
-          groupKey: group.key,
-          unitPrice: item.price,
-          priceDisplay: item.price > 0 ? `${symbol} ${item.price.toFixed(2)}` : `${symbol} 0`,
-        });
-      });
-    });
-    return {
-      id: section.key,
-      label: section.label,
-      items,
-    };
-  });
-  const treatmentLookup = buildTreatmentLookup(treatmentGroups);
-  const toothAnnotations = getTreatmentAnnotations(rows, treatmentLookup);
-  const defaultBridgeItem = treatmentGroups
-    .find((group) => group.id === "bridge")
-    ?.items.find((item) => item.itemId);
+  const buttons = useMemo(() => buildTreatmentButtons(pricelistSections), [pricelistSections]);
+  const diagnosisEntries = useMemo(
+    () => planEntries(plan.teeth, plan.generalStatuses),
+    [plan.teeth, plan.generalStatuses],
+  );
+  const planned = useMemo(() => plannedStates(rows), [rows]);
 
-  const toggleBridgeTooth = (n: number) => {
-    setBridgeSel((prev) => (prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n]));
-  };
-
-  const toggleTreatmentTooth = (n: number) => {
-    setSelectedTeeth((prev) => toggleToothSelection(prev, n));
-  };
-
-  const handlePick = (group: TreatmentGroup, item: TreatmentMenuItem) => {
-    if (item.value === "__bridge_span__") {
-      startBridge();
-      return;
-    }
-    const targets = selectedTeeth.length > 0 ? selectedTeeth : [undefined];
-    addItems(
-      targets.map((toothNumber) => ({
-        name: item.value,
-        toothNumber,
-        amount: 1,
-        unitPrice: item.unitPrice ?? pricelistStore.getPriceFor(item.value),
-        catalogSectionKey: item.sectionKey ?? group.id,
-        catalogGroupKey: item.groupKey,
-        catalogItemId: item.itemId,
-        catalogItemKey: item.itemKey,
-        priceSource: item.itemId ? "catalog" : undefined,
-        manualPriceOverride: false,
-      })),
+  // The selection stays after adding, so more treatments can go on the same teeth.
+  const addEntry = (entry: TreatmentEntry, customName?: string) => {
+    const items = itemsForEntry(entry, selectedTeeth, pricelistSections, customName).map(
+      (item) => ({ ...item, id: uid() }),
+    );
+    if (!items.length) return;
+    treatmentHistory.commit(
+      plan.id,
+      rows,
+      appendToLastVisit(rows, items, uid),
+      shortLabel(treatmentState(items[0])),
     );
   };
 
-  const startBridge = () => {
-    setBridgeMode(true);
-    setBridgeSel([]);
-    setSelectedTeeth([]);
+  const pick = (entry: TreatmentEntry, buttonLabel: string) => {
+    if (needsTeeth(entry) && !selectedTeeth.length) {
+      toast(SELECT_TEETH_MESSAGE);
+      return;
+    }
+    setLastButton(buttonLabel);
+    if (entry.kind === "custom") {
+      setCustomEntry(entry);
+      return;
+    }
+    addEntry(entry);
   };
 
-  const cancelBridge = () => {
-    setBridgeMode(false);
-    setBridgeSel([]);
-  };
-
-  const applyBridge = () => {
-    if (bridgeSel.length < 2) return;
-    // Sort selection along the jaw order
-    const sorted = [...bridgeSel].sort((a, b) => {
-      for (const row of JAW_ORDER) {
-        const ia = row.indexOf(a);
-        const ib = row.indexOf(b);
-        if (ia !== -1 && ib !== -1) return ia - ib;
-      }
-      return a - b;
-    });
-    // Selected teeth become abutments; teeth between them become pontics.
-    // Both render as "bridge" so the connector is one continuous span.
-    const lo = sorted[0];
-    const hi = sorted[sorted.length - 1];
-    // Add a treatment line summarizing the bridge span
-    const bridgeName = `Bridge ${lo}-${hi}`;
-    addItems([
-      {
-        name: bridgeName,
-        amount: 1,
-        unitPrice: defaultBridgeItem?.unitPrice ?? pricelistStore.getPriceFor("Bridge"),
-        catalogSectionKey: defaultBridgeItem?.sectionKey ?? "bridge",
-        catalogGroupKey: defaultBridgeItem?.groupKey ?? "bridge",
-        catalogItemId: defaultBridgeItem?.itemId,
-        catalogItemKey: defaultBridgeItem?.itemKey,
-        priceSource: "catalog",
-        manualPriceOverride: false,
-      },
-    ]);
-    cancelBridge();
+  const actions: TreatmentActions = {
+    sections: pricelistSections,
+    switchType: (itemIds, entry) =>
+      treatmentHistory.commit(plan.id, rows, switchType(rows, itemIds, entry), shortLabel(treatmentState({
+        catalogSectionKey: entry.sectionKey,
+        catalogGroupKey: entry.groupKey,
+        catalogItemKey: entry.item.key,
+      }))),
+    remove: (rowId, itemIds, label) =>
+      treatmentHistory.commit(
+        plan.id,
+        rows,
+        rows.map((row) =>
+          row.kind === "visit" && row.id === rowId
+            ? { ...row, items: row.items.filter((item) => !itemIds.includes(item.id)) }
+            : row,
+        ),
+        label,
+      ),
   };
 
   const totals = treatmentTotals(rows);
@@ -257,118 +186,26 @@ export function TreatmentsView({
 
   return (
     <CurrencyContext.Provider value={symbol}>
+      <TreatmentActionsContext.Provider value={actions}>
       <div className="treatment-workspace">
-        {/* Teeth + Treatment categories */}
+        {/* Teeth + Treatment buttons */}
         <div className="treatment-chart-panel">
           <div className="treatment-chart">
-            <TeethChart
-              teeth={getTreatmentTeeth(plan.teeth, rows, treatmentLookup)}
-              baseTeeth={plan.teeth}
-              selected={bridgeMode ? null : (selectedTeeth.at(-1) ?? null)}
-              onSelect={bridgeMode ? toggleBridgeTooth : toggleTreatmentTooth}
-              onSelectMany={bridgeMode ? setBridgeSel : setSelectedTeeth}
-              highlighted={bridgeMode ? bridgeSel : selectedTeeth}
-              annotations={toothAnnotations}
+            <Odontogram
+              entries={diagnosisEntries}
+              planned={planned}
+              mode="treatments"
+              selected={selectedTeeth}
+              onSelectionChange={setSelectedTeeth}
             />
-            {bridgeMode && (
-              <div
-                data-treatment-selection
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-violet-400/40 bg-violet-500/10 px-3 py-2"
-              >
-                <p className="text-xs font-medium text-foreground">
-                  Bridge mode — pick 2+ teeth across a missing tooth
-                  {bridgeSel.length > 0 && (
-                    <span className="ml-2 font-semibold text-violet-700">
-                      Selected: {[...bridgeSel].sort((a, b) => a - b).join(", ")}
-                    </span>
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={cancelBridge}
-                    className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={applyBridge}
-                    disabled={bridgeSel.length < 2}
-                    className="rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    Apply Bridge
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-
-          <div data-treatment-selection className="treatment-categories">
-            <div className="sr-only">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Clinic treatments
-              </h3>
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                  bridgeMode
-                    ? "bg-violet-500/15 text-violet-700"
-                    : selectedTeeth.length > 0
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted text-muted-foreground",
-                )}
-              >
-                {bridgeMode
-                  ? "Bridge mode"
-                  : selectedTeeth.length > 0
-                    ? `${selectedTeeth.length} ${selectedTeeth.length === 1 ? "tooth" : "teeth"}`
-                    : "Any tooth"}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {treatmentGroups.map((group) => {
-                const isActive = group.id === "bridge" && bridgeMode;
-                return (
-                  <DropdownMenu key={group.id}>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className={cn(
-                          "group flex h-8 items-center justify-between gap-2 rounded-full px-3 text-left text-[11px] font-semibold transition-all",
-                          isActive
-                            ? "bg-violet-600 text-white"
-                            : "bg-[#66b96a] text-white hover:bg-[#54a85a]",
-                        )}
-                      >
-                        <span className="truncate">{group.label}</span>
-                        {isActive ? (
-                          <Check className="h-3.5 w-3.5 shrink-0 opacity-90" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-90" />
-                        )}
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      className="max-h-[320px] min-w-[240px] overflow-y-auto"
-                    >
-                      {group.items?.map((item) => (
-                        <DropdownMenuItem
-                          key={`${group.id}-${item.value}-${item.label}`}
-                          onSelect={() => handlePick(group, item)}
-                          className="flex items-center justify-between gap-3 text-xs font-medium"
-                        >
-                          <span className="truncate">{item.label}</span>
-                          {item.priceDisplay && (
-                            <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                              {item.priceDisplay}
-                            </span>
-                          )}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-              })}
-            </div>
+          <div className="treatment-categories">
+            <TreatmentButtons
+              buttons={buttons}
+              onPick={pick}
+              activeLabel={lastButton}
+              currencySymbol={symbol}
+            />
           </div>
         </div>
 
@@ -705,7 +542,17 @@ export function TreatmentsView({
             }}
           />
         )}
+
+        <GeneralStatusDialog
+          open={customEntry !== null}
+          title="Other treatment"
+          label="Treatment"
+          teeth={selectedTeeth}
+          onClose={() => setCustomEntry(null)}
+          onSubmit={(name) => customEntry && addEntry(customEntry, name)}
+        />
       </div>
+      </TreatmentActionsContext.Provider>
     </CurrencyContext.Provider>
   );
 }
@@ -874,6 +721,19 @@ function ItemRow({
   group: TreatmentItemGroup;
 }) {
   const item = group.items[0];
+  const actions = useContext(TreatmentActionsContext);
+  // Crown, bridge and implant rows can switch to another type of the same group.
+  const typeOptions: CatalogEntry[] =
+    actions && isTypeGroup(item.catalogSectionKey, item.catalogGroupKey)
+      ? (actions.sections
+          .find((section) => section.key === item.catalogSectionKey)
+          ?.groups.find((entry) => entry.key === item.catalogGroupKey)
+          ?.items.map((option) => ({
+            sectionKey: item.catalogSectionKey!,
+            groupKey: item.catalogGroupKey!,
+            item: option,
+          })) ?? [])
+      : [];
   const [teethOpen, setTeethOpen] = useState(false);
   const [teethDraft, setTeethDraft] = useState(group.teeth);
   const [savingTeeth, setSavingTeeth] = useState(false);
@@ -919,14 +779,41 @@ function ItemRow({
     <div className="treatment-item" data-treatment-group={group.id}>
       <TreatmentDragHandle />
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span
-          className="inline-block max-w-full border-b border-slate-300/70 pb-0.5"
-          title={item.name}
-        >
-          {item.name}
+        <span className="inline-flex max-w-full items-center gap-1 border-b border-slate-300/70 pb-0.5">
+          <span className="truncate" title={item.name}>
+            {item.name}
+          </span>
+          {typeOptions.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" aria-label={`Change type of ${item.name}`} className="shrink-0">
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {typeOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.item.id}
+                    onSelect={() => actions?.switchType(group.items.map((entry) => entry.id), option)}
+                    className="text-[13px]"
+                  >
+                    {option.item.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </span>
-        {group.jaw && <span className="text-muted-foreground">{group.jaw}</span>}
-        <div className="flex flex-wrap gap-0.5" aria-label={`Teeth for ${item.name}`}>
+        <button
+          type="button"
+          className="flex flex-wrap gap-0.5"
+          aria-label={`Edit teeth for ${item.name}`}
+          title="Edit teeth"
+          onClick={() => {
+            setTeethDraft(group.teeth);
+            setTeethOpen(true);
+          }}
+        >
           {group.teeth.map((number) => (
             <span
               key={number}
@@ -935,8 +822,7 @@ function ItemRow({
               {number}
             </span>
           ))}
-        </div>
-        <button type="button" className="text-primary underline" aria-label={`Edit teeth for ${item.name}`} onClick={() => { setTeethDraft(group.teeth); setTeethOpen(true); }}>Edit teeth</button>
+        </button>
         {group.packageItems?.some(entry => !group.items.includes(entry)) && <span className="text-muted-foreground">Shared package across both jaws</span>}
       </div>
       <div className="flex items-center justify-end gap-1">
@@ -1006,13 +892,9 @@ function ItemRow({
           aria-label="Remove item"
           title={`Remove ${item.name}`}
           onClick={() =>
-            group.items.length === 1
-              ? patientsStore.removeTreatmentItem(planId, rowId, item.id)
-              : patientsStore.removeTreatmentItems(
-                  planId,
-                  rowId,
-                  group.items.map((entry) => entry.id),
-                )
+            actions
+              ? actions.remove(rowId, group.items.map((entry) => entry.id), shortLabel(treatmentState(item)))
+              : patientsStore.removeTreatmentItems(planId, rowId, group.items.map((entry) => entry.id))
           }
           className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >

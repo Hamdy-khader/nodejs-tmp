@@ -23,6 +23,11 @@ describe("grouped treatments", () => {
     expect(treatmentItemsTotal(items)).toBe(8480);
     expect(items).toEqual(before);
   });
+  it("starts a new row when the same treatment is added after another one", () => {
+    const other = { ...tooth("x", 15), name: "Crown" };
+    const groups = groupTreatmentItems([tooth("a", 17), other, tooth("b", 16)]);
+    expect(groups.map(group => group.teeth)).toEqual([[17], [15], [16]]);
+  });
   it("preserves saved group order and scopes amount edits to one jaw", () => {
     const groups = groupTreatmentItems([tooth("a", 31), tooth("b", 11), tooth("c", 41), tooth("d", 21)]);
     expect(groups.map(group => group.teeth)).toEqual([[31, 41], [11, 21]]);

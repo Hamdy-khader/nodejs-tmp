@@ -3,6 +3,8 @@ import { isTotalAdjustment } from "./treatment-pricing";
 import { moveTreatment, type TreatmentPosition, type Placement } from "./treatment-order";
 import { useEffect, useSyncExternalStore } from "react";
 import { ApiError, clinicApi } from "@/lib/admin/api";
+import type { StatusEntry } from "@/lib/dental/diagnosis-engine";
+import { entriesFromApi, entriesToApi, isStructuredDiagnosis } from "@/lib/dental/plan-diagnosis";
 
 export type ToothStatus =
   | "intact"
@@ -16,9 +18,13 @@ export type ToothStatus =
 
 export interface ToothState {
   number: number;
+  /** Summary for reports and older screens, derived from `statuses` when present. */
   status: ToothStatus;
   note?: string;
+  /** Detail labels of plans saved before diagnoses could stack. */
   diagnosis?: string[];
+  /** Stacked diagnosis chips, in chart order. */
+  statuses?: StatusEntry[];
 }
 
 export type TreatmentPriceMode = "unit" | "package" | "free" | "in-package";
@@ -169,11 +175,24 @@ function toPatient(raw: Record<string, unknown>): Patient {
 }
 
 function toTooth(raw: Record<string, unknown>): ToothState {
+  const number = Number(raw.tooth_number ?? raw.number ?? 0);
+  const diagnosis = raw.diagnosis;
+  const structured = isStructuredDiagnosis(diagnosis);
   return {
-    number: Number(raw.tooth_number ?? raw.number ?? 0),
+    number,
     status: normalizeToothStatus(raw.status),
     note: raw.note ? String(raw.note) : undefined,
-    diagnosis: Array.isArray(raw.diagnosis) ? raw.diagnosis.map(String) : undefined,
+    diagnosis: !structured && Array.isArray(diagnosis) ? diagnosis.map(String) : undefined,
+    statuses: structured ? entriesFromApi(number, diagnosis) : undefined,
+  };
+}
+
+function toothPayload(tooth: ToothState) {
+  return {
+    tooth_number: tooth.number,
+    status: tooth.status,
+    note: tooth.note ?? null,
+    diagnosis: tooth.statuses ? entriesToApi(tooth.statuses) : (tooth.diagnosis ?? []),
   };
 }
 
@@ -418,12 +437,7 @@ function serializeTreatmentRows(treatments: TreatmentRow[]) {
 }
 
 function serializeTeeth(teeth: Record<number, ToothState>) {
-  return Object.values(teeth).map((tooth) => ({
-    tooth_number: tooth.number,
-    status: tooth.status,
-    note: tooth.note ?? null,
-    diagnosis: tooth.diagnosis ?? [],
-  }));
+  return Object.values(teeth).map(toothPayload);
 }
 
 async function loadPatients(force = false) {
@@ -679,12 +693,7 @@ export const patientsStore = {
     updateLocalPlan(planId, {
       teeth: { ...plan.teeth, [tooth.number]: tooth },
     });
-    void clinicApi.plans.updateTooth(planId, tooth.number, {
-      tooth_number: tooth.number,
-      status: tooth.status,
-      note: tooth.note ?? null,
-      diagnosis: tooth.diagnosis ?? [],
-    });
+    void clinicApi.plans.updateTooth(planId, tooth.number, toothPayload(tooth));
   },
 
   setTreatments(planId: string, treatments: TreatmentRow[]) {

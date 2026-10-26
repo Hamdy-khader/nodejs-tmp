@@ -1,12 +1,11 @@
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { defaultTeeth, type TreatmentPlan } from "@/lib/patients-store";
 import type { PlanSettings } from "@/lib/plan-settings-store";
 import { buildTreatmentReportPages } from "@/lib/treatment-report-layout";
+import type { TreatmentPlanPdfPage } from "@/lib/treatment-plan-pdf";
 import { TreatmentReportPage } from "./TreatmentReportPage";
-
-vi.mock("./TeethChart", () => ({ TeethChart: () => null }));
 
 const settings: PlanSettings = {
   language: "English", pageSize: "A4", priceListDesign: "detailed", updatedAt: 0,
@@ -15,15 +14,42 @@ const settings: PlanSettings = {
   pageDesign: { frontCover: { clinicName: "Clinic", title: "Plan" }, innerPages: { headerText: "", footerLeft: "Clinic", footerRight: "", showFooter: true }, backCover: { title: "" } },
 };
 
+function renderPage(page: TreatmentPlanPdfPage, plan: TreatmentPlan, index = 0, total = 1) {
+  const html = renderToStaticMarkup(<TreatmentReportPage page={page} index={index} total={total}
+    plan={plan} settings={settings} pageRef={createRef<HTMLDivElement>()}
+    exportContext={{ clinicName: "Clinic", patientName: "Patient", treatmentNumber: "1" }} />);
+  return new DOMParser().parseFromString(html, "text/html");
+}
+
 function report(plan: TreatmentPlan) {
   const pages = buildTreatmentReportPages(plan, settings);
-  return pages.map((page, index) => {
-    const html = renderToStaticMarkup(<TreatmentReportPage page={page} index={index} total={pages.length}
-      plan={plan} settings={settings} pageRef={createRef<HTMLDivElement>()}
-      exportContext={{ clinicName: "Clinic", patientName: "Patient", treatmentNumber: "1" }} />);
-    return new DOMParser().parseFromString(html, "text/html");
-  });
+  return pages.map((page, index) => renderPage(page, plan, index, pages.length));
 }
+
+const marker = (page: Document, tooth: number) =>
+  page.querySelector(`[data-tooth-number="${tooth}"] [data-marker]`)?.getAttribute("data-marker");
+
+describe("treatment report charts", () => {
+  const base: TreatmentPlan = { id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0 };
+  it("draws the diagnosis as a read-only chart on the status page", () => {
+    const plan: TreatmentPlan = { ...base, teeth: { ...base.teeth, 16: { number: 16, status: "intact", statuses: [{ toothId: 16, stateId: 201 }] } } };
+    const page = renderPage({ kind: "status", title: "Your current dental status" }, plan);
+    expect(page.querySelector('[data-odontogram="diagnosis"]')?.getAttribute("role")).toBe("img");
+    expect(page.querySelectorAll("button")).toHaveLength(0);
+    expect(marker(page, 16)).toBe("status");
+    expect(marker(page, 15)).toBe("none");
+  });
+  it("marks the planned treatments on the first treatment page", () => {
+    const plan: TreatmentPlan = { ...base, treatments: [{ id: "visit", kind: "visit", items: [
+      { id: "a", name: "Zirconium Crown", toothNumber: 16, amount: 1, unitPrice: 700, catalogSectionKey: "crown", catalogGroupKey: "crown", catalogItemKey: "zirconium-crown" },
+    ] }] };
+    const [page] = report(plan);
+    expect(page.querySelector('[data-odontogram="treatments"]')?.getAttribute("role")).toBe("img");
+    expect(page.querySelectorAll("button")).toHaveLength(0);
+    expect(marker(page, 16)).toBe("planned");
+    expect(marker(page, 15)).toBe("none");
+  });
+});
 
 describe("treatment report jaw rows", () => {
   const base: TreatmentPlan = { id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0 };
