@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
-import { defaultTeeth, patientsStore, usePatient, usePlan } from "@/lib/patients-store";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { defaultTeeth, patientsStore, usePatient, usePlan, type TreatmentPlan } from "@/lib/patients-store";
 import { TreatmentPlanWorkspace } from "./TreatmentPlanWorkspace";
 
 vi.mock("@/lib/patients-store", async (original) => ({
@@ -13,49 +13,76 @@ vi.mock("@/lib/use-hydrated", () => ({ useHydrated: () => true }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(), Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
-vi.mock("@/components/TeethChart", () => ({
-  TeethChart: ({ onSelect, highlighted }: { onSelect: (n: number) => void; highlighted: number[] }) => (
-    <div>
-      {[12, 13].map(n => <button key={n} data-tooth-number={n} onClick={() => onSelect(n)}>Chart {n}</button>)}
-      <output data-testid="selected">{highlighted.join(",")}</output>
-    </div>
-  ),
-}));
 afterEach(cleanup);
 
-it("clears all selected teeth as soon as the diagnosis is applied", () => {
-  vi.mocked(usePatient).mockReturnValue({ id: "patient", name: "Patient", createdAt: 0 });
-  vi.mocked(usePlan).mockReturnValue({ id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0 });
-  render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
-  for (const n of [12, 13]) {
-    fireEvent.pointerDown(screen.getByText(`Chart ${n}`));
-    fireEvent.click(screen.getByText(`Chart ${n}`));
-  }
-  expect(screen.getByTestId("selected")).toHaveTextContent("12,13");
-  const missing = screen.getByRole("button", { name: "Missing" });
-  fireEvent.pointerDown(missing);
-  fireEvent.click(missing);
-  expect(patientsStore.updatePlan).toHaveBeenCalledWith("plan", expect.objectContaining({
-    teeth: expect.objectContaining({ 12: expect.objectContaining({ status: "missing" }), 13: expect.objectContaining({ status: "missing" }) }),
-  }));
-  expect(screen.getByTestId("selected")).toBeEmptyDOMElement();
-  expect(screen.getByRole("button", { name: "Missing" })).toBeDisabled();
+const basePlan = (): TreatmentPlan => ({
+  id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0,
 });
 
-it("keeps diagnosis details editable after clearing the tooth selection", async () => {
-  const plan = { id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0 };
+beforeEach(() => {
+  vi.mocked(patientsStore.updatePlan).mockClear();
   vi.mocked(usePatient).mockReturnValue({ id: "patient", name: "Patient", createdAt: 0 });
-  vi.mocked(usePlan).mockReturnValue(plan);
-  const { rerender } = render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
-  fireEvent.click(screen.getByRole("button", { name: "Chart 12" }));
-  fireEvent.keyDown(screen.getByRole("button", { name: "Filled (amalgam)" }), { key: "ArrowDown" });
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Filled (composite)" }));
-  expect(screen.getByTestId("selected")).toBeEmptyDOMElement();
+  vi.mocked(usePlan).mockReturnValue(basePlan());
+});
+
+const chartTooth = (n: number) => screen.getByRole("button", { name: `Tooth ${n}` });
+
+it("applies a status to every selected tooth and then clears the selection", () => {
+  render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
+  fireEvent.click(chartTooth(12));
+  fireEvent.click(chartTooth(13));
+  expect(chartTooth(12)).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Missing" }));
+  expect(patientsStore.updatePlan).toHaveBeenCalledWith("plan", expect.objectContaining({
+    teeth: expect.objectContaining({
+      12: expect.objectContaining({ status: "missing" }),
+      13: expect.objectContaining({ status: "missing" }),
+    }),
+  }));
+  expect(chartTooth(12)).toHaveAttribute("aria-pressed", "false");
+});
+
+it("stacks a crown on a root treated tooth and files it", () => {
+  render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
+  fireEvent.click(chartTooth(16));
+  fireEvent.click(screen.getByRole("button", { name: "Root treated" }));
+  const afterRct = vi.mocked(patientsStore.updatePlan).mock.calls.at(-1)![1];
+  vi.mocked(usePlan).mockReturnValue({ ...basePlan(), ...afterRct });
+  cleanup();
+  render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
+  fireEvent.click(chartTooth(16));
+  fireEvent.click(screen.getByRole("button", { name: "Crown" }));
   const patch = vi.mocked(patientsStore.updatePlan).mock.calls.at(-1)![1];
-  vi.mocked(usePlan).mockReturnValue({ ...plan, ...patch });
+  expect(patch.teeth?.[16].statuses?.map((entry) => entry.stateId)).toEqual([201, 19, 9]);
+});
+
+it("opens the details of the applied status and stores the picked surfaces", async () => {
+  const { rerender } = render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
+  fireEvent.click(chartTooth(16));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Filled (amalgam) options" }), { key: "ArrowDown" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Filled (composite)" }));
+  expect(chartTooth(16)).toHaveAttribute("aria-pressed", "false");
+  const applied = vi.mocked(patientsStore.updatePlan).mock.calls.at(-1)![1];
+  vi.mocked(usePlan).mockReturnValue({ ...basePlan(), ...applied });
   rerender(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
-  expect(screen.getByText("Secondary caries")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Chart 13" }));
-  fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
-  expect(patientsStore.setTooth).toHaveBeenLastCalledWith("plan", expect.objectContaining({ number: 12, status: "filled" }));
+  expect(screen.getByText("Secunder caries")).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("M"));
+  fireEvent.click(screen.getByLabelText("Leaking"));
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
+  const patch = vi.mocked(patientsStore.updatePlan).mock.calls.at(-1)![1];
+  expect(patch.teeth?.[16].statuses?.find((entry) => entry.stateId === 5)).toMatchObject({
+    title: "Filled (composite) - M, Leaking",
+    extraDiagnosis: "M,Leaking",
+  });
+});
+
+it("puts a whole-mouth finding in the general row when no tooth is selected", () => {
+  render(<TreatmentPlanWorkspace patientId="patient" planId="plan" />);
+  fireEvent.keyDown(screen.getByRole("button", { name: "General options" }), { key: "ArrowDown" });
+  return screen.findByRole("menuitem", { name: "Malocclusion" }).then((item) => {
+    fireEvent.click(item);
+    expect(patientsStore.updatePlan).toHaveBeenCalledWith("plan", expect.objectContaining({
+      generalStatuses: ["Malocclusion"],
+    }));
+  });
 });
