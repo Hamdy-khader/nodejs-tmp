@@ -134,3 +134,29 @@ describe("treatment report price table options", () => {
     expect(totalLines(withoutTotal)).toEqual([]);
   });
 });
+
+describe("treatment report images", () => {
+  const base: TreatmentPlan = { id: "plan", patientId: "patient", name: "Plan", notes: "", teeth: defaultTeeth(), createdAt: 0, updatedAt: 0 };
+  const withDesign = (innerPages: Partial<PlanSettings["pageDesign"]["innerPages"]>, backCover: Partial<PlanSettings["pageDesign"]["backCover"]> = {}): PlanSettings => ({
+    ...settings,
+    pageDesign: {
+      ...settings.pageDesign,
+      innerPages: { ...settings.pageDesign.innerPages, ...innerPages },
+      backCover: { ...settings.pageDesign.backCover, ...backCover },
+    },
+  });
+
+  it("shows the uploaded logo in the page header instead of the clinic name", () => {
+    const page = renderPage({ kind: "status", title: "Status" }, base, 0, 1, withDesign({ logo: "/storage/plan-settings/1/logo.png" }));
+    expect(page.querySelector("header img")?.getAttribute("src")).toBe("/storage/plan-settings/1/logo.png");
+    expect(page.querySelector("header")?.textContent).not.toContain("Clinic");
+    const plain = renderPage({ kind: "status", title: "Status" }, base);
+    expect(plain.querySelector("header")?.textContent).toContain("Clinic");
+  });
+
+  it("fills the back page with the uploaded back cover", () => {
+    const page = renderPage({ kind: "back", title: "Back cover" }, base, 0, 1, withDesign({}, { backImage: "/storage/plan-settings/1/back.jpg" }));
+    expect(page.querySelector('img[alt="Back cover"]')?.getAttribute("src")).toBe("/storage/plan-settings/1/back.jpg");
+    expect(page.querySelector("header")).toBeNull();
+  });
+});

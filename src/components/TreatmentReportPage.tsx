@@ -38,6 +38,8 @@ export function TreatmentReportPage({
   const host = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const height = reportPageHeight(settings.pageSize);
+  const backImage = page.kind === "back" ? settings.pageDesign.backCover.backImage : undefined;
+  const logo = settings.pageDesign.innerPages.logo;
   useEffect(() => {
     if (!host.current) return;
     const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 595));
@@ -66,12 +68,19 @@ export function TreatmentReportPage({
           position: "absolute",
           display: "flex",
           flexDirection: "column",
-          padding: page.kind === "cover" ? 0 : "26px 34px 22px",
+          padding: page.kind === "cover" || backImage ? 0 : "26px 34px 22px",
           fontSize: 9,
         }}
       >
         {page.kind === "cover" ? (
           <ReportCover settings={settings} context={exportContext} />
+        ) : backImage ? (
+          <img
+            src={backImage}
+            alt="Back cover"
+            crossOrigin="anonymous"
+            style={{ flex: 1, width: "100%", minHeight: 0, objectFit: "cover" }}
+          />
         ) : (
           <>
             <header
@@ -96,16 +105,25 @@ export function TreatmentReportPage({
               >
                 {page.title}
               </h2>
-              <span
-                style={{
-                  fontFamily: "Georgia, serif",
-                  fontStyle: "italic",
-                  fontSize: 12,
-                  color: "#8c7638",
-                }}
-              >
-                {exportContext.clinicName}
-              </span>
+              {logo ? (
+                <img
+                  src={logo}
+                  alt="Clinic logo"
+                  crossOrigin="anonymous"
+                  style={{ maxHeight: 30, maxWidth: 150, objectFit: "contain" }}
+                />
+              ) : (
+                <span
+                  style={{
+                    fontFamily: "Georgia, serif",
+                    fontStyle: "italic",
+                    fontSize: 12,
+                    color: "#8c7638",
+                  }}
+                >
+                  {exportContext.clinicName}
+                </span>
+              )}
             </header>
             <main style={{ flex: 1 }}>
               {page.kind === "status" && <ReportDiagnosis plan={plan} />}

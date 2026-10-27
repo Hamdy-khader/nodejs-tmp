@@ -6,7 +6,14 @@ export type PageSize = "A4" | "Letter" | "Legal";
 
 export interface PageDesign {
   frontCover: { coverImage?: string; clinicName: string; title: string; subtitle?: string };
-  innerPages: { headerText: string; footerLeft: string; footerRight: string; showFooter: boolean };
+  innerPages: {
+    headerText: string;
+    footerLeft: string;
+    footerRight: string;
+    showFooter: boolean;
+    /** Shown at the top right of every inner page instead of the clinic name. */
+    logo?: string;
+  };
   backCover: { backImage?: string; title: string; note?: string };
 }
 
@@ -155,6 +162,7 @@ function applyRemote(raw: Record<string, unknown>) {
         footerLeft: String(innerPages.footer_left ?? defaults.pageDesign.innerPages.footerLeft),
         footerRight: String(innerPages.footer_right ?? defaults.pageDesign.innerPages.footerRight),
         showFooter: Boolean(innerPages.show_footer ?? defaults.pageDesign.innerPages.showFooter),
+        logo: innerPages.logo ? String(innerPages.logo) : undefined,
       },
       backCover: {
         backImage: backCover.back_image ? String(backCover.back_image) : undefined,
@@ -222,6 +230,7 @@ function toPayload(settings: PlanSettings) {
         footer_left: settings.pageDesign.innerPages.footerLeft,
         footer_right: settings.pageDesign.innerPages.footerRight,
         show_footer: settings.pageDesign.innerPages.showFooter,
+        logo: settings.pageDesign.innerPages.logo ?? null,
       },
       back_cover: {
         back_image: settings.pageDesign.backCover.backImage ?? null,

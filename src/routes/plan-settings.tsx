@@ -31,6 +31,13 @@ import {
   type PageDesign,
 } from "@/lib/plan-settings-store";
 import { DEFAULT_COVER_IMAGE } from "@/lib/pdf-export-context";
+import { ImageUploadField } from "@/components/settings/ImageUploadField";
+import type { ResizeOptions } from "@/lib/image-resize";
+
+// A4 at 150 dpi is enough for a printed cover; logos keep their transparency.
+const COVER_IMAGE: ResizeOptions = { maxSize: 1754, type: "image/jpeg" };
+const LOGO_IMAGE: ResizeOptions = { maxSize: 600, type: "image/png" };
+const PAGE_SIZES = ["A4", "Letter", "Legal"] as const;
 
 export const Route = createFileRoute("/plan-settings")({
   head: () => ({
@@ -42,7 +49,7 @@ export const Route = createFileRoute("/plan-settings")({
   component: PlanSettingsPage,
 });
 
-type EditorKey = keyof PageDesign | "pageSize" | "priceList" | "pricePage" | "planSections" | null;
+type EditorKey = keyof PageDesign | "priceList" | "pricePage" | "planSections" | null;
 
 function PlanSettingsPage() {
   const settings = usePlanSettings();
@@ -115,6 +122,7 @@ function PlanSettingsPage() {
               onClick={() => setEditor("innerPages")}
               preview={
                 <InnerPagesPreview
+                  logo={settings.pageDesign.innerPages.logo}
                   headerText={settings.pageDesign.innerPages.headerText}
                   footerLeft={settings.pageDesign.innerPages.footerLeft}
                   footerRight={settings.pageDesign.innerPages.footerRight}
@@ -129,6 +137,7 @@ function PlanSettingsPage() {
                 <BackCoverPreview
                   title={settings.pageDesign.backCover.title}
                   note={settings.pageDesign.backCover.note}
+                  image={settings.pageDesign.backCover.backImage}
                 />
               }
             />
@@ -136,7 +145,15 @@ function PlanSettingsPage() {
 
           {/* Settings tiles */}
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <SettingTile icon={<span className="text-2xl font-semibold">A4</span>} label="Page size" onClick={() => setEditor("pageSize")} />
+            <SettingTile
+              icon={<span className="text-xl font-semibold">{settings.pageSize}</span>}
+              label="Page size"
+              onClick={() =>
+                planSettingsStore.update({
+                  pageSize: PAGE_SIZES[(PAGE_SIZES.indexOf(settings.pageSize) + 1) % PAGE_SIZES.length],
+                })
+              }
+            />
             <SettingTile icon={<DollarSign className="size-6" />} label="Price list design" onClick={() => setEditor("priceList")} />
             <SettingTile icon={<DollarSign className="size-6" />} label="Price page settings" onClick={() => setEditor("pricePage")} />
             <SettingTile icon={<ArrowUpDown className="size-6" />} label="Plan sections" onClick={() => setEditor("planSections")} />
@@ -236,10 +253,12 @@ function FrontCoverPreview({
 }
 
 function InnerPagesPreview({
+  logo,
   headerText,
   footerLeft,
   footerRight,
 }: {
+  logo?: string;
   headerText: string;
   footerLeft: string;
   footerRight: string;
@@ -248,7 +267,11 @@ function InnerPagesPreview({
     <div className="flex h-full w-full flex-col justify-between p-3">
       <div className="flex items-center justify-between border-b border-border pb-1.5">
         <span className="text-[10px] font-semibold tracking-widest text-foreground/80">{headerText}</span>
-        <FileText className="size-3 text-foreground/60" />
+        {logo ? (
+          <img src={logo} alt="Header logo" className="h-4 max-w-[60px] object-contain" />
+        ) : (
+          <FileText className="size-3 text-foreground/60" />
+        )}
       </div>
       <div className="space-y-1.5">
         {Array.from({ length: 12 }).map((_, i) => (
@@ -264,7 +287,8 @@ function InnerPagesPreview({
   );
 }
 
-function BackCoverPreview({ title, note }: { title: string; note?: string }) {
+function BackCoverPreview({ title, note, image }: { title: string; note?: string; image?: string }) {
+  if (image) return <img src={image} alt="Back cover preview" className="h-full w-full object-cover" />;
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center text-[10px] text-muted-foreground">
       <span className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/70">{title}</span>
@@ -304,19 +328,27 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
             onChange={(e) => planSettingsStore.updatePageDesign("frontCover", { subtitle: e.target.value })}
           />
         </Field>
-        <Field label="Cover image URL">
-          <Input
-            defaultValue={settings.pageDesign.frontCover.coverImage ?? ""}
-            placeholder="https://... or leave empty for default cover"
-            onChange={(e) => planSettingsStore.updatePageDesign("frontCover", { coverImage: e.target.value })}
-          />
-        </Field>
+        <ImageUploadField
+          label="Cover image"
+          value={settings.pageDesign.frontCover.coverImage}
+          hint="The default cover is used when empty."
+          resize={COVER_IMAGE}
+          onChange={(coverImage) => planSettingsStore.updatePageDesign("frontCover", { coverImage })}
+        />
       </div>
     );
   } else if (editor === "innerPages") {
-    title = "Edit Inner Pages";
+    title = "Page header & footer";
     body = (
       <div className="space-y-3">
+        <ImageUploadField
+          label="Header logo"
+          value={settings.pageDesign.innerPages.logo}
+          hint="Shown instead of the clinic name at the top of each page."
+          resize={LOGO_IMAGE}
+          previewClassName="h-24"
+          onChange={(logo) => planSettingsStore.updatePageDesign("innerPages", { logo })}
+        />
         <Field label="Header text">
           <Input
             defaultValue={settings.pageDesign.innerPages.headerText}
@@ -360,30 +392,14 @@ function SettingsEditorDialog({ editor, onClose }: { editor: EditorKey; onClose:
             onChange={(e) => planSettingsStore.updatePageDesign("backCover", { note: e.target.value })}
           />
         </Field>
-        <Field label="Background image URL">
-          <Input
-            defaultValue={settings.pageDesign.backCover.backImage ?? ""}
-            onChange={(e) => planSettingsStore.updatePageDesign("backCover", { backImage: e.target.value })}
-          />
-        </Field>
+        <ImageUploadField
+          label="Back cover image"
+          value={settings.pageDesign.backCover.backImage}
+          hint="Fills the last page of the PDF."
+          resize={COVER_IMAGE}
+          onChange={(backImage) => planSettingsStore.updatePageDesign("backCover", { backImage })}
+        />
       </div>
-    );
-  } else if (editor === "pageSize") {
-    title = "Page Size";
-    body = (
-      <Field label="Size">
-        <Select
-          value={settings.pageSize}
-          onValueChange={(v) => planSettingsStore.update({ pageSize: v as "A4" | "Letter" | "Legal" })}
-        >
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="A4">A4</SelectItem>
-            <SelectItem value="Letter">Letter</SelectItem>
-            <SelectItem value="Legal">Legal</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
     );
   } else if (editor === "priceList") {
     title = "Price List Design";
