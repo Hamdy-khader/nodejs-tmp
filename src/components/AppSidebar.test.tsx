@@ -17,10 +17,12 @@ it("keeps all dashboard sections reachable and can close and reopen the sidebar"
   for (const [name, href] of [
     ["Account", "/clinic"], ["Patients", "/patients"], ["Users", "/users"],
     ["Price list", "/clinic-fees"], ["Templates", "/templates"], ["Documents", "/documents"],
-    ["Overview", "/overview"], ["Plan settings", "/plan-settings"], ["Statistics", "/statistics"], ["Support", "/support"],
+    ["Plan settings", "/plan-settings"], ["Statistics", "/statistics"], ["Support", "/support"],
   ]) {
     expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
   }
+  // The overview lives in each plan's Overview step, not in the menu.
+  expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
   expect(container.querySelector('[data-state="expanded"]')).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole("button", { name: "Close sidebar" })[0]);
   expect(container.querySelector('[data-state="collapsed"]')).toBeInTheDocument();

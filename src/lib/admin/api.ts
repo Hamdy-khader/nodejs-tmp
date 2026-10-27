@@ -637,6 +637,12 @@ export const clinicApi = {
     get: (): Promise<Record<string, unknown>> => clinicReq("GET", "/clinic/plan-settings"),
     update: (body: Record<string, unknown>): Promise<Record<string, unknown>> =>
       clinicReq("PUT", "/clinic/plan-settings", body),
+    /** Stores a cover, back cover or header logo and returns its URL. */
+    uploadImage: (file: File): Promise<{ url: string }> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return clinicUploadReq<{ url: string }>("/clinic/plan-settings/images", formData);
+    },
   },
 
   users: {

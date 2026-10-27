@@ -29,6 +29,26 @@ it("saves rapid edits in order and persists the latest complete design", async (
   }));
 });
 
+it("loads and saves the uploaded header logo and clears a removed cover", async () => {
+  vi.resetModules();
+  const { clinicApi } = await import("@/lib/admin/api");
+  vi.mocked(clinicApi.planSettings.get).mockResolvedValue({
+    page_design: { inner_pages: { logo: "/storage/plan-settings/1/logo.png" }, front_cover: { cover_image: "/storage/plan-settings/1/cover.jpg" } },
+  });
+  vi.mocked(clinicApi.planSettings.update).mockResolvedValue({});
+  const { planSettingsStore, usePlanSettings } = await import("./plan-settings-store");
+  await planSettingsStore.reload();
+  const { result } = renderHook(usePlanSettings);
+  expect(result.current.pageDesign.innerPages.logo).toBe("/storage/plan-settings/1/logo.png");
+  await act(async () => { await planSettingsStore.updatePageDesign("frontCover", { coverImage: undefined }); });
+  expect(clinicApi.planSettings.update).toHaveBeenLastCalledWith(expect.objectContaining({
+    page_design: expect.objectContaining({
+      front_cover: expect.objectContaining({ cover_image: null }),
+      inner_pages: expect.objectContaining({ logo: "/storage/plan-settings/1/logo.png" }),
+    }),
+  }));
+});
+
 it("reports a failed save, keeps edits and allows a successful retry", async () => {
   vi.resetModules();
   const { clinicApi } = await import("@/lib/admin/api");

@@ -1,3 +1,5 @@
+import { loadImage } from "./image-resize";
+
 export interface ImageAdjust {
   zoom: number;
   brightness: number;
@@ -64,9 +66,7 @@ export function xrayStyle(adjust: ImageAdjust) {
 export async function renderXrayImage(source: Blob, adjust: ImageAdjust, view: XrayViewport): Promise<File> {
   const url = URL.createObjectURL(source);
   try {
-    const image = new Image();
-    image.src = url;
-    await image.decode();
+    const image = await loadImage(url);
     const geometry = xrayRenderGeometry(view, image.naturalWidth, adjust.zoom, {
       x: adjust.offsetX ?? 0,
       y: adjust.offsetY ?? 0,

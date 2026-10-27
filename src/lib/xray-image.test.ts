@@ -13,7 +13,10 @@ function mockCanvas(data: number[]) {
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => callback(new Blob(["png"], { type: "image/png" })));
   vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(800);
-  Object.defineProperty(HTMLImageElement.prototype, "decode", { configurable: true, value: vi.fn().mockResolvedValue(undefined) });
+  // jsdom never loads images; fire the load event as soon as a source is set.
+  vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(function (this: HTMLImageElement) {
+    queueMicrotask(() => this.onload?.(new Event("load")));
+  });
   const revoke = vi.fn();
   vi.stubGlobal("URL", { createObjectURL: () => "blob:xray", revokeObjectURL: revoke });
   return { pixels, context, revoke };

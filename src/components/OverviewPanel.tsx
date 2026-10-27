@@ -163,6 +163,8 @@ function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan, settings: Pl
       ? [{ kind: "status" as const, title: "Your current dental status" }]
       : []),
     ...buildTreatmentReportPages(plan, settings, selectedDocs.map(({ title, body }) => ({ title, body }))),
+    // An uploaded back cover closes the PDF as a full page.
+    ...(settings.pageDesign.backCover.backImage ? [{ kind: "back" as const, title: "Back cover" }] : []),
 
   ];
 }
