@@ -13,6 +13,8 @@ export interface TreatmentPlanPdfPage {
   treatmentRows?: TreatmentRow[];
   showTreatmentChart?: boolean;
   showTotals?: boolean;
+  /** "Fit to page": the price table drawn smaller to stay on this page. */
+  fitScale?: number;
 }
 
 export async function saveTreatmentPlanPdf(args: {

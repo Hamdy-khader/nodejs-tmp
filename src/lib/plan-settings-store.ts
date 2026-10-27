@@ -22,12 +22,26 @@ export interface PlanSettings {
     showTotal: boolean;
     showInsurance: boolean;
     currency: string;
+    /** "Prices / jaws": one table row per jaw instead of per treatment. */
+    showJaws: boolean;
+    /** "Procedure": the table split into visits with their headers. */
+    showVisits: boolean;
+    showAmount: boolean;
+    showUnitPrice: boolean;
+    showPrice: boolean;
+    /** Shrinks a long price table so it stays on one page. */
+    fitToPage: boolean;
   };
   planSections: {
+    /** The "current dental status" page. */
     showDiagnosis: boolean;
     showTreatments: boolean;
     showDocuments: boolean;
     showOverview: boolean;
+    /** The treatment chart above the price table. */
+    showPlanChart: boolean;
+    /** X-rays and documents start on a new page. */
+    pageBreaks: boolean;
   };
   pageDesign: PageDesign;
   updatedAt: number;
@@ -45,12 +59,20 @@ const defaults: PlanSettings = {
     showTotal: true,
     showInsurance: true,
     currency: "USD",
+    showJaws: false,
+    showVisits: true,
+    showAmount: true,
+    showUnitPrice: true,
+    showPrice: true,
+    fitToPage: true,
   },
   planSections: {
     showDiagnosis: true,
     showTreatments: true,
     showDocuments: true,
     showOverview: true,
+    showPlanChart: true,
+    pageBreaks: true,
   },
   pageDesign: {
     frontCover: {
@@ -91,25 +113,35 @@ function applyRemote(raw: Record<string, unknown>) {
   const frontCover = (pageDesign.front_cover ?? {}) as Record<string, unknown>;
   const innerPages = (pageDesign.inner_pages ?? {}) as Record<string, unknown>;
   const backCover = (pageDesign.back_cover ?? {}) as Record<string, unknown>;
+  // Clinics that hid prices before the price columns existed keep them hidden.
+  const showPrices = Boolean(pricePage.show_prices ?? defaults.pricePage.showPrices);
 
   state = {
     language: String(raw.language ?? defaults.language),
     pageSize: String(raw.page_size ?? defaults.pageSize) as PageSize,
     priceListDesign: String(raw.price_list_design ?? defaults.priceListDesign) as PlanSettings["priceListDesign"],
     pricePage: {
-      showPrices: Boolean(pricePage.show_prices ?? defaults.pricePage.showPrices),
+      showPrices,
       showSubtotal: Boolean(pricePage.show_subtotal ?? defaults.pricePage.showSubtotal),
       showDiscount: Boolean(pricePage.show_discount ?? defaults.pricePage.showDiscount),
       showTax: Boolean(pricePage.show_tax ?? defaults.pricePage.showTax),
       showTotal: Boolean(pricePage.show_total ?? defaults.pricePage.showTotal),
       showInsurance: Boolean(pricePage.show_insurance ?? defaults.pricePage.showInsurance),
       currency: String(pricePage.currency ?? defaults.pricePage.currency),
+      showJaws: Boolean(pricePage.show_jaws ?? defaults.pricePage.showJaws),
+      showVisits: Boolean(pricePage.show_visits ?? defaults.pricePage.showVisits),
+      showAmount: Boolean(pricePage.show_amount ?? defaults.pricePage.showAmount),
+      showUnitPrice: Boolean(pricePage.show_unit_price ?? showPrices),
+      showPrice: Boolean(pricePage.show_price ?? showPrices),
+      fitToPage: Boolean(pricePage.fit_to_page ?? defaults.pricePage.fitToPage),
     },
     planSections: {
       showDiagnosis: Boolean(planSections.show_diagnosis ?? defaults.planSections.showDiagnosis),
       showTreatments: Boolean(planSections.show_treatments ?? defaults.planSections.showTreatments),
       showDocuments: Boolean(planSections.show_documents ?? defaults.planSections.showDocuments),
       showOverview: Boolean(planSections.show_overview ?? defaults.planSections.showOverview),
+      showPlanChart: Boolean(planSections.show_plan_chart ?? defaults.planSections.showPlanChart),
+      pageBreaks: Boolean(planSections.page_breaks ?? defaults.planSections.pageBreaks),
     },
     pageDesign: {
       frontCover: {
@@ -156,19 +188,27 @@ function toPayload(settings: PlanSettings) {
     page_size: settings.pageSize,
     price_list_design: settings.priceListDesign,
     price_page: {
-      show_prices: settings.pricePage.showPrices,
+      show_prices: settings.pricePage.showUnitPrice || settings.pricePage.showPrice,
       show_subtotal: settings.pricePage.showSubtotal,
       show_discount: settings.pricePage.showDiscount,
       show_tax: settings.pricePage.showTax,
       show_total: settings.pricePage.showTotal,
       show_insurance: settings.pricePage.showInsurance,
       currency: settings.pricePage.currency,
+      show_jaws: settings.pricePage.showJaws,
+      show_visits: settings.pricePage.showVisits,
+      show_amount: settings.pricePage.showAmount,
+      show_unit_price: settings.pricePage.showUnitPrice,
+      show_price: settings.pricePage.showPrice,
+      fit_to_page: settings.pricePage.fitToPage,
     },
     plan_sections: {
       show_diagnosis: settings.planSections.showDiagnosis,
       show_treatments: settings.planSections.showTreatments,
       show_documents: settings.planSections.showDocuments,
       show_overview: settings.planSections.showOverview,
+      show_plan_chart: settings.planSections.showPlanChart,
+      page_breaks: settings.planSections.pageBreaks,
     },
     page_design: {
       front_cover: {

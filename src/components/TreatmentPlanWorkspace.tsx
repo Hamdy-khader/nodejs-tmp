@@ -229,17 +229,12 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
             </div>
           </div>
 
-          {xrayOpen && step === "treatments" && (
-            <XrayPanel
-              ref={xrayEditor}
-              planId={plan.id}
-              xrays={plan.xrays ?? []}
-              onClose={() => setXrayOpen(false)}
-            />
-          )}
-
           {step === "treatments" ? (
-            <TreatmentsView plan={plan} currency={patient.currency ?? "USD"} />
+            <TreatmentsView
+              plan={plan}
+              currency={patient.currency ?? "USD"}
+              afterChart={xrayOpen && <XrayPanel ref={xrayEditor} planId={plan.id} xrays={plan.xrays ?? []} />}
+            />
           ) : step === "documents" ? (
             <DocumentsPanel />
           ) : step === "overview" ? (
@@ -282,14 +277,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                 </div>
               </div>
 
-              {xrayOpen && (
-                <XrayPanel
-                  ref={xrayEditor}
-                  planId={plan.id}
-                  xrays={plan.xrays ?? []}
-                  onClose={() => setXrayOpen(false)}
-                />
-              )}
+              {xrayOpen && <XrayPanel ref={xrayEditor} planId={plan.id} xrays={plan.xrays ?? []} />}
 
               <DiagnosisRows
                 entries={diagnosis.entries}

@@ -1,7 +1,7 @@
 import type { PlanSettings } from "@/lib/plan-settings-store";
 import { TreatmentReportPage as PageCard } from "./TreatmentReportPage";
 import { buildTreatmentReportPages } from "@/lib/treatment-report-layout";
-import { createRef, useMemo, useState } from "react";
+import { createRef, useMemo, useState, type ReactNode } from "react";
 import {
   Undo2,
   Redo2,
@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   useSelectedIds,
   useSectionOrder,
@@ -160,7 +159,9 @@ function buildSection(
 function buildPdfPages(selectedDocs: DocRow[], plan: TreatmentPlan, settings: PlanSettings): TreatmentPlanPdfPage[] {
   return [
     { kind: "cover", title: "Cover" },
-    { kind: "status", title: "Your current dental status" },
+    ...(settings.planSections.showDiagnosis
+      ? [{ kind: "status" as const, title: "Your current dental status" }]
+      : []),
     ...buildTreatmentReportPages(plan, settings, selectedDocs.map(({ title, body }) => ({ title, body }))),
 
   ];
@@ -306,8 +307,13 @@ function RightSidebar({
   downloading: boolean;
 }) {
   const price = settings.pricePage;
+  const sections = settings.planSections;
   const setPrice = (patch: Partial<typeof price>) =>
     planSettingsStore.update({ pricePage: { ...price, ...patch } });
+  const setSections = (patch: Partial<typeof sections>) =>
+    planSettingsStore.update({ planSections: { ...sections, ...patch } });
+  const [open, setOpen] = useState<"price" | "modules" | null>(null);
+  const toggle = (panel: "price" | "modules") => setOpen((current) => (current === panel ? null : panel));
 
   return (
     <aside className="self-start space-y-3">
@@ -347,83 +353,84 @@ function RightSidebar({
         {downloading ? "Downloading..." : "Download"}
       </button>
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <div className="mb-3 text-xs text-muted-foreground">
+        <div className="mb-2 px-3 text-xs text-muted-foreground">
           {selectedDocs.length} document pages selected
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted/60">
-              <TableIcon className="size-4 text-muted-foreground" />
-              <span>Price table</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="left" align="start" className="w-72 p-4">
-            <h4 className="mb-3 text-sm font-semibold">Price table options</h4>
-            <div className="space-y-3">
-              <label className="flex cursor-pointer items-center gap-3 text-sm">
-                <Checkbox
-                  checked={price.showPrices}
-                  onCheckedChange={(v) => setPrice({ showPrices: !!v })}
-                />
-                <span className="font-medium">Show prices in PDF</span>
-              </label>
-              <div className="space-y-2 border-t border-border/60 pt-3 pl-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Line items
-                </p>
-                <CheckRow
-                  label="Subtotal"
-                  checked={price.showSubtotal}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showSubtotal: v })}
-                />
-                <CheckRow
-                  label="Discount"
-                  checked={price.showDiscount}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showDiscount: v })}
-                />
-                <CheckRow
-                  label="Tax"
-                  checked={price.showTax}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showTax: v })}
-                />
-                <CheckRow
-                  label="Total"
-                  checked={price.showTotal}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showTotal: v })}
-                />
-                <CheckRow
-                  label="Insurance coverage"
-                  checked={price.showInsurance}
-                  disabled={!price.showPrices}
-                  onChange={(v) => setPrice({ showInsurance: v })}
-                />
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <PanelButton
+          icon={<TableIcon className="size-4 text-muted-foreground" />}
+          label="Price table"
+          open={open === "price"}
+          onClick={() => toggle("price")}
+        />
+        {open === "price" && (
+          <div className="space-y-0.5 pb-2" role="group" aria-label="Price table">
+            <CheckRow label="Prices / jaws" checked={price.showJaws} onChange={(v) => setPrice({ showJaws: v })} />
+            <CheckRow label="Procedure" checked={price.showVisits} onChange={(v) => setPrice({ showVisits: v })} />
+            <CheckRow label="Amount" checked={price.showAmount} onChange={(v) => setPrice({ showAmount: v })} />
+            <CheckRow label="Unit price" checked={price.showUnitPrice} onChange={(v) => setPrice({ showUnitPrice: v })} />
+            <CheckRow label="Price" checked={price.showPrice} onChange={(v) => setPrice({ showPrice: v })} />
+            <CheckRow label="Total" checked={price.showTotal} onChange={(v) => setPrice({ showTotal: v })} />
+            <CheckRow label="Fit to page" checked={price.fitToPage} onChange={(v) => setPrice({ fitToPage: v })} />
+          </div>
+        )}
+        <div className="my-2 h-px bg-border" />
+        <PanelButton
+          icon={<Puzzle className="size-4 text-muted-foreground" />}
+          label="Modules"
+          open={open === "modules"}
+          onClick={() => toggle("modules")}
+        />
+        {open === "modules" && (
+          <div className="space-y-0.5 pb-2" role="group" aria-label="Modules">
+            <CheckRow label="Charts" checked={sections.showPlanChart} onChange={(v) => setSections({ showPlanChart: v })} />
+            <CheckRow label="Diagnosis" checked={sections.showDiagnosis} onChange={(v) => setSections({ showDiagnosis: v })} />
+            <CheckRow label="Page breaks" checked={sections.pageBreaks} onChange={(v) => setSections({ pageBreaks: v })} />
+          </div>
+        )}
       </div>
     </aside>
+  );
+}
+
+function PanelButton({
+  icon,
+  label,
+  open,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  open: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-full px-3 py-2.5 text-sm hover:bg-muted/60",
+        open && "bg-muted",
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
 function CheckRow({
   label,
   checked,
-  disabled,
   onChange,
 }: {
   label: string;
   checked: boolean;
-  disabled?: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className={cn("flex items-center gap-3 text-sm", disabled && "opacity-40")}>
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange(!!v)} />
+    <label className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-muted/40">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
       <span>{label}</span>
     </label>
   );
