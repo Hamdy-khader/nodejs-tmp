@@ -1,28 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Activity,
   AlertCircle,
-  Anchor,
   Banknote,
   Check,
   ChevronDown,
-  Crown as CrownIcon,
-  DollarSign,
-  Droplet,
-  Layers,
   Lock,
   Loader2,
-  MoreHorizontal,
-  Package,
   Plus,
   Save,
-  Scissors,
-  Settings,
-  Smile,
-  Sparkles,
-  StickyNote,
-  Wrench,
   X,
 } from "lucide-react";
 
@@ -68,21 +54,40 @@ const DEFAULT_CURRENCIES: Currency[] = [
   { code: "AED", label: "UAE dirham", symbol: "AED" },
 ];
 
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  scissors: Scissors,
-  layers: Layers,
-  droplet: Droplet,
-  smile: Smile,
-  activity: Activity,
-  anchor: Anchor,
-  crown: CrownIcon,
-  wrench: Wrench,
-  package: Package,
-  more: MoreHorizontal,
-  sparkles: Sparkles,
+// The number of the treatment button each catalog section feeds. Veneers sit
+// under the Crown button, so their section is listed with button 7.
+const BUTTON_NUMBERS: Record<string, number> = {
+  extraction: 1,
+  "prosthesis-removal": 2,
+  filling: 3,
+  dentures: 4,
+  "root-canal-treatment": 5,
+  implant: 6,
+  crown: 7,
+  veneer: 7,
+  bridge: 8,
+  general: 9,
+  other: 10,
 };
 
-const ICON_OPTIONS = Object.keys(ICON_MAP);
+interface ButtonBlock {
+  id: string;
+  number: number | null;
+  label: string;
+  sections: PricelistSection[];
+}
+
+/** Sections grouped by the treatment button they belong to, in catalog order. */
+function buttonBlocks(sections: PricelistSection[]): ButtonBlock[] {
+  const blocks: ButtonBlock[] = [];
+  for (const section of sections) {
+    const number = BUTTON_NUMBERS[section.key ?? ""] ?? null;
+    const block = number != null ? blocks.find((candidate) => candidate.number === number) : undefined;
+    if (block) block.sections.push(section);
+    else blocks.push({ id: section.id, number, label: section.label, sections: [section] });
+  }
+  return blocks;
+}
 
 function getItemPolicy(item: PricelistItem) {
   const isUsed = Boolean(item.is_used ?? (item.usage_count ?? 0) > 0);
@@ -143,7 +148,7 @@ export function ClinicFeesPage() {
   const [currencies, setCurrencies] = useState<Currency[]>(DEFAULT_CURRENCIES);
   const [pendingCurrency, setPendingCurrency] = useState("USD");
 
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
     if (!clinicTokenStore.exists()) {
@@ -279,7 +284,7 @@ export function ClinicFeesPage() {
   );
 
   const addItem = useCallback(
-    async (groupId: string, item: { name: string; price: number; note: string }) => {
+    async (groupId: string, item: { name: string; price: number; note: string }): Promise<boolean> => {
       try {
         const created = await clinicApi.pricelist.addItem({
           group_id: groupId,
@@ -302,8 +307,10 @@ export function ClinicFeesPage() {
           return next;
         });
         toast.success("Treatment added");
+        return true;
       } catch {
         toast.error("Failed to add treatment.");
+        return false;
       }
     },
     [],
@@ -337,94 +344,73 @@ export function ClinicFeesPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-secondary/40 to-background">
-      <div className="bg-[image:var(--gradient-hero)] px-6 py-5 text-white shadow-[var(--shadow-soft)]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 backdrop-blur">
-              <Banknote className="h-5 w-5 text-accent" />
-            </div>
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.25em] text-white/60">Clinic</div>
-              <h1 className="text-lg font-semibold tracking-wide">Price List</h1>
-            </div>
-          </div>
+  const blocks = buttonBlocks(data.sections);
+  const openCurrency = () => {
+    setPendingCurrency(settings?.currency_code ?? "USD");
+    setSetupOpen(true);
+  };
 
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 backdrop-blur">
-              <DollarSign className="h-3.5 w-3.5" /> {currentCurrency.code}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 rounded-full bg-white/10 text-white hover:bg-white/20"
-              onClick={() => {
-                setPendingCurrency(settings?.currency_code ?? "USD");
-                setSetupOpen(true);
-              }}
-            >
-              <Settings className="h-3.5 w-3.5" /> Settings
-            </Button>
-            <Button
-              size="sm"
-              className="gap-1.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90"
+  return (
+    <div className="min-h-screen bg-secondary/40">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 lg:grid lg:grid-cols-[minmax(0,1fr)_200px] lg:gap-6 lg:p-6">
+        <div className="min-w-0">
+          <div className="flex items-center justify-between rounded-md bg-card px-5 py-3.5 shadow-sm">
+            <h1 className="font-sans text-[15px] font-medium uppercase tracking-wide text-primary">Price list</h1>
+            <button
+              type="button"
               onClick={() => savePricelist()}
               disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-primary transition hover:bg-primary/10 disabled:opacity-60"
             >
-              {saving ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? "Saving..." : "Save"}
-            </Button>
+            </button>
           </div>
-        </div>
-      </div>
 
-      <div className="mx-auto max-w-7xl gap-6 p-6 lg:grid lg:grid-cols-[1fr_240px] lg:p-8">
-        <div className="space-y-5">
-          {data.sections.map((section) => (
-            <SectionCard
-              key={section.id}
-              section={section}
+          {blocks.map((block) => (
+            <ButtonSection
+              key={block.id}
+              block={block}
               currency={currentCurrency}
               registerRef={(el) => {
-                sectionRefs.current[section.id] = el;
+                sectionRefs.current[block.id] = el;
               }}
-              onItemPatch={(groupId, itemId, patch) =>
-                patchItem(section.id, groupId, itemId, patch)
-              }
+              onItemPatch={patchItem}
               onItemAdd={addItem}
             />
           ))}
         </div>
 
-        <aside className="hidden lg:block">
-          <div className="sticky top-6 space-y-1 rounded-2xl border border-border/60 bg-card p-3 shadow-[var(--shadow-soft)]">
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
-              Categories
-            </div>
-            {data.sections.map((section) => {
-              const Icon = ICON_MAP[section.icon] ?? Package;
-              return (
+        <aside className="order-first lg:order-none">
+          <div className="rounded-md bg-card p-2 shadow-sm lg:sticky lg:top-6">
+            <button
+              type="button"
+              aria-label="Currency"
+              onClick={openCurrency}
+              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-secondary"
+            >
+              <Banknote className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="block text-sm">{currentCurrency.code}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{currentCurrency.label}</span>
+              </span>
+            </button>
+            <nav className="hidden lg:block" aria-label="Treatment buttons">
+              <div className="mx-2 my-2 h-px bg-border" />
+              {blocks.map((block) => (
                 <button
-                  key={section.id}
+                  key={block.id}
                   type="button"
-                  onClick={() => scrollTo(section.id)}
-                  className="group flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-foreground transition hover:bg-secondary"
+                  onClick={() => scrollTo(block.id)}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-secondary"
                 >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-secondary text-primary group-hover:bg-primary group-hover:text-primary-foreground">
-                    <Icon className="h-3.5 w-3.5" />
+                  <span className="grid h-4 w-4 shrink-0 place-items-center rounded-[3px] border border-foreground/60 text-[9px] font-semibold leading-none">
+                    {block.number ?? "•"}
                   </span>
-                  <span className="flex-1 truncate">{section.label}</span>
-                  {section.n != null && (
-                    <span className="text-[10px] font-bold text-muted-foreground">{section.n}</span>
-                  )}
+                  <span className="truncate">{block.label}</span>
                 </button>
-              );
-            })}
+              ))}
+            </nav>
           </div>
         </aside>
       </div>
@@ -440,7 +426,7 @@ export function ClinicFeesPage() {
 
           <div className="rounded-xl bg-secondary p-3">
             <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5 text-muted-foreground" />
+              <Banknote className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1">
                 <div className="text-xs text-muted-foreground">Currency</div>
                 <Select value={pendingCurrency} onValueChange={setPendingCurrency}>
@@ -495,214 +481,141 @@ export function ClinicFeesPage() {
   );
 }
 
-function SectionCard({
-  section,
+type ItemPatch = Partial<Pick<PricelistItem, "name" | "price" | "note">>;
+type NewItem = { name: string; price: number; note: string };
+
+// Underlined inputs, as in the reference price list.
+const lineInput =
+  "h-8 rounded-none border-0 border-b border-border bg-transparent px-1 text-sm shadow-none focus-visible:border-primary focus-visible:ring-0";
+const priceInput =
+  "w-16 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
+/** One treatment button: "BUTTON 7 - CROWN" and the groups of its sections. */
+function ButtonSection({
+  block,
   currency,
   registerRef,
   onItemPatch,
   onItemAdd,
 }: {
-  section: PricelistSection;
+  block: ButtonBlock;
   currency: Currency;
-  registerRef: (el: HTMLDivElement | null) => void;
-  onItemPatch: (
-    groupId: string,
-    itemId: string,
-    patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>,
-  ) => void;
-  onItemAdd: (
-    groupId: string,
-    item: { name: string; price: number; note: string },
-  ) => Promise<void>;
+  registerRef: (el: HTMLElement | null) => void;
+  onItemPatch: (sectionId: string, groupId: string, itemId: string, patch: ItemPatch) => void;
+  onItemAdd: (groupId: string, item: NewItem) => Promise<boolean>;
 }) {
-  const Icon = ICON_MAP[section.icon] ?? Package;
-
   return (
-    <div
-      ref={registerRef}
-      className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-soft)]"
-    >
-      <div className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-gradient-to-r from-primary/5 to-transparent px-5 py-3.5">
-        <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
-            {section.n != null ? `Button ${section.n}` : "Section"}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[minmax(160px,1fr)_88px_128px]">
-            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-sm font-semibold uppercase tracking-wide">
-              {section.label}
-            </div>
-            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-sm">
-              {section.n ?? "-"}
-            </div>
-            <div className="flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs">
-              {section.icon}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="divide-y divide-border/60">
-        {section.groups.length === 0 && (
-          <div className="p-5 text-center text-xs text-muted-foreground">
-            No groups yet. Add one to start building this section.
-          </div>
+    <section ref={registerRef} className="scroll-mt-4" aria-label={block.label}>
+      <h2 className="px-1 pb-2.5 pt-6 font-sans text-[13px] uppercase tracking-wide">
+        {block.number != null ? (
+          <>
+            <b>Button {block.number}</b> - {block.label}
+          </>
+        ) : (
+          <b>{block.label}</b>
         )}
-        {section.groups.map((group) => (
-          <SubGroupBlock
-            key={group.id}
-            sectionId={section.id}
-            group={group}
-            currency={currency}
-            onItemPatch={(itemId, patch) => onItemPatch(group.id, itemId, patch)}
-            onItemAdd={(item) => onItemAdd(group.id, item)}
-          />
-        ))}
+      </h2>
+      <div className="space-y-px overflow-hidden rounded-md shadow-sm">
+        {block.sections.map((section, index) =>
+          section.groups.map((group) => (
+            <GroupCard
+              key={group.id}
+              // A second section under the same button has its own "Other" group.
+              title={index > 0 && group.key === "other" ? `${group.title} (${section.label})` : group.title}
+              group={group}
+              currency={currency}
+              onItemPatch={(itemId, patch) => onItemPatch(section.id, group.id, itemId, patch)}
+              onItemAdd={(item) => onItemAdd(group.id, item)}
+            />
+          )),
+        )}
       </div>
-    </div>
+    </section>
   );
 }
 
-function SubGroupBlock({
-  sectionId,
+function GroupCard({
+  title,
   group,
   currency,
   onItemPatch,
   onItemAdd,
 }: {
-  sectionId: string;
+  title: string;
   group: PricelistGroup;
   currency: Currency;
-  onItemPatch: (
-    itemId: string,
-    patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>,
-  ) => void;
-  onItemAdd: (item: { name: string; price: number; note: string }) => Promise<void>;
+  onItemPatch: (itemId: string, patch: ItemPatch) => void;
+  onItemAdd: (item: NewItem) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(true);
-  const [draftName, setDraftName] = useState("");
-  const [draftPrice, setDraftPrice] = useState("");
-  const [draftNote, setDraftNote] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const submitNewItem = async () => {
-    const name = draftName.trim();
-    if (!name) return;
-    setAdding(true);
-    try {
-      await onItemAdd({
-        name,
-        price: Math.max(0, Number(draftPrice) || 0),
-        note: draftNote.trim(),
-      });
-      setDraftName("");
-      setDraftPrice("");
-      setDraftNote("");
-    } finally {
-      setAdding(false);
-    }
-  };
-
   return (
-    <div className="px-5 py-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="bg-card">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <h3 className="min-w-0 flex-1 truncate font-sans text-sm font-medium">{title}</h3>
+        <span className="hidden w-24 shrink-0 text-right text-[11px] text-muted-foreground sm:block">
+          Unit price
+        </span>
+        <span className="hidden w-[240px] shrink-0 text-[11px] text-muted-foreground sm:block">Note</span>
         <button
           type="button"
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
           onClick={() => setOpen((value) => !value)}
-          className="grid h-8 w-8 place-items-center rounded-md hover:bg-secondary"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
         >
-          <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
+          <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
         </button>
-        <div className="flex h-8 min-w-[180px] flex-1 items-center rounded-md border border-input bg-background px-3 text-sm font-semibold">
-          {group.title}
-        </div>
       </div>
 
       {open && (
-        <div className="space-y-1.5">
-          {group.items.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-center text-xs text-muted-foreground">
-              No items yet
-            </div>
-          )}
+        <>
           {group.items.map((item) => (
             <PriceRow
               key={item.id}
-              sectionId={sectionId}
-              groupTitle={group.title}
               item={item}
               currency={currency}
               onPatch={(patch) => onItemPatch(item.id, patch)}
             />
           ))}
-          <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-3 py-3">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Add treatment
-            </div>
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px]">
-              <Input
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                placeholder="Treatment name"
-                className="h-8"
-              />
-              <Input
-                type="number"
-                min={0}
-                value={draftPrice}
-                onChange={(event) => setDraftPrice(event.target.value)}
-                placeholder="Price"
-                className="h-8"
-              />
-            </div>
-            <div className="mt-2 flex flex-col gap-2 md:flex-row">
-              <Input
-                value={draftNote}
-                onChange={(event) => setDraftNote(event.target.value)}
-                placeholder="Optional note"
-                className="h-8 flex-1"
-              />
-              <Button
+          {adding ? (
+            <NewItemRow
+              currency={currency}
+              onCancel={() => setAdding(false)}
+              onAdd={async (item) => {
+                if (await onItemAdd(item)) setAdding(false);
+              }}
+            />
+          ) : (
+            <div className="border-t border-border/60 py-2 text-center">
+              <button
                 type="button"
-                size="sm"
-                className="gap-1.5 self-start"
-                onClick={submitNewItem}
-                disabled={adding || !draftName.trim()}
+                onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs text-muted-foreground transition hover:bg-secondary hover:text-foreground"
               >
-                {adding ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Plus className="h-3.5 w-3.5" />
-                )}
-                Add
-              </Button>
+                <Plus className="h-3.5 w-3.5" /> {title}
+              </button>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 function PriceRow({
-  sectionId,
-  groupTitle,
   item,
   currency,
   onPatch,
 }: {
-  sectionId: string;
-  groupTitle: string;
   item: PricelistItem;
   currency: Currency;
-  onPatch: (patch: Partial<Pick<PricelistItem, "name" | "price" | "note">>) => void;
+  onPatch: (patch: ItemPatch) => void;
 }) {
   const [localName, setLocalName] = useState(item.name);
   const [localPrice, setLocalPrice] = useState(String(item.price));
   const [localNote, setLocalNote] = useState(item.note ?? "");
-  const [editingNote, setEditingNote] = useState(false);
 
   useEffect(() => {
     setLocalName(item.name);
@@ -729,91 +642,129 @@ function PriceRow({
     if (localNote !== (item.note ?? "")) onPatch({ note: localNote });
   };
 
-  const hasNote = Boolean(localNote.trim());
   const policy = getItemPolicy(item);
-  const statusText = policy.isUsed
-    ? `Used in ${policy.usageCount} treatment plan${policy.usageCount === 1 ? "" : "s"}`
-    : "Not used yet";
+  const lockTitle = policy.isUsed
+    ? `Used in ${policy.usageCount} treatment plan${policy.usageCount === 1 ? "" : "s"}. Only the price can be changed.`
+    : undefined;
 
   return (
-    <div className="group rounded-xl border border-transparent bg-secondary/40 px-3 py-2 transition hover:border-border hover:bg-secondary/70">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-            policy.isUsed ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900",
-          )}
-        >
-          {statusText}
-        </span>
-        {policy.isUsed && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            <Lock className="h-3 w-3" />
-            Name and note locked
-          </span>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 px-4 py-1.5 sm:flex-nowrap">
+      <span className="grid h-4 w-4 shrink-0 place-items-center text-muted-foreground" title={lockTitle}>
+        {policy.isUsed && <Lock className="h-3.5 w-3.5" aria-label={lockTitle} />}
+      </span>
+      <Input
+        value={localName}
+        aria-label="Treatment name"
+        onChange={(event) => setLocalName(event.target.value)}
+        onBlur={handleNameBlur}
+        readOnly={!policy.canEditName}
+        className={cn(lineInput, "min-w-0 flex-1 sm:max-w-[320px]", !policy.canEditName && "cursor-default border-transparent")}
+      />
+      <span className="hidden flex-1 sm:block" />
+      <label className="flex w-24 shrink-0 items-center justify-end gap-1 text-sm">
+        <span className="text-muted-foreground">{currency.symbol}</span>
         <Input
-          value={localName}
-          onChange={(event) => setLocalName(event.target.value)}
-          onBlur={handleNameBlur}
-          readOnly={!policy.canEditName}
-          className={cn(
-            "h-8 min-w-[220px] flex-1 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-1",
-            !policy.canEditName && "cursor-default text-foreground/80 focus-visible:ring-0",
-          )}
+          type="number"
+          min={0}
+          value={localPrice}
+          aria-label={`Price for ${item.name}`}
+          onChange={(event) => setLocalPrice(event.target.value)}
+          onBlur={handlePriceBlur}
+          readOnly={!policy.canEditPrice}
+          className={cn(lineInput, priceInput, !policy.canEditPrice && "cursor-default")}
         />
+      </label>
+      <Input
+        value={localNote}
+        aria-label={`Note for ${item.name}`}
+        placeholder="Note:"
+        onChange={(event) => setLocalNote(event.target.value)}
+        onBlur={handleNoteBlur}
+        readOnly={!policy.canEditNote}
+        className={cn(lineInput, "w-full text-xs sm:w-[240px] sm:shrink-0", !policy.canEditNote && "cursor-default")}
+      />
+      <span className="hidden w-7 shrink-0 sm:block" />
+    </div>
+  );
+}
 
-        <div className="flex items-center gap-1 rounded-md bg-background px-2 py-1 ring-1 ring-border/60">
-          <span className="text-xs font-semibold text-muted-foreground">{currency.symbol}</span>
-          <Input
-            type="number"
-            value={localPrice}
-            onChange={(event) => setLocalPrice(event.target.value)}
-            onBlur={handlePriceBlur}
-            readOnly={!policy.canEditPrice}
-            className={cn(
-              "h-6 w-20 border-0 bg-transparent p-0 text-right text-sm font-semibold shadow-none focus-visible:ring-0",
-              !policy.canEditPrice && "cursor-default text-foreground/80",
-            )}
-          />
-        </div>
+function NewItemRow({
+  currency,
+  onAdd,
+  onCancel,
+}: {
+  currency: Currency;
+  onAdd: (item: NewItem) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
+  const submit = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      await onAdd({ name: trimmed, price: Math.max(0, Number(price) || 0), note: note.trim() });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const keys = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter") void submit();
+    if (event.key === "Escape") onCancel();
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/60 bg-secondary/30 px-4 py-2 sm:flex-nowrap">
+      <span className="hidden w-4 shrink-0 sm:block" />
+      <Input
+        autoFocus
+        value={name}
+        placeholder="Treatment name"
+        aria-label="New treatment name"
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={keys}
+        className={cn(lineInput, "min-w-0 flex-1 sm:max-w-[320px]")}
+      />
+      <span className="hidden flex-1 sm:block" />
+      <label className="flex w-24 shrink-0 items-center justify-end gap-1 text-sm">
+        <span className="text-muted-foreground">{currency.symbol}</span>
+        <Input
+          type="number"
+          min={0}
+          value={price}
+          placeholder="0"
+          aria-label="New treatment price"
+          onChange={(event) => setPrice(event.target.value)}
+          onKeyDown={keys}
+          className={cn(lineInput, priceInput)}
+        />
+      </label>
+      <Input
+        value={note}
+        placeholder="Note:"
+        aria-label="New treatment note"
+        onChange={(event) => setNote(event.target.value)}
+        onKeyDown={keys}
+        className={cn(lineInput, "w-full text-xs sm:w-[240px] sm:shrink-0")}
+      />
+      <div className="flex shrink-0 items-center gap-1">
+        <Button type="button" size="sm" className="h-7 gap-1 rounded-full" onClick={() => void submit()} disabled={busy || !name.trim()}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+          Add
+        </Button>
         <button
           type="button"
-          disabled={!policy.canEditNote}
-          onClick={() => setEditingNote((value) => !value)}
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-md transition",
-            hasNote || editingNote
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-background hover:text-foreground",
-            !policy.canEditNote && "cursor-not-allowed opacity-50",
-          )}
-          title={
-            !policy.canEditNote
-              ? "Used treatments cannot edit note"
-              : hasNote
-                ? "Edit note"
-                : "Add note"
-          }
+          aria-label="Cancel"
+          onClick={onCancel}
+          className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
         >
-          <StickyNote className="h-4 w-4" />
+          <X className="h-4 w-4" />
         </button>
       </div>
-
-      {(editingNote || hasNote) && (
-        <Input
-          autoFocus={editingNote && !hasNote}
-          value={localNote}
-          onChange={(event) => setLocalNote(event.target.value)}
-          onBlur={handleNoteBlur}
-          readOnly={!policy.canEditNote}
-          placeholder="Note..."
-          className={cn("mt-2 h-8 bg-background text-xs", !policy.canEditNote && "cursor-default")}
-        />
-      )}
     </div>
   );
 }

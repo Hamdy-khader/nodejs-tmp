@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, StickyNote, X } from "lucide-react";
 import {
   patientsStore,
@@ -90,9 +90,12 @@ const TreatmentActionsContext = createContext<TreatmentActions | null>(null);
 export function TreatmentsView({
   plan,
   currency = "USD",
+  afterChart,
 }: {
   plan: TreatmentPlan;
   currency?: string;
+  /** Shown right under the chart (the X-ray panel). */
+  afterChart?: ReactNode;
 }) {
   const symbol = currencySymbol(currency);
   // Ensure the clinic's pricelist is loaded so picked treatments resolve their price.
@@ -122,7 +125,7 @@ export function TreatmentsView({
     return () => document.removeEventListener("pointerdown", clear);
   }, []);
 
-  const rows = plan.treatments ?? [];
+  const rows = useMemo(() => plan.treatments ?? [], [plan.treatments]);
   const visibleRows = withoutTotalAdjustment(rows);
   const billingMode = plan.billingMode ?? "insurance";
   const buttons = useMemo(() => buildTreatmentButtons(pricelistSections), [pricelistSections]);
@@ -208,6 +211,8 @@ export function TreatmentsView({
             />
           </div>
         </div>
+
+        {afterChart && <div className="mt-3">{afterChart}</div>}
 
         {/* Suggested treatment header */}
         <div className="treatment-suggestion">

@@ -11,7 +11,12 @@ import {
   resolveTemplate,
   type PdfExportContext,
 } from "@/lib/pdf-export-context";
-import { reportPageHeight, REPORT_XRAY_HEIGHT, REPORT_XRAY_BLOCK_HEIGHT } from "@/lib/treatment-report-layout";
+import {
+  reportPageHeight,
+  reportTableOptions,
+  REPORT_XRAY_HEIGHT,
+  REPORT_XRAY_BLOCK_HEIGHT,
+} from "@/lib/treatment-report-layout";
 
 export function TreatmentReportPage({
   page,
@@ -314,7 +319,15 @@ function ReportTreatment({
   plan: TreatmentPlan;
   settings: PlanSettings;
 }) {
-  const { showPrices, showSubtotal, showTotal, showDiscount, currency } = settings.pricePage;
+  const { showSubtotal, showDiscount, currency } = settings.pricePage;
+  const showAmount = settings.pricePage.showAmount ?? true;
+  const showUnitPrice = settings.pricePage.showUnitPrice ?? settings.pricePage.showPrices;
+  const showPrice = settings.pricePage.showPrice ?? settings.pricePage.showPrices;
+  const showTotal = settings.pricePage.showTotal;
+  const { showJaws, showVisits } = reportTableOptions(settings);
+  // "Fit to page" draws the whole table smaller so it stays on this page.
+  const scale = page.fitScale ?? 1;
+  const px = (value: number) => value * scale;
   const money = (value: number) =>
     `${currency === "EUR" ? "€" : currency === "USD" ? "$" : currency} ${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   const allRows = plan.treatments ?? [];
@@ -337,133 +350,147 @@ function ReportTreatment({
     0,
   );
   const visits = allRows.filter((row) => row.kind === "visit");
+  const allItems = visits.flatMap((visit) => visit.items);
+  // A continued fragment still needs its whole visit to know who owns a package.
+  const contextItems = (row: Extract<TreatmentRow, { kind: "visit" }>) =>
+    showVisits ? visits.find((visit) => visit.id === row.id)?.items ?? row.items : allItems;
+  const columns = [
+    { label: "Treatment", width: 0, visible: true },
+    { label: "Amount", width: 11, visible: showAmount },
+    { label: "Unit price", width: 16, visible: showUnitPrice },
+    { label: "Price", width: 16, visible: showPrice },
+  ].filter((column) => column.visible);
+  const nameWidth = 100 - columns.reduce((sum, column) => sum + column.width, 0);
+  const totals: Array<[string, number]> =
+    discount > 0
+      ? [
+          ...(showSubtotal ? [["Total", subtotal] as [string, number]] : []),
+          ...(showDiscount ? [["Discount", -discount] as [string, number]] : []),
+          ["Discounted price", Math.max(0, subtotal - discount)],
+        ]
+      : [["Total", subtotal]];
   return (
     <>
       {page.showTreatmentChart && <ReportChart plan={plan} rows={allRows} />}
-      {(page.treatmentRows ?? []).map((row, index) => (
-        <section key={`${row.id}-${index}`} style={{ marginTop: 10 }}>
-          {row.kind === "visit" ? (
-            <>
-              <div
-                data-pdf-keep-together
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  background: "#ededed",
-                  padding: "7px 6px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                <span>
-                  {visits.findIndex((visit) => visit.id === row.id) + 1}. Visit: {row.label}
-                </span>
-                {showPrices && (
-                  <span>
-                    {money(treatmentItemsTotal((visits.find(visit => visit.id === row.id) as Extract<TreatmentRow, { kind: "visit" }> | undefined)?.items ?? []))}
-                  </span>
-                )}
-              </div>
-              {row.note && <p style={{ margin: "4px 6px", whiteSpace: "pre-wrap" }}>{row.note}</p>}
-              <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-                <colgroup>
-                  <col style={{ width: "57%" }} />
-                  <col style={{ width: "11%" }} />
-                  <col style={{ width: "16%" }} />
-                  <col style={{ width: "16%" }} />
-                </colgroup>
-                <thead>
-                  <tr style={{ color: "#999", borderBottom: "1px solid #bbb" }}>
-                    {["Treatment", "Amount", "Unit price", "Price"].map((label, i) => (
-                      <th
-                        key={label}
-                        style={{
-                          padding: "5px 6px",
-                          fontWeight: 400,
-                          textAlign: i ? "right" : "left",
-                        }}
-                      >
-                        {!showPrices && i > 1 ? "" : label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupTreatmentItems(row.items, visits.find(visit => visit.id === row.id)?.items ?? row.items).map((group) => (
-                    <tr
-                      key={group.id}
-                      data-pdf-keep-together
-                      style={{ borderBottom: "1px solid #ddd" }}
-                    >
-                      <td style={{ padding: "6px", lineHeight: "13px", overflowWrap: "anywhere" }}>
-                        {group.items[0].name}
-                        {group.jaw && ` — ${group.jaw}`}
-                        {group.teeth.length > 0 && ` (${group.teeth.join(", ")})`}
-                      </td>
-                      <td style={{ textAlign: "right", padding: 6 }}>{group.amount} ×</td>
-                      <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && (group.packageIncluded ? "In package" : group.priceMode === "unit" ? money(group.unitPrice) : group.priceMode === "package" ? `${money(group.unitPrice)} (${PRICE_MODES[group.priceMode]})` : PRICE_MODES[group.priceMode])}
-                      </td>
-                      <td style={{ textAlign: "right", padding: 6 }}>
-                        {showPrices && (group.packageIncluded ? "In package" : money(group.total))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : (
-            <div data-pdf-keep-together style={{ padding: "7px 6px" }}>
-              {row.kind === "healing" ? (
-                <>
-                  Healing period: {row.label} {row.days != null && `${row.days} days`}
-                </>
-              ) : (
-                <>
-                  Discount{" "}
-                  {showPrices && (row.mode === "percent" ? `${row.value}%` : money(row.value))}
-                </>
-              )}
-              {row.note && <p style={{ whiteSpace: "pre-wrap" }}>{row.note}</p>}
-            </div>
-          )}
-        </section>
-      ))}
-      {page.showTotals && (
-        <div data-pdf-keep-together style={{ marginTop: 18 }}>
-          {showPrices && (
-            <div style={{ background: "#ededed", fontSize: 11, fontWeight: 700 }}>
-              {[
-                ["Total", subtotal, showSubtotal],
-                ["Discount", -discount, showDiscount && discount > 0],
-                [
-                  discount > 0 ? "Discounted price" : "Total payable",
-                  Math.max(0, subtotal - discount),
-                  showTotal,
-                ],
-              ].map(([label, value, visible]) =>
-                visible ? (
+      <div style={{ fontSize: px(9) }}>
+        {(page.treatmentRows ?? []).map((row, index) => (
+          <section key={`${row.id}-${index}`} style={{ marginTop: px(10) }}>
+            {row.kind === "visit" ? (
+              <>
+                {showVisits && (
                   <div
-                    key={String(label)}
+                    data-pdf-keep-together
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      background: "#ededed",
+                      padding: `${px(7)}px ${px(6)}px`,
+                      fontSize: px(10),
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>
+                      {visits.findIndex((visit) => visit.id === row.id) + 1}. Visit: {row.label}
+                    </span>
+                    {showPrice && <span>{money(treatmentItemsTotal(contextItems(row)))}</span>}
+                  </div>
+                )}
+                {showVisits && row.note && (
+                  <p style={{ margin: `${px(4)}px ${px(6)}px`, whiteSpace: "pre-wrap" }}>{row.note}</p>
+                )}
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                  <colgroup>
+                    {columns.map((column) => (
+                      <col key={column.label} style={{ width: `${column.width || nameWidth}%` }} />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr style={{ color: "#999", borderBottom: "1px solid #bbb" }}>
+                      {columns.map((column, i) => (
+                        <th
+                          key={column.label}
+                          style={{
+                            padding: `${px(5)}px ${px(6)}px`,
+                            fontWeight: 400,
+                            textAlign: i ? "right" : "left",
+                          }}
+                        >
+                          {column.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupTreatmentItems(row.items, contextItems(row), { splitJaws: showJaws }).map((group) => (
+                      <tr
+                        key={group.id}
+                        data-pdf-keep-together
+                        style={{ borderBottom: "1px solid #ddd" }}
+                      >
+                        <td style={{ padding: px(6), lineHeight: `${px(13)}px`, overflowWrap: "anywhere" }}>
+                          {group.items[0].name}
+                          {group.jaw && ` — ${group.jaw}`}
+                          {group.teeth.length > 0 && ` (${group.teeth.join(", ")})`}
+                        </td>
+                        {showAmount && <td style={{ textAlign: "right", padding: px(6) }}>{group.amount} ×</td>}
+                        {showUnitPrice && (
+                          <td style={{ textAlign: "right", padding: px(6) }}>
+                            {group.packageIncluded ? "In package" : group.priceMode === "unit" ? money(group.unitPrice) : group.priceMode === "package" ? `${money(group.unitPrice)} (${PRICE_MODES[group.priceMode]})` : PRICE_MODES[group.priceMode]}
+                          </td>
+                        )}
+                        {showPrice && (
+                          <td style={{ textAlign: "right", padding: px(6) }}>
+                            {group.packageIncluded ? "In package" : money(group.total)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <div data-pdf-keep-together style={{ padding: `${px(7)}px ${px(6)}px` }}>
+                {row.kind === "healing" ? (
+                  <>
+                    Healing period: {row.label} {row.days != null && `${row.days} days`}
+                  </>
+                ) : (
+                  <>
+                    Discount{" "}
+                    {(showUnitPrice || showPrice) && (row.mode === "percent" ? `${row.value}%` : money(row.value))}
+                  </>
+                )}
+                {row.note && <p style={{ whiteSpace: "pre-wrap" }}>{row.note}</p>}
+              </div>
+            )}
+          </section>
+        ))}
+        {page.showTotals && (
+          <div data-pdf-keep-together style={{ marginTop: px(18) }}>
+            {showTotal && (
+              <div style={{ background: "#ededed", fontSize: px(11), fontWeight: 700 }}>
+                {totals.map(([label, value]) => (
+                  <div
+                    key={label}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       borderBottom: "1px solid #bbb",
-                      padding: "6px",
+                      padding: px(6),
                     }}
                   >
                     <span>{label}</span>
-                    <span>{money(Number(value))}</span>
+                    <span>{money(value)}</span>
                   </div>
-                ) : null,
-              )}
-            </div>
-          )}
-          {plan.treatmentNote && (
-            <p style={{ whiteSpace: "pre-wrap", marginTop: 12 }}>{plan.treatmentNote}</p>
-          )}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+            {plan.treatmentNote && (
+              <p style={{ whiteSpace: "pre-wrap", marginTop: px(12) }}>{plan.treatmentNote}</p>
+            )}
+          </div>
+        )}
+      </div>
     </>
   );
 }

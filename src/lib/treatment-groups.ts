@@ -31,8 +31,16 @@ function treatmentJaw(number: number | undefined): TreatmentItemGroup["jaw"] {
     : quadrant === 3 || quadrant === 4 ? "Lower jaw" : null;
 }
 
-function displayKey(item: TreatmentItem): string {
-  return JSON.stringify([treatmentKey(item), treatmentJaw(item.toothNumber) ?? item.toothNumber]);
+function displayKey(item: TreatmentItem, splitJaws: boolean): string {
+  return JSON.stringify([
+    treatmentKey(item),
+    splitJaws ? (treatmentJaw(item.toothNumber) ?? item.toothNumber) : null,
+  ]);
+}
+
+export interface GroupOptions {
+  /** One row per jaw (the plan screen, and reports with "Prices / jaws" on). */
+  splitJaws?: boolean;
 }
 
 /**
@@ -41,7 +49,11 @@ function displayKey(item: TreatmentItem): string {
  * together form one row, the same treatment added after something else starts
  * a new row until Autocorrect brings them together.
  */
-export function groupTreatmentItems(items: TreatmentItem[], visitItems = items): TreatmentItemGroup[] {
+export function groupTreatmentItems(
+  items: TreatmentItem[],
+  visitItems = items,
+  { splitJaws = true }: GroupOptions = {},
+): TreatmentItemGroup[] {
   const groups: TreatmentItemGroup[] = [];
   let block: { key: string; byJaw: Map<string, TreatmentItemGroup> } | null = null;
   // A package can cover both jaws. Splitting its display must not charge it twice.
@@ -55,14 +67,14 @@ export function groupTreatmentItems(items: TreatmentItem[], visitItems = items):
     packages.set(key, entries);
   }
   for (const item of items) {
-    const jaw = treatmentJaw(item.toothNumber);
-    const key = displayKey(item);
+    const jaw = splitJaws ? treatmentJaw(item.toothNumber) : null;
+    const key = displayKey(item, splitJaws);
     if (block?.key !== treatmentKey(item)) block = { key: treatmentKey(item), byJaw: new Map() };
     let group = block.byJaw.get(key);
     if (!group) {
       group = { id: item.id, jaw, items: [], teeth: [], amount: 0, unitPrice: item.unitPrice, total: 0, priceMode: item.priceMode ?? "unit", packageIncluded: false };
       group.packageItems = packages.get(treatmentKey(item));
-      group.packageIncluded = Boolean(group.packageItems && displayKey(group.packageItems[0]) !== key);
+      group.packageIncluded = Boolean(group.packageItems && displayKey(group.packageItems[0], splitJaws) !== key);
       block.byJaw.set(key, group);
       groups.push(group);
     }
@@ -72,6 +84,15 @@ export function groupTreatmentItems(items: TreatmentItem[], visitItems = items):
     group.amount += item.amount;
     group.total = group.priceMode === "package" ? (group.packageIncluded ? 0 : group.unitPrice)
       : group.priceMode === "unit" ? group.amount * group.unitPrice : 0;
+  }
+  if (!splitJaws) {
+    // Without jaw rows, the package is charged on the row holding its first item;
+    // the same treatment elsewhere (or continued on another page) is included.
+    for (const group of groups) {
+      if (!group.packageItems || group.priceMode !== "package") continue;
+      group.packageIncluded = !group.items.includes(group.packageItems[0]);
+      group.total = group.packageIncluded ? 0 : group.unitPrice;
+    }
   }
   for (const group of groups) group.teeth.sort((a, b) => a - b);
   return groups;

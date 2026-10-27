@@ -1,31 +1,62 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import {
-  ChevronLeft, ChevronRight, Maximize2, UploadCloud, X, RotateCcw, Save, Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Contrast,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  RotateCw,
+  UploadCloud,
+  X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { patientsStore, type XrayImage } from "@/lib/patients-store";
 import { cn } from "@/lib/utils";
 import { clinicApi } from "@/lib/admin/api";
-import { DEFAULT_XRAY_ADJUST as DEFAULT_ADJUST, renderXrayImage, type ImageAdjust } from "@/lib/xray-image";
+import {
+  DEFAULT_XRAY_ADJUST as DEFAULT_ADJUST,
+  renderXrayImage,
+  xrayStyle,
+  type ImageAdjust,
+} from "@/lib/xray-image";
 import { toast } from "sonner";
 
 interface XrayPanelProps {
   ref?: Ref<XrayPanelHandle>;
   planId: string;
   xrays: XrayImage[];
-  onClose: () => void;
 }
 
 export interface XrayPanelHandle {
+  /** Bakes pending adjustments into the image; false when that failed. */
   save: () => Promise<boolean>;
 }
 
-export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
+/**
+ * The X-ray viewer under the chart, laid out like the reference planner: the
+ * image with its bar (fullscreen, upload, delete, previous/next) on the left,
+ * zoom, brightness, contrast, invert, rotate and reset on the right. Changes
+ * are written into the image when the user moves on (another image, closing,
+ * another step, saving the plan), so reports and the PDF show them too.
+ */
+export function XrayPanel({ planId, xrays, ref }: XrayPanelProps) {
   const [index, setIndex] = useState(0);
   const [adjust, setAdjust] = useState<ImageAdjust>(DEFAULT_ADJUST);
   const [fullscreen, setFullscreen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const inlineImage = useRef<HTMLImageElement>(null);
@@ -36,7 +67,9 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
   const deletingRef = useRef(false);
   const busy = saving || deleting || uploading;
   const current = xrays[index];
-  const dirty = Object.keys(DEFAULT_ADJUST).some((key) => adjust[key as keyof ImageAdjust] !== DEFAULT_ADJUST[key as keyof ImageAdjust]);
+  const dirty = (Object.keys(DEFAULT_ADJUST) as (keyof ImageAdjust)[]).some(
+    (key) => adjust[key] !== DEFAULT_ADJUST[key],
+  );
 
   const save = async (): Promise<boolean> => {
     if (savingRef.current || deletingRef.current || uploading) return false;
@@ -55,7 +88,6 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
       const file = await renderXrayImage(source, adjust, view);
       await patientsStore.replaceXray(planId, current.id, file);
       setAdjust(DEFAULT_ADJUST);
-      toast.success("X-ray image saved.");
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the X-ray. Your adjustments are still here; please retry.");
@@ -68,9 +100,6 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
 
   const selectImage = async (next: number) => {
     if (await save()) setIndex(next);
-  };
-  const close = async () => {
-    if (await save()) onClose();
   };
   useImperativeHandle(ref, () => ({ save }));
 
@@ -122,271 +151,262 @@ export function XrayPanel({ planId, xrays, onClose, ref }: XrayPanelProps) {
     }
   };
 
-  const filterStyle = {
-    filter: `brightness(${adjust.brightness}%) contrast(${adjust.contrast}%)`,
-    transform: `scale(${adjust.zoom / 100})`,
-    transformOrigin: "center center",
-    transition: "transform 0.15s ease",
-  } as React.CSSProperties;
+  const viewer = (large: boolean) => (
+    <Viewer
+      large={large}
+      xrays={xrays}
+      index={index}
+      adjust={adjust}
+      busy={busy}
+      status={saving ? "Saving…" : uploading ? "Uploading…" : deleting ? "Deleting…" : null}
+      imageRef={large ? fullscreenImage : inlineImage}
+      onMove={(offsetX, offsetY) => setAdjust((a) => ({ ...a, offsetX, offsetY }))}
+      onUpload={() => fileInput.current?.click()}
+      onDrop={(files) => void handleFiles(files)}
+      onDelete={() => setConfirmDelete(true)}
+      onSelect={(next) => void selectImage(next)}
+      onFullscreen={async () => {
+        if (await save()) setFullscreen(!large);
+      }}
+    />
+  );
+  const controls = (dark: boolean) => (
+    <Controls dark={dark} adjust={adjust} disabled={!current || busy} onChange={setAdjust} />
+  );
 
   return (
     <>
-      <div aria-busy={busy} className="rounded-2xl border border-border/60 bg-card p-4 shadow-[var(--shadow-soft)]">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-primary">X-ray</h3>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="destructive" disabled={!current || busy} onClick={() => void remove()}>
-              <Trash2 className="h-4 w-4" /> {deleting ? "Deleting…" : "Delete image"}
-            </Button>
-            <Button size="sm" disabled={!current || !dirty || busy} onClick={() => void save()}>
-              <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save image"}
-            </Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => fileInput.current?.click()}>
-              <UploadCloud className="h-4 w-4" /> {uploading ? "Uploading…" : "Upload"}
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={busy} aria-label="Close X-ray" onClick={() => void close()}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            handleFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          {/* Image area */}
-          <div
-            className={cn(
-              "relative flex aspect-[4/3] min-h-[260px] items-center justify-center overflow-hidden rounded-xl bg-[#0e1216] text-white/70",
-              !current && "border-2 border-dashed border-border/60 bg-muted/40 text-muted-foreground",
-            )}
-            onDragOver={(e) => {
-              e.preventDefault();
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleFiles(e.dataTransfer.files);
-            }}
-          >
-            {current ? (
-              <>
-                <img
-                  ref={inlineImage}
-                  src={current.url}
-                  alt={`X-ray ${index + 1}`}
-                  className="max-h-full max-w-full select-none object-contain"
-                  style={filterStyle}
-                  draggable={false}
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={async () => { if (await save()) setFullscreen(true); }}
-                  className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
-                  title="Fullscreen"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInput.current?.click()}
-                  className="absolute left-14 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
-                  title="Upload more"
-                >
-                  <UploadCloud className="h-4 w-4" />
-                </button>
-
-
-                {xrays.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void selectImage((index - 1 + xrays.length) % xrays.length)}
-                      className="absolute bottom-3 left-1/2 -translate-x-[3.25rem] grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs text-white backdrop-blur">
-                      {index + 1} / {xrays.length}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void selectImage((index + 1) % xrays.length)}
-                      className="absolute bottom-3 left-1/2 translate-x-[1.5rem] grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </>
-                )}
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInput.current?.click()}
-                className="flex flex-col items-center gap-2 px-6 py-10 text-center"
-              >
-                <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                <span className="text-sm font-medium">Click or drop images here</span>
-                <span className="text-xs text-muted-foreground">PNG, JPG, WEBP — multiple allowed</span>
-              </button>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="space-y-5">
-            <AdjustSlider
-              label="Zoom"
-              value={adjust.zoom}
-              min={50}
-              max={300}
-              disabled={!current || busy}
-              onChange={(v) => setAdjust((a) => ({ ...a, zoom: v }))}
-            />
-            <AdjustSlider
-              label="Brightness"
-              value={adjust.brightness}
-              min={20}
-              max={200}
-              disabled={!current || busy}
-              onChange={(v) => setAdjust((a) => ({ ...a, brightness: v }))}
-            />
-            <AdjustSlider
-              label="Contrast"
-              value={adjust.contrast}
-              min={20}
-              max={200}
-              disabled={!current || busy}
-              onChange={(v) => setAdjust((a) => ({ ...a, contrast: v }))}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!current || busy}
-              onClick={() => setAdjust(DEFAULT_ADJUST)}
-              className="w-full"
-            >
-              <RotateCcw className="h-4 w-4" /> Reset adjustments
-            </Button>
-
-            {xrays.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {xrays.map((xray, i) => (
-                  <button
-                    key={xray.id}
-                    type="button"
-                    aria-label={`Select X-ray ${i + 1}`}
-                    aria-pressed={i === index}
-                    disabled={busy}
-                    onClick={() => void selectImage(i)}
-                    className={cn(
-                      "h-12 w-16 overflow-hidden rounded-md border-2 transition",
-                      i === index ? "border-primary" : "border-border/60 opacity-70 hover:opacity-100",
-                    )}
-                  >
-                    <img src={xray.url} alt="" className="h-full w-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+      <div
+        aria-busy={busy}
+        aria-label="X-ray"
+        role="region"
+        className="grid grid-cols-1 gap-4 rounded-md bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,3fr)_minmax(220px,2fr)]"
+      >
+        {viewer(false)}
+        {controls(false)}
       </div>
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        aria-label="Upload OPG X-ray"
+        onChange={(e) => {
+          void handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       <Dialog open={fullscreen} onOpenChange={async (open) => { if (open || await save()) setFullscreen(open); }}>
-        <DialogContent className="max-w-[96vw] border-0 bg-black p-0 sm:max-w-[96vw]">
-          <DialogTitle className="sr-only">Edit X-ray</DialogTitle>
-          <div className="relative flex h-[90vh] w-full items-center justify-center overflow-hidden bg-[#0e1216]">
-            {current && (
-              <img
-                ref={fullscreenImage}
-                src={current.url}
-                alt={`X-ray ${index + 1}`}
-                className="max-h-full max-w-full object-contain"
-                style={filterStyle}
-                draggable={false}
-              />
-            )}
-            {xrays.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void selectImage((index - 1 + xrays.length) % xrays.length)}
-                  className="absolute left-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/25"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void selectImage((index + 1) % xrays.length)}
-                  className="absolute right-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/25"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-                <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-xs text-white backdrop-blur">
-                  {index + 1} / {xrays.length}
-                </span>
-              </>
-            )}
-            <div className="absolute right-4 top-12 flex flex-col gap-3 rounded-2xl bg-white/10 p-4 text-white backdrop-blur w-[240px]">
-              <Button size="sm" disabled={!current || !dirty || busy} onClick={() => void save()}>
-                <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save image"}
-              </Button>
-              <Button size="sm" variant="destructive" disabled={!current || busy} onClick={() => void remove()}>
-                <Trash2 className="h-4 w-4" /> {deleting ? "Deleting�" : "Delete image"}
-              </Button>
-              <AdjustSlider
-                label="Zoom"
-                value={adjust.zoom}
-                min={50}
-                max={300}
-                disabled={!current || busy}
-                onChange={(v) => setAdjust((a) => ({ ...a, zoom: v }))}
-                dark
-              />
-              <AdjustSlider
-                label="Brightness"
-                value={adjust.brightness}
-                min={20}
-                max={200}
-                disabled={!current || busy}
-                onChange={(v) => setAdjust((a) => ({ ...a, brightness: v }))}
-                dark
-              />
-              <AdjustSlider
-                label="Contrast"
-                value={adjust.contrast}
-                min={20}
-                max={200}
-                disabled={!current || busy}
-                onChange={(v) => setAdjust((a) => ({ ...a, contrast: v }))}
-                dark
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setAdjust(DEFAULT_ADJUST)}
-                disabled={busy}
-                className="text-white hover:bg-white/15 hover:text-white"
-              >
-                <RotateCcw className="h-4 w-4" /> Reset
-              </Button>
-            </div>
+        <DialogContent className="max-w-[96vw] border-0 bg-[#0e1216] p-4 sm:max-w-[96vw]">
+          <DialogTitle className="sr-only">X-ray</DialogTitle>
+          <div className="grid h-[86vh] grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+            {viewer(true)}
+            {controls(true)}
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this X-ray?</AlertDialogTitle>
+            <AlertDialogDescription>The image is removed from the plan. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmDelete(false);
+                void remove();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
+  );
+}
+
+function Viewer({
+  large,
+  xrays,
+  index,
+  adjust,
+  busy,
+  status,
+  imageRef,
+  onMove,
+  onUpload,
+  onDrop,
+  onDelete,
+  onSelect,
+  onFullscreen,
+}: {
+  large: boolean;
+  xrays: XrayImage[];
+  index: number;
+  adjust: ImageAdjust;
+  busy: boolean;
+  status: string | null;
+  imageRef: Ref<HTMLImageElement>;
+  onMove: (offsetX: number, offsetY: number) => void;
+  onUpload: () => void;
+  onDrop: (files: FileList) => void;
+  onDelete: () => void;
+  onSelect: (index: number) => void;
+  onFullscreen: () => void;
+}) {
+  const current = xrays[index];
+  const drag = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const barButton =
+    "grid h-8 w-8 place-items-center rounded-full text-white transition hover:bg-white/15 disabled:opacity-40";
+
+  return (
+    <div
+      className={cn(
+        "relative min-w-0 overflow-hidden rounded-md",
+        large ? "h-full" : "aspect-[2/1] min-h-[220px]",
+        current ? "bg-[#0e1216]" : "bg-muted",
+      )}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop(e.dataTransfer.files);
+      }}
+    >
+      {current ? (
+        <>
+          <div
+            className={cn("flex h-full w-full items-center justify-center", !busy && "cursor-grab active:cursor-grabbing")}
+            onPointerDown={(e) => {
+              if (busy || e.button !== 0) return;
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              drag.current = { x: e.clientX, y: e.clientY, offsetX: adjust.offsetX, offsetY: adjust.offsetY };
+            }}
+            onPointerMove={(e) => {
+              const start = drag.current;
+              if (!start) return;
+              onMove(start.offsetX + e.clientX - start.x, start.offsetY + e.clientY - start.y);
+            }}
+            onPointerUp={() => {
+              drag.current = null;
+            }}
+            onPointerCancel={() => {
+              drag.current = null;
+            }}
+          >
+            <img
+              ref={imageRef}
+              src={current.url}
+              alt={`X-ray ${index + 1}`}
+              className="max-h-full max-w-full select-none object-contain"
+              style={xrayStyle(adjust)}
+              draggable={false}
+            />
+          </div>
+          <div className="absolute inset-x-0 bottom-0 flex h-11 items-center bg-gradient-to-t from-black/70 to-transparent px-2">
+            <div className="flex items-center gap-1">
+              <button type="button" className={barButton} disabled={busy} onClick={onFullscreen} aria-label={large ? "Exit fullscreen" : "Fullscreen"} title={large ? "Exit fullscreen" : "Fullscreen"}>
+                {large ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button type="button" className={barButton} disabled={busy} onClick={onUpload} aria-label="Upload X-ray" title="Upload X-ray">
+                <UploadCloud className="h-4 w-4" />
+              </button>
+              <button type="button" className={barButton} disabled={busy} onClick={onDelete} aria-label="Delete X-ray" title="Delete X-ray">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1 text-xs text-white">
+              <button type="button" className={barButton} disabled={busy || xrays.length < 2} onClick={() => onSelect((index - 1 + xrays.length) % xrays.length)} aria-label="Previous X-ray">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-10 text-center tabular-nums">
+                {index + 1} / {xrays.length}
+              </span>
+              <button type="button" className={barButton} disabled={busy || xrays.length < 2} onClick={() => onSelect((index + 1) % xrays.length)} aria-label="Next X-ray">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            {status && (
+              <span role="status" className="ml-auto flex items-center gap-1.5 pr-2 text-xs text-white">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {status}
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onUpload}
+          disabled={busy}
+          className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground transition hover:text-foreground"
+        >
+          {busy ? <Loader2 className="h-9 w-9 animate-spin" /> : <UploadCloud className="h-10 w-10" />}
+          <span className="text-sm">{status ?? "Upload OPG X-ray"}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Controls({
+  dark,
+  adjust,
+  disabled,
+  onChange,
+}: {
+  dark: boolean;
+  adjust: ImageAdjust;
+  disabled: boolean;
+  onChange: (update: (adjust: ImageAdjust) => ImageAdjust) => void;
+}) {
+  const toolButton = cn(
+    "flex h-9 flex-1 items-center justify-center rounded-md border transition disabled:opacity-40",
+    dark ? "border-white/20 text-white hover:bg-white/10" : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+  return (
+    <div className={cn("flex flex-col justify-center gap-5 rounded-md p-4", dark ? "bg-white/5" : "bg-muted/60")}>
+      <AdjustSlider label="Zoom" value={adjust.zoom} min={50} max={300} dark={dark} disabled={disabled} onChange={(zoom) => onChange((a) => ({ ...a, zoom }))} />
+      <AdjustSlider label="Brightness" value={adjust.brightness} min={20} max={200} dark={dark} disabled={disabled} onChange={(brightness) => onChange((a) => ({ ...a, brightness }))} />
+      <AdjustSlider label="Contrast" value={adjust.contrast} min={20} max={200} dark={dark} disabled={disabled} onChange={(contrast) => onChange((a) => ({ ...a, contrast }))} />
+      <div className="flex gap-2" role="group" aria-label="Image tools">
+        <button
+          type="button"
+          className={cn(toolButton, adjust.invert && (dark ? "bg-white/15 text-white" : "bg-primary/10 text-primary"))}
+          disabled={disabled}
+          aria-pressed={adjust.invert}
+          aria-label="Invert colors"
+          title="Invert colors"
+          onClick={() => onChange((a) => ({ ...a, invert: !a.invert }))}
+        >
+          <Contrast className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className={toolButton}
+          disabled={disabled}
+          aria-label="Rotate 90°"
+          title="Rotate 90°"
+          onClick={() => onChange((a) => ({ ...a, rotation: (a.rotation + 90) % 360 }))}
+        >
+          <RotateCw className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className={toolButton}
+          disabled={disabled}
+          aria-label="Reset"
+          title="Reset"
+          onClick={() => onChange(() => DEFAULT_ADJUST)}
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -403,7 +423,7 @@ function AdjustSlider({
 }) {
   return (
     <div className={cn(disabled && "opacity-50")}>
-      <div className={cn("mb-1.5 text-sm font-medium", dark ? "text-white" : "text-foreground")}>
+      <div className={cn("mb-1.5 text-sm", dark ? "text-white" : "text-foreground")}>
         {label} ({value}%)
       </div>
       <Slider
@@ -413,6 +433,7 @@ function AdjustSlider({
         value={[value]}
         onValueChange={(v) => onChange(v[0])}
         disabled={disabled}
+        aria-label={label}
       />
     </div>
   );
