@@ -24,10 +24,10 @@ describe("diagnosis drawings", () => {
   it("draws one caries spot per picked surface", () => {
     const visual = buildToothVisual(16, [at(16, 3, "M,O")]);
     expect(visual.spots).toEqual([
-      { kind: "caries", surface: "M", planned: false },
-      { kind: "caries", surface: "O", planned: false },
+      { kind: "caries", surface: "M", planned: false, detailed: true },
+      { kind: "caries", surface: "O", planned: false, detailed: true },
     ]);
-    expect(visual.marker).toBe("status");
+    expect(visual.marker).toBe("detailed");
   });
 
   it("draws the default spot when no surface was picked", () => {

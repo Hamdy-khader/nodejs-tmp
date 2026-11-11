@@ -30,6 +30,7 @@ const C = ODONTOGRAM_COLORS;
 // Planned work and the "white" restorations (filling, inlay, onlay) are green;
 // existing caries is red, amalgam dark and old composite light grey.
 function spotStyle(spot: Spot) {
+  if (spot.detailed && !spot.planned) return { fill: C.caries, stroke: C.cariesLine };
   if (spot.planned || spot.kind === "inlay" || spot.kind === "onlay" || spot.kind === "filling") {
     return { fill: C.planned, stroke: C.plannedLine };
   }
@@ -125,6 +126,7 @@ function Implant({
   abutmentPlanned,
   cap,
   capPlanned,
+  detailed,
 }: {
   g: ReturnType<typeof toothGeometry>;
   planned: boolean;
@@ -133,9 +135,10 @@ function Implant({
   abutmentPlanned: boolean;
   cap: boolean;
   capPlanned: boolean;
+  detailed: boolean;
 }) {
-  const fill = planned ? C.planned : "#C9C9C9";
-  const line = planned ? C.plannedLine : C.outline;
+  const fill = planned ? C.planned : detailed ? C.caries : "#C9C9C9";
+  const line = planned ? C.plannedLine : detailed ? C.cariesLine : C.outline;
   const top = g.neckY - 1;
   const bottom = g.neckY - 36;
   const half = 5.8;
@@ -204,13 +207,15 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
             : crown.shape === "telescopic"
               ? g.telescopic
               : g.crown;
-  const crownColor =
-    crown.shape === "core"
+  const crownColor = crown.detailed
+    ? C.caries
+    : crown.shape === "core"
       ? crown.fill === "planned"
         ? C.plannedDark
         : C.metal
       : crownFill(crown.fill);
-  const crownLine = crown.fill === "planned" ? C.plannedLine : C.outline;
+  const crownLine =
+    crown.fill === "planned" ? C.plannedLine : crown.detailed ? C.cariesLine : C.outline;
   const plannedFiled = crown.shape === "filed" && crown.fill === "planned";
 
   return (
@@ -236,8 +241,8 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
             <g key={index}>
               <path
                 d={root}
-                fill={C.root}
-                stroke={C.outline}
+                fill={visual.rootCanal?.defective ? C.caries : C.root}
+                stroke={visual.rootCanal?.defective ? C.cariesLine : C.outline}
                 strokeWidth={0.9}
                 strokeLinejoin="round"
               />
@@ -251,6 +256,7 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
           <Implant
             g={g}
             planned={visual.implant.planned}
+            detailed={!!visual.implant.detailed}
             onePhase={visual.implant.onePhase}
             abutment={!!visual.abutment}
             abutmentPlanned={!!visual.abutment?.planned}
@@ -264,7 +270,13 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
               key={index}
               d={line}
               fill="none"
-              stroke={visual.rootCanal?.planned ? C.plannedLine : C.metal}
+              stroke={
+                visual.rootCanal?.planned
+                  ? C.plannedLine
+                  : visual.rootCanal?.defective
+                    ? C.cariesLine
+                    : C.metal
+              }
               strokeWidth={1.5}
               strokeLinecap="round"
             />
@@ -320,7 +332,13 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
               <path
                 d={g.crown}
                 fill="none"
-                stroke={visual.veneer.planned ? C.plannedLine : "#6CB86C"}
+                stroke={
+                  visual.veneer.planned
+                    ? C.plannedLine
+                    : visual.veneer.detailed
+                      ? C.cariesLine
+                      : "#6CB86C"
+                }
                 strokeWidth={2.2}
                 transform={`translate(${g.cx} ${g.edgeY}) scale(0.86) translate(${-g.cx} ${-g.edgeY})`}
               />

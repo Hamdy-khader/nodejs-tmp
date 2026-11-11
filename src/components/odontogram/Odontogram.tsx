@@ -166,9 +166,11 @@ function Row({
               "mx-auto grid h-[19px] w-[19px] place-items-center rounded-full border text-[10px] tabular-nums leading-none text-[#8a8f94]",
               visual.marker === "planned"
                 ? "border-[#5cb85c]"
-                : visual.marker === "status"
-                  ? "border-[#8a8f94]"
-                  : "border-transparent",
+                : visual.marker === "detailed"
+                  ? "border-[#B32424] text-[#B32424]"
+                  : visual.marker === "status"
+                    ? "border-[#8a8f94]"
+                    : "border-transparent",
             )}
             data-marker={visual.marker}
           >

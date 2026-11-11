@@ -18,6 +18,7 @@ export interface Spot {
   /** Undefined draws the tooth's default spot (occlusal at the back, side at the front). */
   surface?: Surface;
   planned: boolean;
+  detailed?: boolean;
 }
 
 /** Everything the odontogram needs to draw one tooth. */
@@ -29,14 +30,14 @@ export interface ToothVisual {
   extraction: boolean;
   /** Natural root visible (false for implants, missing teeth, pontics and denture teeth). */
   naturalRoot: boolean;
-  implant?: { onePhase: boolean; planned: boolean };
+  implant?: { onePhase: boolean; planned: boolean; detailed?: boolean };
   abutment?: { planned: boolean };
   healingCap?: { planned: boolean };
-  rootCanal?: { planned: boolean };
+  rootCanal?: { planned: boolean; defective: boolean };
   post?: { planned: boolean };
   pins?: { planned: boolean };
-  crown: { shape: CrownShape; fill: CrownFill };
-  veneer?: { planned: boolean };
+  crown: { shape: CrownShape; fill: CrownFill; detailed?: boolean };
+  veneer?: { planned: boolean; detailed?: boolean };
   veneerPreparation: boolean;
   impacted: boolean;
   spots: Spot[];
@@ -46,7 +47,7 @@ export interface ToothVisual {
   attachment?: { planned: boolean };
   drift?: "front" | "back";
   /** The circle around the tooth number. */
-  marker: "none" | "status" | "planned";
+  marker: "none" | "status" | "detailed" | "planned";
 }
 
 /** A planned treatment on a tooth, in the order the steps were added. */
@@ -116,6 +117,7 @@ function applyState(
   planned: boolean,
   extraDiagnosis?: string,
 ) {
+  const detailed = !planned && Boolean(extraDiagnosis?.trim());
   const kind = SURFACE_STATES[stateId];
   if (kind) {
     if (visual.crown.shape === "none") return;
@@ -123,7 +125,7 @@ function applyState(
       visual.spots = visual.spots.filter(
         (spot) => !(spot.surface === surface && spot.kind !== kind),
       );
-      visual.spots.push({ kind, surface, planned });
+      visual.spots.push({ kind, surface, planned, ...(detailed ? { detailed } : {}) });
     }
     return;
   }
@@ -157,14 +159,19 @@ function applyState(
       visual.impacted = true;
       return;
     case STATE.inlay:
-      visual.spots.push({ kind: "inlay", surface: "O", planned });
+      visual.spots.push({ kind: "inlay", surface: "O", planned, detailed });
       return;
     case STATE.onlay:
-      visual.spots.push({ kind: "onlay", surface: "O", planned });
+      visual.spots.push({ kind: "onlay", surface: "O", planned, detailed });
       return;
     case STATE.rootCanal:
     case STATE.rootCanalAlt:
-      if (visual.naturalRoot) visual.rootCanal = { planned };
+      if (visual.naturalRoot) {
+        visual.rootCanal = {
+          planned,
+          defective: detailed,
+        };
+      }
       return;
     case STATE.post:
     case STATE.postWhite:
@@ -193,7 +200,7 @@ function applyState(
       return;
     case STATE.crown:
     case STATE.goldCrown:
-      visual.crown = { shape: "natural", fill: planned ? "planned" : "gray" };
+      visual.crown = { shape: "natural", fill: planned ? "planned" : "gray", ...(detailed ? { detailed } : {}) };
       clearCrownWork(visual);
       return;
     case STATE.bridge:
@@ -206,6 +213,7 @@ function applyState(
       visual.crown = {
         shape: "natural",
         fill: temporary ? "temporary" : planned ? "planned" : "gray",
+        detailed,
       };
       clearCrownWork(visual);
       return;
@@ -223,7 +231,7 @@ function applyState(
       clearCrownWork(visual);
       return;
     case STATE.veneer:
-      visual.veneer = { planned };
+      visual.veneer = { planned, detailed };
       return;
     case STATE.veneerPreparation:
       visual.veneerPreparation = true;
@@ -236,7 +244,7 @@ function applyState(
       clearSocket(visual);
       visual.present = true;
       visual.extraction = false;
-      visual.implant = { onePhase: stateId === STATE.implantOnePhase, planned };
+      visual.implant = { onePhase: stateId === STATE.implantOnePhase, planned, detailed };
       return;
     case STATE.abutment:
     case STATE.abutmentBioHpp:
@@ -317,7 +325,13 @@ export function buildToothVisual(
   for (const step of steps) applyState(visual, step.stateId, true, step.extraDiagnosis);
   // Any planned step turns the number green, even ones with nothing to draw
   // (impression, custom treatment); otherwise a finding gives a grey circle.
-  visual.marker = steps.length ? "planned" : diagnosed ? "status" : "none";
+  visual.marker = steps.length
+    ? "planned"
+    : own.some((entry) => entry.extraDiagnosis?.trim())
+      ? "detailed"
+      : diagnosed
+        ? "status"
+        : "none";
   return visual;
 }
 
