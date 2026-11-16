@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { ImportPlanDialog } from "@/components/ImportPlanDialog";
 
 export const Route = createFileRoute("/patients/$patientId/")({
   component: PatientPage,
@@ -102,14 +103,20 @@ function PatientPage() {
         </div>
       </div>
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Treatment plans</h2>
           <p className="text-sm text-muted-foreground">{plans.length} plan{plans.length === 1 ? "" : "s"}</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <ImportPlanDialog patientId={patient.id} patientName={patient.name} onImported={(planId) => {
+          toast.success("PDF imported and saved");
+          navigate({ to: "/patients/$patientId/plans/$planId", params: { patientId: patient.id, planId } });
+        }} />
         <Button onClick={() => { setNewPlanName("Your suggested treatment"); setNewPlanOpen(true); }} className="rounded-full">
           <Plus className="h-4 w-4" /> New plan
         </Button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -530,6 +530,15 @@ export const clinicApi = {
   },
 
   plans: {
+    importPdf: (patientId: string, file: File, preview: boolean, name?: string): Promise<Record<string, unknown>> => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("preview", preview ? "1" : "0");
+      if (name) formData.append("name", name);
+      return clinicUploadReq(`/clinic/patients/${patientId}/plans/import-pdf`, formData);
+    },
+    downloadImportedPdf: (planId: string): Promise<Blob> =>
+      clinicDownloadReq(`/clinic/plans/${planId}/imported-pdf`),
     list: (
       patientId: string,
     ): Promise<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]> =>

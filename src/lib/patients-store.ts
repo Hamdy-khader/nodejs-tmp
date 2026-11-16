@@ -65,6 +65,7 @@ export interface TreatmentPlan {
   generalStatuses?: string[];
   treatments?: TreatmentRow[];
   treatmentNote?: string;
+  pdfImport?: { filename: string; currency_symbol: string; total: number; warnings: string[] };
   billingMode?: "insurance" | "payment";
   insurance?: { unusedMax: number; deductible: number };
   paymentPlan?: { amount: number; term: number; interest: number };
@@ -309,6 +310,7 @@ function toPlan(raw: Record<string, unknown>, fallbackPatientId?: string): Treat
       .filter(Boolean),
     treatments: treatmentRowsRaw.map((item) => toTreatmentRow(item as Record<string, unknown>)),
     treatmentNote: raw.treatment_note ? String(raw.treatment_note) : undefined,
+    pdfImport: raw.pdf_import as TreatmentPlan["pdfImport"],
     billingMode: raw.billing_mode
       ? (String(raw.billing_mode) as "insurance" | "payment")
       : undefined,
@@ -639,6 +641,13 @@ export const patientsStore = {
 
   async createPlan(patientId: string, name: string) {
     const raw = await clinicApi.plans.create(patientId, { name, notes: "" });
+    const plan = toPlan(raw, patientId);
+    mergePlan(plan);
+    return plan;
+  },
+
+  async importPdf(patientId: string, file: File, name: string) {
+    const raw = await clinicApi.plans.importPdf(patientId, file, false, name);
     const plan = toPlan(raw, patientId);
     mergePlan(plan);
     return plan;

@@ -31,6 +31,7 @@ import { planEntries } from "@/lib/dental/plan-diagnosis";
 import { autocorrect, rootlessTeeth } from "@/lib/dental/treatment-engine";
 import { treatmentHistory, useTreatmentHistory } from "@/lib/dental/treatment-history";
 import { pricelistStore } from "@/lib/pricelist-store";
+import { ImportedPlanSource } from "@/components/ImportedPlanSource";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -158,6 +159,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
 
   return (
     <div className="flex w-full min-w-0 flex-col overflow-x-hidden bg-muted/30">
+      <ImportedPlanSource plan={plan} />
       {/* Wizard steps */}
       <div className="border-b border-border/60 bg-card">
         <div className="mx-auto flex max-w-[1600px] items-stretch">
