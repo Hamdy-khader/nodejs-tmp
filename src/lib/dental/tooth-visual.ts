@@ -310,12 +310,21 @@ export function buildToothVisual(
 ): ToothVisual {
   const visual = natural(toothId);
   const own = entries.filter((entry) => entry.toothId === toothId);
+  // Older imported plans store an empty source cell as this custom finding.
+  // It is not an intact tooth and must not create anatomy or a status circle.
+  const unspecified = (entry: StatusEntry) => entry.stateId === STATE.customStatus
+    && (entry.baseTitle ?? entry.title) === "Not specified in source PDF";
+  if (own.some(unspecified) && own.every((entry) =>
+    entry.stateId === STATE.customStatus || GENERAL_STATE_IDS.includes(entry.stateId))) {
+    clearSocket(visual);
+  }
   let diagnosed = false;
   for (const entry of own) {
+    if (unspecified(entry)) continue;
     applyState(visual, entry.stateId, false, entry.extraDiagnosis);
     if (entry.stateId !== STATE.intact && entry.stateId !== STATE.missing) diagnosed = true;
   }
-  if (own.some((entry) => GENERAL_STATE_IDS.includes(entry.stateId))) diagnosed = true;
+  if (own.some((entry) => !unspecified(entry) && GENERAL_STATE_IDS.includes(entry.stateId))) diagnosed = true;
   const steps = planned
     .filter((step) => step.toothId === toothId)
     .sort(

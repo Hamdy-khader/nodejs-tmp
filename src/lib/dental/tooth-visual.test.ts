@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StatusEntry } from "@/lib/dental/diagnosis-engine";
+import { importedBridgeEntries } from "@/test/fixtures/imported-bridge-chart";
+import { entriesFromApi, entriesToApi } from "./plan-diagnosis";
 import {
   bridgeConnectors,
   buildMouthVisuals,
@@ -17,6 +19,32 @@ const plan = (toothId: number, ...stateIds: number[]): PlannedState[] =>
   stateIds.map((stateId) => ({ toothId, stateId }));
 
 describe("diagnosis drawings", () => {
+  it("leaves an explicitly unspecified source cell blank, including after save/reload", () => {
+    const entries = importedBridgeEntries().filter((entry) => entry.toothId === 22);
+    const reloaded = entriesFromApi(22, entriesToApi(entries));
+    expect(buildToothVisual(22, reloaded)).toMatchObject({ present: false, naturalRoot: false, crown: { shape: "none" }, marker: "none" });
+    expect(buildToothVisual(22, reloaded, plan(22, 11, 13, 9))).toMatchObject({
+      present: true, implant: { planned: true }, abutment: { planned: true }, crown: { fill: "planned" }, marker: "planned",
+    });
+    expect(buildToothVisual(22, [...reloaded, at(22, 1)])).toMatchObject({ present: true, naturalRoot: true, marker: "none" });
+  });
+
+  it("does not hide natural teeth for ordinary custom findings", () => {
+    expect(buildToothVisual(22, [{ toothId: 22, stateId: 208, title: "Review mobility" }])).toMatchObject({ present: true, naturalRoot: true, marker: "status" });
+  });
+
+  it("retains every support, pontic and bridge connection in the imported full-mouth case", () => {
+    const visuals = buildMouthVisuals(importedBridgeEntries());
+    for (const tooth of [11, 13, 14, 17, 31, 33, 41, 43]) {
+      expect(visuals[tooth]).toMatchObject({ naturalRoot: false, implant: { planned: false }, abutment: { planned: false }, bridge: { pontic: false } });
+    }
+    for (const tooth of [12, 15, 16, 32, 42]) {
+      expect(visuals[tooth]).toMatchObject({ naturalRoot: false, bridge: { pontic: true } });
+      expect(visuals[tooth].implant).toBeUndefined();
+    }
+    expect(bridgeConnectors([18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28], visuals)).toHaveLength(6);
+    expect(bridgeConnectors([48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38], visuals)).toHaveLength(5);
+  });
   it("hides a missing tooth and leaves its number plain", () => {
     expect(buildToothVisual(16, [at(16, 2)])).toMatchObject({ present: false, marker: "none" });
   });

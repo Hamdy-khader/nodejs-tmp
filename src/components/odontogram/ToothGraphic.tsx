@@ -127,6 +127,7 @@ function Implant({
   cap,
   capPlanned,
   detailed,
+  layer,
 }: {
   g: ReturnType<typeof toothGeometry>;
   planned: boolean;
@@ -136,6 +137,7 @@ function Implant({
   cap: boolean;
   capPlanned: boolean;
   detailed: boolean;
+  layer: "fixture" | "restoration";
 }) {
   const fill = planned ? C.planned : detailed ? C.caries : "#C9C9C9";
   const line = planned ? C.plannedLine : detailed ? C.cariesLine : C.outline;
@@ -144,7 +146,8 @@ function Implant({
   const half = 5.8;
   const threads = Array.from({ length: 7 }, (_, index) => top - 4 - index * 4.4);
   return (
-    <g data-implant="true">
+    <g data-implant={layer === "fixture" ? "true" : undefined} data-implant-layer={layer}>
+      {layer === "fixture" && <>
       <path
         d={`M${g.cx - half} ${top} L${g.cx - half + 1.6} ${bottom + 2} Q${g.cx} ${bottom - 1} ${g.cx + half - 1.6} ${bottom + 2} L${g.cx + half} ${top} Z`}
         fill={fill}
@@ -159,15 +162,17 @@ function Implant({
           strokeWidth={0.7}
         />
       ))}
-      {(abutment || onePhase) && (
+      </>}
+      {layer === "restoration" && (abutment || onePhase) && (
         <path
-          d={`M${g.cx - 4} ${top} L${g.cx - 3} ${top + 7} L${g.cx - 4.2} ${top + 7} L${g.cx - 4.2} ${top + 10.5} L${g.cx + 4.2} ${top + 10.5} L${g.cx + 4.2} ${top + 7} L${g.cx + 3} ${top + 7} L${g.cx + 4} ${top} Z`}
+          data-abutment="true"
+          d={`M${g.cx - 4} ${top} L${g.cx - 4} ${top + 4} L${g.cx - 6} ${top + 4} L${g.cx - 6} ${top + 7} L${g.cx - 3.4} ${top + 7} L${g.cx - 2.5} ${top + 14} Q${g.cx} ${top + 15} ${g.cx + 2.5} ${top + 14} L${g.cx + 3.4} ${top + 7} L${g.cx + 6} ${top + 7} L${g.cx + 6} ${top + 4} L${g.cx + 4} ${top + 4} L${g.cx + 4} ${top} Z`}
           fill={(onePhase ? planned : abutmentPlanned) ? C.planned : "#C9C9C9"}
           stroke={(onePhase ? planned : abutmentPlanned) ? C.plannedLine : C.outline}
           strokeWidth={0.8}
         />
       )}
-      {cap && !abutment && !onePhase && (
+      {layer === "restoration" && cap && !abutment && !onePhase && (
         <rect
           x={g.cx - 5.6}
           y={top}
@@ -246,14 +251,16 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
                 strokeWidth={0.9}
                 strokeLinejoin="round"
               />
-              {!visual.rootCanal && <path d={g.canals[index]} fill={C.canal} />}
             </g>
           ))}
+        {visual.present && visual.naturalRoot && !visual.rootCanal &&
+          g.canals.map((canal, index) => <path key={index} d={canal} fill={C.canal} />)}
         {visual.present && visual.naturalRoot && crown.shape === "none" && (
           <path d={g.radixCap} fill="none" stroke={C.outline} strokeWidth={0.9} />
         )}
         {visual.implant && (
           <Implant
+            layer="fixture"
             g={g}
             planned={visual.implant.planned}
             detailed={!!visual.implant.detailed}
@@ -353,6 +360,20 @@ export function ToothGraphic({ visual }: { visual: ToothVisual }) {
               />
             )}
           </>
+        )}
+        {/* Abutments stay visible inside an overlying crown/bridge, just as posts do. */}
+        {visual.implant && (
+          <Implant
+            layer="restoration"
+            g={g}
+            planned={visual.implant.planned}
+            detailed={!!visual.implant.detailed}
+            onePhase={visual.implant.onePhase}
+            abutment={!!visual.abutment}
+            abutmentPlanned={!!visual.abutment?.planned}
+            cap={!!visual.healingCap}
+            capPlanned={!!visual.healingCap?.planned}
+          />
         )}
         {/* The post and its core stay visible through a crown placed over them. */}
         {visual.post && (

@@ -3,6 +3,30 @@ import { describe, expect, it } from "vitest";
 import { buildToothVisual } from "@/lib/dental/tooth-visual";
 import { EXTRA_DIAGNOSIS } from "@/lib/dental/states";
 import { ODONTOGRAM_COLORS, ToothGraphic } from "./ToothGraphic";
+import { render, cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+import { Odontogram } from "./Odontogram";
+import { importedBridgeEntries } from "@/test/fixtures/imported-bridge-chart";
+
+afterEach(cleanup);
+
+describe("imported bridge chart", () => {
+  it("paints abutments above the crown on both jaws and leaves unspecified anatomy empty", () => {
+    const { container } = render(<Odontogram entries={importedBridgeEntries()} readOnly />);
+    const tooth = (n: number) => container.querySelector(`[data-tooth-number="${n}"]`)!;
+    expect(tooth(22).querySelectorAll("svg path")).toHaveLength(0);
+    expect(tooth(22).querySelector('[data-marker="none"]')).not.toBeNull();
+    for (const n of [11,13,14,17,31,33,41,43]) {
+      const crown = tooth(n).querySelector('[data-crown]')!;
+      const abutment = tooth(n).querySelector('[data-abutment]')!;
+      expect(crown.compareDocumentPosition(abutment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    for (const n of [26,27]) {
+      expect(tooth(n).querySelector('[data-abutment]')).not.toBeNull();
+      expect(tooth(n).querySelector('[data-crown]')).toBeNull();
+    }
+  });
+});
 
 describe("additional diagnosis colors", () => {
   for (const stateId of [3, 4, 5, 18, 9, 15, 26, 11, 201]) {

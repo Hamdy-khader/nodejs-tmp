@@ -135,8 +135,8 @@ const LOWER: Record<number, ToothSpec> = {
     crownH: 27,
     cusps: 3,
     roots: [
-      { from: 0.0, to: 0.44, apexX: 0.02, length: 33 },
-      { from: 0.56, to: 1.0, apexX: 0.98, length: 33 },
+      { from: 0.0, to: 0.44, apexX: 0.22, length: 29 },
+      { from: 0.56, to: 1.0, apexX: 0.78, length: 29 },
     ],
   },
   7: {
@@ -145,8 +145,8 @@ const LOWER: Record<number, ToothSpec> = {
     crownH: 26,
     cusps: 3,
     roots: [
-      { from: 0.0, to: 0.45, apexX: 0.12, length: 31 },
-      { from: 0.55, to: 1.0, apexX: 0.88, length: 31 },
+      { from: 0.0, to: 0.45, apexX: 0.22, length: 27 },
+      { from: 0.55, to: 1.0, apexX: 0.78, length: 27 },
     ],
   },
   8: {
@@ -212,31 +212,44 @@ function crownPath(cx: number, neckY: number, spec: ToothSpec) {
   const neck = neckW / 2;
   const left = cx - half;
   const right = cx + half;
-  const bulge = cusps === 0 ? 0.68 : cusps === 1 ? 0.5 : 0.4;
+  const bulge = cusps === 0 ? 0.68 : cusps === 1 ? 0.52 : 0.48;
   const bulgeY = neckY + crownH * bulge;
-  const corner = cusps === 0 ? 2.2 : 1.5;
+  const corner = cusps === 0 ? 3.6 : 3;
   let path = `M${r(cx - neck)} ${r(neckY)}`;
   path += ` C${r(cx - neck - 0.8)} ${r(neckY + crownH * bulge * 0.4)} ${r(left)} ${r(neckY + crownH * bulge * 0.55)} ${r(left)} ${r(bulgeY)}`;
   path += ` C${r(left)} ${r(edge - crownH * 0.12)} ${r(left + corner * 0.3)} ${r(edge)} ${r(left + crownW * 0.12 + corner)} ${r(edge)}`;
   const start = left + crownW * 0.12 + corner;
   const end = right - crownW * 0.12 - corner;
   if (cusps === 0) {
-    path += ` Q${r(cx)} ${r(edge + 1.2)} ${r(end)} ${r(edge)}`;
+    path += ` C${r(cx - crownW * 0.15)} ${r(edge + 1.8)} ${r(cx + crownW * 0.2)} ${r(edge - 1.6)} ${r(end)} ${r(edge - 0.6)}`;
   } else if (cusps === 1) {
-    path += ` Q${r((start + cx) / 2)} ${r(edge + 1.4)} ${r(cx)} ${r(edge + 3.2)} Q${r((cx + end) / 2)} ${r(edge + 1.4)} ${r(end)} ${r(edge)}`;
+    path += ` Q${r((start + cx) / 2)} ${r(edge + 1.4)} ${r(cx + 1.2)} ${r(edge + 3.2)} Q${r((cx + end) / 2)} ${r(edge + 1.4)} ${r(end)} ${r(edge - 1)}`;
+  } else if (cusps === 2) {
+    // Premolars have an oblique pair of rounded cusps, not a flat rectangular cap.
+    path += ` C${r(start + 1)} ${r(edge + 3)} ${r(cx - 3)} ${r(edge + 2.8)} ${r(cx)} ${r(edge + 1)} C${r(cx + 3)} ${r(edge - 0.5)} ${r(end - 2)} ${r(edge + 0.8)} ${r(end)} ${r(edge - 2)}`;
   } else {
-    const step = (end - start) / cusps;
-    for (let index = 0; index < cusps; index++) {
-      const x0 = start + step * index;
-      const x1 = x0 + step;
-      path += ` Q${r(x0 + step / 2)} ${r(edge + 2.4)} ${r(x1)} ${r(edge)}`;
-    }
+    path += ` C${r(start + 1)} ${r(edge + 3.5)} ${r(cx - 5)} ${r(edge + 3)} ${r(cx - 2)} ${r(edge + 0.5)} Q${r(cx)} ${r(edge - 0.8)} ${r(cx + 2)} ${r(edge + 0.5)} C${r(cx + 5)} ${r(edge + 2.5)} ${r(end - 1)} ${r(edge + 3)} ${r(end)} ${r(edge - 0.5)}`;
   }
   path += ` C${r(right - corner * 0.3)} ${r(edge)} ${r(right)} ${r(edge - crownH * 0.12)} ${r(right)} ${r(bulgeY)}`;
   path += ` C${r(right)} ${r(neckY + crownH * bulge * 0.55)} ${r(cx + neck + 0.8)} ${r(neckY + crownH * bulge * 0.4)} ${r(cx + neck)} ${r(neckY)}`;
   // The enamel border curves up towards the root between the two sides.
-  path += ` Q${r(cx)} ${r(neckY - 2.6)} ${r(cx - neck)} ${r(neckY)} Z`;
+  path += ` C${r(cx + neck * 0.5)} ${r(neckY - 2.8)} ${r(cx + 3)} ${r(neckY + 1.2)} ${r(cx)} ${r(neckY + 0.2)} C${r(cx - 3)} ${r(neckY - 1.8)} ${r(cx - neck * 0.65)} ${r(neckY - 2.6)} ${r(cx - neck)} ${r(neckY)} Z`;
   return path;
+}
+
+// Lower molars share a broad root trunk before dividing into two curved roots.
+// Drawing two separate straight cones loses that furcation and looks like fangs.
+function molarRoots(cx: number, neckY: number, spec: ToothSpec) {
+  const left = cx - spec.neckW / 2;
+  const right = cx + spec.neckW / 2;
+  const tip = neckY - Math.max(...spec.roots.map((root) => root.length));
+  return `M${left} ${neckY + 1}
+    C${left - 1} ${neckY - 9} ${left + 1} ${tip + 7} ${left + 4} ${tip + 2}
+    Q${left + 7} ${tip - 1} ${left + 8} ${tip + 4}
+    C${left + 9} ${tip + 10} ${cx - 6} ${neckY - 12} ${cx} ${neckY - 12}
+    C${cx + 6} ${neckY - 12} ${right - 9} ${tip + 10} ${right - 8} ${tip + 4}
+    Q${right - 7} ${tip - 1} ${right - 4} ${tip + 2}
+    C${right - 1} ${tip + 7} ${right + 1} ${neckY - 9} ${right} ${neckY + 1} Z`;
 }
 
 // A root tapers from its span at the neck to a narrow rounded apex. Its two
@@ -320,7 +333,9 @@ export function toothGeometry(toothId: number): ToothGeometry {
     edgeY,
     crownW: spec.crownW,
     crown: crownPath(cx, neckY, spec),
-    roots: spec.roots.map((root) => rootPath(cx, neckY, spec, root)),
+    roots: !upper && position >= 6
+      ? [molarRoots(cx, neckY, spec)]
+      : spec.roots.map((root) => rootPath(cx, neckY, spec, root)),
     canals: spec.roots.map((root) => canalPath(cx, neckY, spec, root)),
     canalLines: spec.roots.map((root) => canalLine(cx, neckY, spec, root)),
     worn: `${crownPath(cx, neckY, { ...spec, crownH: wornY - neckY, cusps: 0 })}`,
