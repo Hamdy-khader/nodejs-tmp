@@ -5,7 +5,6 @@ import {
   createRootRouteWithContext,
   useRouter,
   useRouterState,
-  useNavigate,
   Navigate,
 } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
@@ -108,7 +107,6 @@ function RootComponent() {
   // During a pending navigation, location can already point at the next page
   // while Outlet still renders the previous match. Guard the rendered page.
   const pathname = useRouterState({ select: (s) => s.matches.at(-1)?.pathname ?? s.location.pathname });
-  const navigate = useNavigate();
 
   const [hasAdminToken, setHasAdminToken] = useState(() => adminTokenStore.exists());
   const [admin, setAdmin] = useState<AdminUser | null>(null);
@@ -121,9 +119,13 @@ function RootComponent() {
   );
 
   const syncTokens = useCallback(() => {
-    setHasAdminToken(adminTokenStore.exists());
-    setHasClinicToken(clinicTokenStore.exists());
-  }, []);
+    const nextAdminToken = adminTokenStore.exists();
+    const nextClinicToken = clinicTokenStore.exists();
+    if (nextAdminToken !== hasAdminToken) setAdminSessionValid(nextAdminToken ? null : false);
+    if (nextClinicToken !== hasClinicToken) setClinicSessionValid(nextClinicToken ? null : false);
+    setHasAdminToken(nextAdminToken);
+    setHasClinicToken(nextClinicToken);
+  }, [hasAdminToken, hasClinicToken]);
 
   useEffect(() => {
     window.addEventListener("auth:changed", syncTokens);
@@ -191,56 +193,21 @@ function RootComponent() {
   const isPublicHome = pathname === "/";
   const isAuthPage = isAdminLogin || isClinicLogin;
 
-  useEffect(() => {
-    if (isAdminLogin) {
-      if (hasAdminToken && adminSessionValid === true) {
-        navigate({ to: "/admin/dashboard", replace: true });
-      }
-      return;
-    }
-
-    if (isClinicLogin) {
-      if (hasClinicToken && clinicSessionValid === true) {
-        navigate({ to: "/clinic", replace: true });
-      }
-      return;
-    }
-
-    if (isAdminRoute) {
-      if (!hasAdminToken || adminSessionValid === false) {
-        navigate({ to: "/admin/login", replace: true });
-        return;
-      }
-      if (adminSessionValid === true && isAdminIndex) {
-        navigate({ to: "/admin/dashboard", replace: true });
-      }
-      return;
-    }
-
-    // Public homepage — accessible without auth
-    if (isPublicHome) return;
-
-    if (!hasClinicToken || clinicSessionValid === false) {
-      navigate({ to: "/clinic/login", replace: true });
-    }
-  }, [
-    adminSessionValid,
-    clinicSessionValid,
-    hasAdminToken,
-    hasClinicToken,
-    isAdminIndex,
-    isAdminLogin,
-    isAdminRoute,
-    isClinicLogin,
-    isPublicHome,
-    navigate,
-  ]);
-
   const waitingForAdminSession = hasAdminToken && adminSessionValid === null;
   const waitingForClinicSession = hasClinicToken && clinicSessionValid === null;
 
-  // Redirect in render so protected child routes can never mount while the
-  // navigation effect is still being scheduled.
+  // Choose redirects before mounting either the login form or protected content.
+  if (isAdminLogin && hasAdminToken && adminSessionValid === true) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  if (isClinicLogin && hasClinicToken && clinicSessionValid === true) {
+    return <Navigate to="/clinic" replace />;
+  }
+
+  if (isAdminIndex && hasAdminToken && adminSessionValid === true) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
   if (isAdminRoute && !isAdminLogin && (!hasAdminToken || adminSessionValid === false)) {
     return <Navigate to="/admin/login" replace />;
   }

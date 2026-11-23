@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Home } from "lucide-react";
 import { useAdminStyles, Alert } from "@/components/admin/ui";
-import { clinicApi, clinicTokenStore, ApiError } from "@/lib/admin/api";
+import { clinicApi, ApiError } from "@/lib/admin/api";
 
 export const Route = createFileRoute("/clinic_/login")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -29,10 +29,6 @@ function ClinicLoginPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (clinicTokenStore.exists()) navigate({ to: redirectTo });
-  }, [navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

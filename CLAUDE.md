@@ -49,3 +49,9 @@ The production API is `https://backend.treatlyonline.de/api`. There are two sepa
 
 - `API_CONTRACT.md`, `API_REFERENCE.md` and `docs/*.md` in this repo (a mix of Arabic and English)
 - `openapi.yaml` and `public/swagger.html` in dental-back-end
+
+## Delivery rule
+
+The user explicitly requests automatic delivery: after completing requested work and passing relevant checks, commit and push the task's changes and deploy them to the live site without asking again. Do not include unrelated uncommitted work. Report the deployed revision and verification result; if deployment is blocked, explain the concrete blocker.
+
+Frontend production is hosted over SSH via the `treatly` host alias. Deploy the built static frontend to both `/home/u203733728/domains/treatlyonline.de/public_html` and `/home/u203733728/domains/treatly.pro/public_html`. Back up existing frontend files, upload assets before switching `index.html`, retain old hashed assets for open sessions, and preserve each site's `backend` directory. Verify the public pages reference the new build.
