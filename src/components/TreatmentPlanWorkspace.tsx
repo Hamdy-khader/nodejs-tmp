@@ -252,7 +252,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
               {/* Chart + diagnosis buttons */}
               <div
                 className={cn(
-                  "grid grid-cols-1 gap-5 rounded-md bg-card p-4 shadow-[var(--shadow-soft)] lg:grid-cols-[minmax(0,1.75fr)_minmax(240px,1fr)]",
+                  "relative grid grid-cols-1 gap-4 bg-white px-5 py-4 shadow-sm lg:grid-cols-[minmax(0,1.55fr)_minmax(240px,1fr)]",
                   pinned && "lg:sticky lg:top-0 lg:z-30",
                 )}
               >
@@ -263,7 +263,7 @@ export function TreatmentPlanWorkspace({ patientId, planId, initialStep = "diagn
                     selected={diagnosis.selectedTeeth}
                     onSelectionChange={diagnosis.setSelectedTeeth}
                   />
-                  <div className="-mb-7 mt-1 flex justify-center">
+                  <div className="absolute -bottom-4 left-1/2 z-10 flex -translate-x-1/2 justify-center">
                     <button
                       type="button"
                       onClick={() => setPinned((p) => !p)}

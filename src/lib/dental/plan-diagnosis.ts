@@ -181,9 +181,18 @@ export function isStructuredDiagnosis(value: unknown): value is ApiStatus[] {
 }
 
 export function entriesFromApi(toothId: number, value: ApiStatus[]): StatusEntry[] {
+  // Early PDF imports preserved these standard findings as custom text.
+  // Recover only exact labels; arbitrary notes must remain custom findings.
+  const importedAliases: Record<string, number> = {
+    "filled (amalgam)": STATE.filledAmalgam,
+    "filled (composite)": STATE.filledComposite,
+    "root treated": STATE.rootCanal,
+  };
   return value.map((item) => ({
     toothId,
-    stateId: Number(item.state_id),
+    stateId: Number(item.state_id) === STATE.customStatus
+      ? importedAliases[(item.base_title ?? item.title ?? "").trim().toLowerCase()] ?? STATE.customStatus
+      : Number(item.state_id),
     title: item.title ?? undefined,
     baseTitle: item.base_title ?? undefined,
     extraDiagnosis: item.extra_diagnosis ?? undefined,

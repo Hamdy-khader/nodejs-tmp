@@ -32,7 +32,7 @@ export function DiagnosisButtons({ onApply, activeLabel }: Props) {
           <div
             key={button.label}
             className={cn(
-              "flex h-8 items-stretch overflow-hidden rounded-full text-[12.5px] font-medium text-white transition-colors",
+              "flex h-[34px] items-stretch overflow-hidden rounded-full font-[Arial,sans-serif] text-[13px] font-medium text-white transition-colors",
               active ? "bg-[#707070]" : "bg-[#9e9e9e]",
             )}
           >

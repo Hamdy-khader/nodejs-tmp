@@ -27,10 +27,10 @@ function Chip({
   return (
     <span
       className={cn(
-        "inline-flex max-w-full items-center gap-1.5 rounded-full py-1 pl-3 pr-1.5 text-[13px] transition-colors",
+        "inline-flex max-w-full items-center gap-2 rounded-full py-0.5 pl-3 pr-1 text-[14px] leading-[18px] transition-colors",
         active
           ? "bg-[#2f8fd8] text-white"
-          : "bg-white text-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.04)]",
+          : "bg-white text-[#333333] ring-1 ring-[#e5e5e5]",
       )}
       data-chip={entry.stateId}
     >
@@ -63,10 +63,10 @@ function ToothRow({
   );
   return (
     <div
-      className="flex min-h-[38px] items-center gap-2 border-b border-white/70 py-1 last:border-b-0"
+      className="flex min-h-[38px] items-center gap-2 border-b border-dotted border-[#d9dadd] py-1"
       data-tooth-row={tooth}
     >
-      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-[11px] tabular-nums text-[#9aa0a6]">
+      <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-white text-[14px] tabular-nums text-[#a0a0a0]">
         {tooth}
       </span>
       <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
@@ -95,13 +95,13 @@ function ToothRow({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
-    <section className="rounded-md bg-card px-5 py-4 shadow-[var(--shadow-soft)]">
+    <section className="bg-white px-5 py-5">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center justify-between"
       >
-        <h3 className="font-sans text-[15px] font-medium uppercase tracking-wide text-[#1f6fb5]">
+        <h3 className="text-[16px] font-medium uppercase text-[#0866d9]">
           {title}
         </h3>
         {open ? (
@@ -110,7 +110,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
           <ChevronDown className="h-4 w-4 text-[#1f6fb5]" />
         )}
       </button>
-      {open && <div className="mt-3">{children}</div>}
+      {open && <div className="mt-3.5">{children}</div>}
     </section>
   );
 }
@@ -130,7 +130,7 @@ const JAWS = {
 export function DiagnosisRows(props: Props) {
   const general = props.entries.filter((entry) => entry.toothId === 0);
   return (
-    <div className="space-y-4" data-diagnosis-selection>
+    <div className="space-y-2.5 bg-[#f0f1f3] font-[Arial,sans-serif]" data-diagnosis-selection>
       <Section title="General">
         <div className="flex min-h-[48px] items-center gap-2 rounded-md bg-[#eef0f2] px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
@@ -156,9 +156,9 @@ export function DiagnosisRows(props: Props) {
       </Section>
       {(["upper", "lower"] as const).map((jaw) => (
         <Section key={jaw} title={jaw === "upper" ? "Upper jaw" : "Lower jaw"}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             {JAWS[jaw].map((column) => (
-              <div key={column[0]} className="rounded-md bg-[#eef0f2] px-3 py-1">
+              <div key={column[0]} className="rounded-[9px] bg-[#f1f2f4] px-6 py-2">
                 {column.map((tooth) => (
                   <ToothRow key={tooth} tooth={tooth} {...props} />
                 ))}

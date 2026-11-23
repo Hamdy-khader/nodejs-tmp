@@ -12,6 +12,18 @@ import { defaultTeeth, type ToothState } from "@/lib/patients-store";
 
 const ids = (entries: { stateId: number }[]) => entries.map((entry) => entry.stateId);
 
+it("recovers exact standard findings from early PDF imports without interpreting free text", () => {
+  const entries = entriesFromApi(36, [
+    { state_id: 208, title: "Root treated" },
+    { state_id: 208, title: "Filled (amalgam)" },
+    { state_id: 208, title: "Possible root treated tooth" },
+  ]);
+  expect(ids(entries)).toEqual([201, 4, 208]);
+  expect(entriesToApi(entries).map((entry) => entry.title)).toEqual([
+    "Root treated", "Filled (amalgam)", "Possible root treated tooth",
+  ]);
+});
+
 describe("reading plans saved before chips could stack", () => {
   it("turns a labelled filling with surfaces into one chip with its details", () => {
     const tooth: ToothState = {

@@ -21,18 +21,18 @@ interface ToothSpec {
 // Root spans are fractions of the neck width (0 = distal edge, 1 = mesial edge).
 const UPPER: Record<number, ToothSpec> = {
   1: {
-    crownW: 30,
-    neckW: 21,
-    crownH: 34,
+    crownW: 26,
+    neckW: 19,
+    crownH: 30,
     cusps: 0,
-    roots: [{ from: 0.08, to: 0.92, apexX: 0.5, length: 35 }],
+    roots: [{ from: 0.08, to: 0.92, apexX: 0.5, length: 43 }],
   },
   2: {
-    crownW: 25,
-    neckW: 18,
-    crownH: 31,
+    crownW: 22,
+    neckW: 16,
+    crownH: 27,
     cusps: 0,
-    roots: [{ from: 0.1, to: 0.9, apexX: 0.45, length: 33 }],
+    roots: [{ from: 0.1, to: 0.9, apexX: 0.45, length: 36 }],
   },
   3: {
     crownW: 28,
@@ -261,7 +261,7 @@ function rootPath(cx: number, neckY: number, spec: ToothSpec, root: ToothSpec["r
   const span = x1 - x0;
   const ax = neckLeft + spec.neckW * root.apexX;
   const top = neckY - root.length;
-  const tip = Math.max(1, span * 0.2);
+  const tip = Math.max(0.7, span * 0.08);
   const L = root.length;
   return (
     `M${r(x0)} ${r(neckY + 0.5)}` +

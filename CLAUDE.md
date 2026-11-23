@@ -42,7 +42,7 @@ The production API is `https://backend.treatlyonline.de/api`. There are two sepa
 - Business logic lives in `app/Services` (pricing, financial summary, PDF builder).
 - Tests: `php artisan test`.
 - X-ray upload expects the multipart field `file`, not `file_url`.
-- **Pushing to `main` in dental-back-end deploys to production.** A GitHub Actions workflow resets the server to `origin/main`, runs `composer install` and `artisan migrate --force`, then rebuilds the caches. Never push there or ship a migration without the user's go-ahead.
+- **Pushing to `main` in dental-back-end deploys to production.** A GitHub Actions workflow resets the server to `origin/main`, runs `composer install` and `artisan migrate --force`, then rebuilds the caches. The standing delivery authorization below covers routine task pushes and this deployment. Review any migration's data impact before delivery; it does not authorize unrelated or destructive data changes.
 - If production behaves differently from the code, first check whether the deployed version is behind the repo.
 
 ## Docs
@@ -52,6 +52,6 @@ The production API is `https://backend.treatlyonline.de/api`. There are two sepa
 
 ## Delivery rule
 
-The user explicitly requests automatic delivery: after completing requested work and passing relevant checks, commit and push the task's changes and deploy them to the live site without asking again. Do not include unrelated uncommitted work. Report the deployed revision and verification result; if deployment is blocked, explain the concrete blocker.
+The user explicitly requests automatic delivery, reaffirmed on 2026-11-23: "ارفع دائما عند الانتهاء خليها ضمن role المشروع". After completing requested work and passing relevant checks, commit and push the task's changes to the configured frontend/backend origins and deploy them to the live site without asking again. This includes the backend production workflow triggered by a push to main. A later user hold or scope restriction takes precedence. Do not include unrelated uncommitted work or secrets. Report the deployed revision and verification result; if a check or deployment is blocked, explain the concrete blocker.
 
 Frontend production is hosted over SSH via the `treatly` host alias. Deploy the built static frontend to both `/home/u203733728/domains/treatlyonline.de/public_html` and `/home/u203733728/domains/treatly.pro/public_html`. Back up existing frontend files, upload assets before switching `index.html`, retain old hashed assets for open sessions, and preserve each site's `backend` directory. Verify the public pages reference the new build.
