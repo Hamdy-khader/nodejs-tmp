@@ -7,7 +7,7 @@ import { patientsStore } from "@/lib/patients-store";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it("previews before saving and invalidates review when the file changes", async () => {
-  const analyze = vi.spyOn(clinicApi.plans, "importPdf").mockResolvedValue({ teeth: [{ tooth_number: 16, status: "missing" }], rows: [], currency_symbol: "$", total: 300, warnings: [] });
+  const analyze = vi.spyOn(clinicApi.plans, "importPdf").mockResolvedValue({ teeth: [{ tooth_number: 16, status: "bridge", note: "Missing , Bridge" }, { tooth_number: 22, status: "not-specified", note: "Not specified in source PDF" }], rows: [], currency_symbol: "$", total: 300, warnings: [] });
   const save = vi.spyOn(patientsStore, "importPdf").mockResolvedValue({ id: "42" } as never);
   const opened = vi.fn();
   render(<ImportPlanDialog patientId="7" patientName="Test Patient" onImported={opened} />);
@@ -15,7 +15,8 @@ it("previews before saving and invalidates review when the file changes", async 
   const file = new File(["%PDF"], "report.pdf", { type: "application/pdf" });
   fireEvent.change(screen.getByLabelText("Treatment report (PDF)"), { target: { files: [file] } });
   fireEvent.click(screen.getByText("Analyze PDF"));
-  expect(await screen.findByText("missing")).toBeInTheDocument();
+  expect(await screen.findByText("Missing , Bridge")).toBeInTheDocument();
+  expect(screen.getByText("Not specified in source PDF")).toBeInTheDocument();
   expect(analyze).toHaveBeenCalledWith("7", file, true);
   expect(save).not.toHaveBeenCalled();
   expect(screen.getByText("Save and open plan")).toBeDisabled();

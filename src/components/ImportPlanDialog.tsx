@@ -8,7 +8,7 @@ import { ApiError, clinicApi } from "@/lib/admin/api";
 import { patientsStore } from "@/lib/patients-store";
 
 interface Preview {
-  teeth: { tooth_number: number; status: string }[];
+  teeth: { tooth_number: number; status: string; note?: string }[];
   rows: { kind: string; label: string; note: string; items: { name: string; tooth_number?: number; amount: number; unit_price: number; price_mode: string }[] }[];
   total: number;
   currency_symbol: string;
@@ -73,7 +73,7 @@ export function ImportPlanDialog({ patientId, patientName, onImported }: {
             <section className="space-y-2" aria-label="Extracted diagnosis">
               <h3 className="font-semibold">Diagnosis · {preview.teeth.length} teeth</h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
-                {preview.teeth.map((tooth) => <div key={tooth.tooth_number} className="flex gap-2"><dt className="font-medium">{tooth.tooth_number}</dt><dd>{tooth.status}</dd></div>)}
+                {preview.teeth.map((tooth) => <div key={tooth.tooth_number} className="flex gap-2"><dt className="font-medium">{tooth.tooth_number}</dt><dd>{tooth.note || tooth.status}</dd></div>)}
               </dl>
             </section>
             <section className="space-y-4" aria-label="Extracted treatments">
